@@ -8592,6 +8592,7 @@ __metadata:
     vitest: "npm:^5.0.0"
   peerDependencies:
     "@carbon/react": 1.x
+    "@carbon/styles": 1.x
     "@openmrs/esm-framework": "*"
     dayjs: 1.x
     react: 18.x

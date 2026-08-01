@@ -38,7 +38,12 @@ export function useResultados(params: GetResultadosParams) {
 export function useResultadosSeries(params: GetSeriesParams | null) {
   const { data, error, isLoading, mutate } = useSWR<SeriesResponse, Error>(
     params ? ['resultados-series', params] : null,
-    () => getResultadosSeries(params!),
+    () => {
+      if (!params) {
+        throw new Error('No series parameters provided');
+      }
+      return getResultadosSeries(params);
+    },
   );
 
   return {

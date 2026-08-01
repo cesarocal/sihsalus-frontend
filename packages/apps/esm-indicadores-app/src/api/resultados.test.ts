@@ -26,7 +26,7 @@ describe('previewSql routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { sql: 'SELECT 1', params: {}, periodo_inicio: '', periodo_fin: '', version_id: '', version_num: 1 },
-    } as any);
+    } as never);
 
     await previewSql('ind-abc');
 
@@ -38,7 +38,7 @@ describe('previewSql routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { sql: 'SELECT 1', params: {}, periodo_inicio: '', periodo_fin: '', version_id: '', version_num: 1 },
-    } as any);
+    } as never);
 
     await previewSql('ind-abc', 'v2');
 
@@ -50,7 +50,7 @@ describe('previewSql routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { sql: 'SELECT 1', params: {}, periodo_inicio: '', periodo_fin: '', version_id: '', version_num: 1 },
-    } as any);
+    } as never);
 
     await previewSql('ind-abc');
 
@@ -68,7 +68,7 @@ describe('getResultados routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
-    } as any);
+    } as never);
 
     await getResultados({ page: 1, size: 10 });
 
@@ -80,7 +80,7 @@ describe('getResultados routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
-    } as any);
+    } as never);
 
     await getResultados({ page: 2, size: 25, indicador_id: 'ind-1' });
 
@@ -94,7 +94,7 @@ describe('getResultados routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
-    } as any);
+    } as never);
 
     await getResultados({ page: 1, size: 10 });
 
@@ -112,7 +112,7 @@ describe('calcularAhora routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { calculados: 3, errores: [], total: 3 },
-    } as any);
+    } as never);
 
     await calcularAhora();
 
@@ -124,7 +124,7 @@ describe('calcularAhora routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { calculados: 0, errores: [], total: 0 },
-    } as any);
+    } as never);
 
     await calcularAhora();
 
@@ -151,7 +151,7 @@ describe('getResultadosSeries routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], indicador_id: 'ind-001', anio: 2026, granularity: 'mensual' },
-    } as any);
+    } as never);
 
     await getResultadosSeries({ indicador_id: 'ind-001', anio: 2026, granularity: 'mensual' });
 
@@ -163,7 +163,7 @@ describe('getResultadosSeries routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], indicador_id: 'ind-001', anio: 2026, granularity: 'mensual' },
-    } as any);
+    } as never);
 
     await getResultadosSeries({ indicador_id: 'ind-001', anio: 2026, granularity: 'mensual', include_meta: true });
 
@@ -175,7 +175,7 @@ describe('getResultadosSeries routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], indicador_id: 'ind-001', anio: 2026, granularity: 'mensual' },
-    } as any);
+    } as never);
 
     await getResultadosSeries({ indicador_id: 'ind-001', anio: 2026, granularity: 'mensual' });
 
@@ -187,7 +187,7 @@ describe('getResultadosSeries routing', () => {
     mockResourcePath('/services/reportes-sql');
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], indicador_id: 'ind-001', anio: 2026, granularity: 'trimestral' },
-    } as any);
+    } as never);
 
     await getResultadosSeries({ indicador_id: 'ind-001', anio: 2026, granularity: 'trimestral', include_meta: true });
 
@@ -216,7 +216,7 @@ describe('recalcularAnio routing', () => {
         errores: [],
         total: 24,
       },
-    } as any);
+    } as never);
 
     await recalcularAnio({ anio: 2026 });
 
@@ -236,7 +236,7 @@ describe('recalcularAnio routing', () => {
         errores: [],
         total: 0,
       },
-    } as any);
+    } as never);
 
     await recalcularAnio({ anio: 2026 });
 
@@ -259,7 +259,7 @@ describe('recalcularAnio routing', () => {
         errores: [],
         total: 12,
       },
-    } as any);
+    } as never);
 
     await recalcularAnio({ anio: 2025, indicador_id: 'ind-001' });
 
@@ -284,7 +284,7 @@ describe('indicadores CRUD now routes through reportes-sql', () => {
   it('getIndicadores routes through reportes-sql base', async () => {
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
-    } as any);
+    } as never);
 
     await getIndicadores(1, 10);
 
@@ -296,7 +296,7 @@ describe('indicadores CRUD now routes through reportes-sql', () => {
   it('getIndicadores does NOT use legacy indicatorsApiPath', async () => {
     mockedOpenmrsFetch.mockResolvedValue({
       data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
-    } as any);
+    } as never);
 
     await getIndicadores(1, 10);
 

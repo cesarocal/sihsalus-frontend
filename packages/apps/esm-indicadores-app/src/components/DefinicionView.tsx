@@ -9,11 +9,6 @@ interface DefinicionViewProps {
   definicion: DefinicionIndicadorForm;
 }
 
-const tipoLabels = {
-  conteo_atenciones: 'Conteo de atenciones',
-  conteo_pacientes: 'Conteo de pacientes',
-};
-
 const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
   const { t } = useTranslation();
   const locationUuids = useMemo(() => definicion.evento?.location_uuids ?? [], [definicion.evento?.location_uuids]);
