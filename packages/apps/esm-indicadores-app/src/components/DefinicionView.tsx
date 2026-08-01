@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { DefinicionIndicadorForm } from '../api/types';
 import { useResolvedDiagnosticos, useResolvedLocations, useResolvedOrdenes } from '../features/indicadores/hooks';
@@ -14,6 +15,7 @@ const tipoLabels = {
 };
 
 const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
+  const { t } = useTranslation();
   const locationUuids = useMemo(() => definicion.evento?.location_uuids ?? [], [definicion.evento?.location_uuids]);
   const diagnosticoUuids = useMemo(
     () => definicion.evento?.diagnosticos?.flatMap((item) => item.concepto_uuids) ?? [],
@@ -31,35 +33,35 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
   return (
     <div className={styles.definitionList}>
       <div>
-        <strong>Tipo:</strong> {tipoLabels[definicion.tipo]}
+        <strong>{t('definitionType', 'Tipo:')}</strong> 
+            {definicion.tipo === 'conteo_atenciones' ? t('countEncounters', 'Conteo de atenciones') : t('countPatients', 'Conteo de pacientes')}
       </div>
       <div>
-        <strong>Servicios:</strong>{' '}
-        {locationUuids.length ? locationUuids.map((uuid) => displayMap.get(uuid) ?? uuid).join(', ') : 'Todos'}
+        <strong>{t('definitionLocations', 'Servicios:')}</strong>{' '}
+        {locationUuids.length ? locationUuids.map((uuid) => displayMap.get(uuid) ?? uuid).join(', ') : t('all', 'Todos')}
       </div>
       <div>
-        <strong>Mínimo de ocurrencias:</strong> {definicion.evento?.minimo_ocurrencias ?? 1}
+        <strong>{t('definitionMinOccurrences', 'Mínimo de ocurrencias:')}</strong> {definicion.evento?.minimo_ocurrencias ?? 1}
       </div>
       <div>
-        <strong>Diagnósticos:</strong>{' '}
+        <strong>{t('definitionDiagnostics', 'Diagnósticos:')}</strong>{' '}
         {definicion.evento?.diagnosticos?.length
           ? definicion.evento.diagnosticos
               .map((item) => item.concepto_uuids.map((uuid) => resolveMap.get(uuid)?.nombre ?? uuid).join(', '))
               .join(', ')
-          : 'Sin filtro'}
+          : t('noFilter', 'Sin filtro')}
       </div>
       <div>
-        <strong>Órdenes:</strong>{' '}
+        <strong>{t('definitionOrders', 'Órdenes:')}</strong>{' '}
         {definicion.evento?.ordenes?.length
           ? definicion.evento.ordenes.map((item) => ordenesData?.[item.concepto_uuid] ?? item.concepto_uuid).join(', ')
-          : 'Sin filtro'}
+          : t('noFilter', 'Sin filtro')}
       </div>
       <div>
-        <strong>Sexo:</strong> {definicion.poblacion?.sexo ?? 'Sin filtro'}
+        <strong>{t('definitionSex', 'Sexo:')}</strong> {definicion.poblacion?.sexo ?? 'Sin filtro'}
       </div>
       <div>
-        <strong>Edad:</strong> min {definicion.poblacion?.min_anios ?? '-'} años / max{' '}
-        {definicion.poblacion?.max_anios_excl ?? '-'} años
+        <strong>{t('definitionAge', 'Edad:')}</strong> {t('ageRangeValue', 'min {{min}} años / max {{max}} años', { min: definicion.poblacion?.min_anios ?? '-', max: definicion.poblacion?.max_anios_excl ?? '-' })}
       </div>
     </div>
   );
