@@ -12,9 +12,9 @@
     "build": "rspack --mode=production",
     "analyze": "rspack --mode=production --env analyze=true",
     "lint": "node ../../tooling/scripts/run-biome.js lint .",
-    "prettier": "node ../../tooling/scripts/run-biome.js format --write src",
     "typescript": "tsc",
     "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest watch",
     "coverage": "vitest run --coverage --passWithNoTests",
     "extract-translations": "i18next 'src/**/*.{ts,tsx}' '!src/**/*.test.{ts,tsx}' '!src/**/*.spec.{ts,tsx}' --config ../../tooling/scripts/i18next-parser.config.js"
   },
@@ -45,6 +45,7 @@
   },
   "peerDependencies": {
     "@carbon/react": "1.x",
+    "@carbon/styles": "1.x",
     "@openmrs/esm-framework": "*",
     "dayjs": "1.x",
     "react": "18.x",

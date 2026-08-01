@@ -91,7 +91,7 @@ const IndicadoresPage: React.FC = () => {
                       </TableCell>
                       <TableCell>{indicador.descripcion ?? 'Sin descripción'}</TableCell>
                       <TableCell>
-                        <Tag type="green">Activo</Tag>
+                        <Tag type={indicador.activo ? 'green' : 'gray'}>{indicador.activo ? 'Activo' : 'Inactivo'}</Tag>
                       </TableCell>
                       <TableCell>{new Date(indicador.creado_en).toLocaleString('es-PE')}</TableCell>
                       <TableCell>

@@ -452,8 +452,8 @@ const ResultadosPage: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {seriesData.items.map((item, idx) => (
-                    <TableRow key={`${item.periodo_label}-${idx}`}>
+                  {seriesData.items.map((item) => (
+                    <TableRow key={`${item.periodo_label}-${item.anio}`}>
                       <TableCell>{item.periodo_label}</TableCell>
                       <TableCell>{item.valor}</TableCell>
                       <TableCell>{item.meses_disponibles}</TableCell>
