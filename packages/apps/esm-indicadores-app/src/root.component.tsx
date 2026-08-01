@@ -1,6 +1,7 @@
 import { InlineNotification, Tab, TabList, TabPanel, TabPanels, Tabs } from '@carbon/react';
 import { AppErrorBoundary, modulePrivileges, RequireModulePrivilege } from '@sihsalus/esm-rbac';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { useMockMode } from './api/mock-mode';
@@ -15,23 +16,24 @@ import ResultadosPage from './pages/ResultadosPage';
 const trimTrailingSlash = (path: string) => path.replace(/\/+$/, '');
 
 const TabsLayout: React.FC = () => {
+  const { t } = useTranslation();
   const [tabIndex, setTabIndex] = useState(0);
 
   return (
     <div className={styles.container}>
       <div className={styles.moduleHeader}>
         <div>
-          <h1 className={styles.pageTitle}>Indicadores Clínicos</h1>
+          <h1 className={styles.pageTitle}>{t('indicatorsTitle', 'Indicadores Clínicos')}</h1>
           <p className={styles.subtitle}>
-            Configuración, versionado y resultados de indicadores clínicos en un solo módulo.
+            {t('rootSubtitle', 'Configuración, versionado y resultados de indicadores clínicos en un solo módulo.')}
           </p>
         </div>
       </div>
       <Tabs selectedIndex={tabIndex} onChange={({ selectedIndex }) => setTabIndex(selectedIndex)}>
-        <TabList aria-label="Navegación de indicadores">
-          <Tab>Indicadores</Tab>
-          <Tab>Resultados</Tab>
-          <Tab>Metas</Tab>
+        <TabList aria-label={t('indicatorsTabs', 'Navegación de indicadores')}>
+          <Tab>{t('indicators', 'Indicadores')}</Tab>
+          <Tab>{t('results', 'Resultados')}</Tab>
+          <Tab>{t('metasTitle', 'Metas')}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel>
@@ -50,6 +52,7 @@ const TabsLayout: React.FC = () => {
 };
 
 const IndicatorsContent: React.FC = () => {
+  const { t } = useTranslation();
   const { isMockMode, isBackendAvailable } = useMockMode();
   useIndicatorsHealth();
   const spaBase = trimTrailingSlash(window.getOpenmrsSpaBase?.() ?? globalThis.spaBase ?? '/openmrs/spa');
@@ -61,16 +64,16 @@ const IndicatorsContent: React.FC = () => {
         {isMockMode ? (
           <InlineNotification
             kind="warning"
-            title="Datos de demostración activos"
-            subtitle="La API no respondió. Los datos visibles son ejemplos y ninguna escritura se simulará."
+            title={t('demoDataActiveTitle', 'Datos de demostración activos')}
+            subtitle={t('demoDataActiveBody', 'La API no respondió. Los datos visibles son ejemplos y ninguna escritura se simulará.')}
             lowContrast
           />
         ) : null}
         {!isMockMode && !isBackendAvailable ? (
           <InlineNotification
             kind="error"
-            title="Servicio de indicadores no disponible"
-            subtitle="No se mostrarán datos de ejemplo ni se simularán operaciones."
+            title={t('backendUnavailableTitle', 'Servicio de indicadores no disponible')}
+            subtitle={t('backendUnavailableBody', 'No se mostrarán datos de ejemplo ni se simularán operaciones.')}
             lowContrast
           />
         ) : null}

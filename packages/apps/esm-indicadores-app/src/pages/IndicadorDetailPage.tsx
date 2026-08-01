@@ -1,6 +1,7 @@
 import { Button, Tag, Tile } from '@carbon/react';
-import { getUserFacingErrorMessage } from '@openmrs/esm-framework';
+import { formatDate, getUserFacingErrorMessage, parseDate } from '@openmrs/esm-framework';
 import React, { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { DefinicionIndicadorForm } from '../api/types';
 import DefinicionView from '../components/DefinicionView';
@@ -17,9 +18,10 @@ import {
 import { parseDefinicion } from '../features/indicadores/parseDefinicion';
 import styles from '../indicators-dashboard.module.scss';
 
-const formatVersionDate = (iso: string) => new Date(iso).toLocaleString('es-PE');
+const formatVersionDate = (iso: string) => formatDate(parseDate(iso));
 
 const IndicadorDetailPage: React.FC = () => {
+  const { t } = useTranslation();
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -63,7 +65,7 @@ const IndicadorDetailPage: React.FC = () => {
     try {
       await createVersion(definicion);
       setShowVersionForm(false);
-      notifySuccess('Versión creada');
+      notifySuccess(t('versionCreated', 'Versión creada'));
     } catch (createError) {
       const message = getUserFacingErrorMessage(
         createError,
@@ -81,10 +83,10 @@ const IndicadorDetailPage: React.FC = () => {
   return (
     <div className={styles.container}>
       <Link to="/" className={styles.backLink}>
-        Volver a indicadores
+        {t('backToIndicators', 'Volver a indicadores')}
       </Link>
 
-      {isLoading ? <p>Cargando indicador...</p> : null}
+      {isLoading ? <p>{t('loadingIndicator', 'Cargando indicador...')}</p> : null}
       {error ? (
         <div className={styles.errorBanner}>
           {getUserFacingErrorMessage(error, 'No se pudo cargar el indicador.', indicatorsErrorMessageOptions)}
@@ -97,23 +99,23 @@ const IndicadorDetailPage: React.FC = () => {
             <div className={styles.header}>
               <div>
                 <h2>{data.nombre}</h2>
-                <p className={styles.subtitle}>{data.descripcion ?? 'Sin descripción'}</p>
+                <p className={styles.subtitle}>{data.descripcion ?? t('noDescription', 'Sin descripción')}</p>
               </div>
-              <Tag type={data.activo ? 'green' : 'gray'}>{data.activo ? 'Activo' : 'Inactivo'}</Tag>
+              <Tag type={data.activo ? 'green' : 'gray'}>{data.activo ? t('active', 'Activo') : t('inactive', 'Inactivo')}</Tag>
             </div>
             <div className={styles.headerActions}>
               <Button size="sm" onClick={() => navigate(`/${data.id}/edit`)}>
-                Editar metadata
+                {t('editMetadata', 'Editar metadata')}
               </Button>
               <Button size="sm" kind="secondary" onClick={() => setShowVersionForm((value) => !value)}>
-                {showVersionForm ? 'Cancelar nueva versión' : 'Nueva versión'}
+                {showVersionForm ? t('cancelNewVersion', 'Cancelar nueva versión') : t('newVersion', 'Nueva versión')}
               </Button>
             </div>
           </Tile>
 
           {showVersionForm ? (
             <Tile className={styles.section}>
-              <h3 className={styles.sectionTitle}>Crear nueva versión</h3>
+              <h3 className={styles.sectionTitle}>{t('createNewVersion', 'Crear nueva versión')}</h3>
               <IndicadorForm
                 mode="version"
                 defaultValues={latestVersion ? parseDefinicion(latestVersion.definicion, ordenesData) : undefined}
@@ -129,13 +131,13 @@ const IndicadorDetailPage: React.FC = () => {
             <div className={styles.detailMain}>
               {latestVersion ? (
                 <Tile className={styles.detailCard}>
-                  <h3 className={styles.sectionTitle}>Definición actual</h3>
+                  <h3 className={styles.sectionTitle}>{t('currentDefinition', 'Definición actual')}</h3>
                   <div className={styles.versionMeta}>
                     <span>
-                      <strong>Versión:</strong> #{latestVersion.version}
+                      {t('versionLabel', 'Versión:')} #{latestVersion.version}
                     </span>
                     <span>
-                      <strong>Creado:</strong> {formatVersionDate(latestVersion.creado_en)}
+                      {t('createdLabel', 'Creado:')} {formatVersionDate(latestVersion.creado_en)}
                     </span>
                   </div>
                   <DefinicionView definicion={latestVersion.definicion} />
@@ -149,8 +151,8 @@ const IndicadorDetailPage: React.FC = () => {
             </div>
 
             <aside className={styles.detailAside}>
-              <h3 className={styles.sectionTitle}>Historial de versiones</h3>
-              <ol className={styles.historyList} aria-label="Versiones del indicador">
+              <h3 className={styles.sectionTitle}>{t('versionHistory', 'Historial de versiones')}</h3>
+              <ol className={styles.historyList} aria-label={t('versionHistoryAria', 'Versiones del indicador')}>
                 {data.versiones.map((version) => (
                   <li key={version.id} className={styles.historyItem}>
                     <details className={styles.historyDetails}>

@@ -11,8 +11,9 @@ import {
   Tag,
   Tile,
 } from '@carbon/react';
-import { getUserFacingErrorMessage } from '@openmrs/esm-framework';
+import { getUserFacingErrorMessage, formatDate, parseDate } from '@openmrs/esm-framework';
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
@@ -21,6 +22,7 @@ import styles from '../indicators-dashboard.module.scss';
 
 const IndicadoresPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const deletingIdsRef = useRef(new Set<string>());
@@ -37,7 +39,7 @@ const IndicadoresPage: React.FC = () => {
     setDeletingIds(new Set(deletingIdsRef.current));
     try {
       await deleteIndicador(id);
-      notifySuccess('Indicador desactivado');
+      notifySuccess(t('indicatorDeactivated', 'Indicador desactivado'));
     } catch (deleteError) {
       notifyError(
         getUserFacingErrorMessage(deleteError, 'No se pudo desactivar el indicador.', indicatorsErrorMessageOptions),
@@ -52,15 +54,17 @@ const IndicadoresPage: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <div>
-          <h2>Indicadores</h2>
-          <p className={styles.subtitle}>Listado principal del módulo, con acceso a detalle, edición y versionado.</p>
+          <h2>{t('indicators', 'Indicadores')}</h2>
+          <p className={styles.subtitle}>
+                {t('indicatorsPageSubtitle', 'Listado principal del módulo, con acceso a detalle, edición y versionado.')}
+              </p>
         </div>
         <div className={styles.headerActions}>
-          <Button onClick={() => navigate('/new')}>Nuevo indicador</Button>
+          <Button onClick={() => navigate('/new')}>{t('newIndicator', 'Nuevo indicador')}</Button>
         </div>
       </div>
 
-      {isLoading ? <InlineLoading description="Cargando indicadores..." /> : null}
+      {isLoading ? <InlineLoading description={t('loadingIndicators', 'Cargando indicadores...')} /> : null}
       {error ? (
         <div className={styles.errorBanner}>
           {getUserFacingErrorMessage(error, 'No se pudieron cargar los indicadores.', indicatorsErrorMessageOptions)}
@@ -71,14 +75,14 @@ const IndicadoresPage: React.FC = () => {
         data?.items.length ? (
           <>
             <div className={styles.tableSurface}>
-              <Table aria-label="Listado de indicadores">
+              <Table aria-label={t('indicatorsTableAria', 'Listado de indicadores')}>
                 <TableHead>
                   <TableRow>
-                    <TableHeader>Nombre</TableHeader>
-                    <TableHeader>Descripción</TableHeader>
-                    <TableHeader>Estado</TableHeader>
-                    <TableHeader>Creado</TableHeader>
-                    <TableHeader>Acciones</TableHeader>
+                    <TableHeader>{t('name', 'Nombre')}</TableHeader>
+                    <TableHeader>{t('description', 'Descripción')}</TableHeader>
+                    <TableHeader>{t('status', 'Estado')}</TableHeader>
+                    <TableHeader>{t('createdAt', 'Creado')}</TableHeader>
+                    <TableHeader>{t('actions', 'Acciones')}</TableHeader>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -89,27 +93,23 @@ const IndicadoresPage: React.FC = () => {
                           {indicador.nombre}
                         </Link>
                       </TableCell>
-                      <TableCell>{indicador.descripcion ?? 'Sin descripción'}</TableCell>
+                      <TableCell>{indicador.descripcion ?? t('noDescription', 'Sin descripción')}</TableCell>
                       <TableCell>
-                        <Tag type={indicador.activo ? 'green' : 'gray'}>{indicador.activo ? 'Activo' : 'Inactivo'}</Tag>
+                        <Tag type={indicador.activo ? 'green' : 'gray'}>
+                              {indicador.activo ? t('active', 'Activo') : t('inactive', 'Inactivo')}
+                            </Tag>
                       </TableCell>
-                      <TableCell>{new Date(indicador.creado_en).toLocaleString('es-PE')}</TableCell>
+                      <TableCell>{formatDate(parseDate(indicador.creado_en))}</TableCell>
                       <TableCell>
                         <div className={styles.tableActions}>
-                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}`)}>
-                            Ver
-                          </Button>
-                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}/edit`)}>
-                            Editar
-                          </Button>
+                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}`)}>{t('view', 'Ver')}</Button>
+                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}/edit`)}>{t('edit', 'Editar')}</Button>
                           <Button
                             size="sm"
                             kind="danger--ghost"
                             onClick={() => handleDelete(indicador.id)}
                             disabled={deletingIds.has(indicador.id)}
-                          >
-                            Desactivar
-                          </Button>
+                          >{t('deactivate', 'Desactivar')}</Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -127,7 +127,7 @@ const IndicadoresPage: React.FC = () => {
             />
           </>
         ) : (
-          <Tile className={styles.empty}>No hay indicadores cargados.</Tile>
+          <Tile className={styles.empty}>{t('noIndicatorsYet', 'No hay indicadores definidos aún.')}</Tile>
         )
       ) : null}
     </div>

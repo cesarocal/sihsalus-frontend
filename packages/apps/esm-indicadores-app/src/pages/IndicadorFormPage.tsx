@@ -1,5 +1,6 @@
 import { getUserFacingErrorMessage } from '@openmrs/esm-framework';
 import React, { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { DefinicionIndicadorForm } from '../api/types';
 import IndicadorForm from '../components/IndicadorForm';
@@ -20,6 +21,7 @@ interface IndicadorFormPageProps {
 }
 
 const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -70,11 +72,11 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
           throw new Error('La definición es obligatoria para crear un indicador.');
         }
         const created = await createIndicador({ ...metadata, definicion });
-        notifySuccess('Indicador creado');
+        notifySuccess(t('indicatorCreated', 'Indicador creado'));
         navigate(`/${created.id}`);
       } else if (id) {
         await updateIndicador(id, metadata);
-        notifySuccess('Indicador actualizado');
+        notifySuccess(t('indicatorUpdated', 'Indicador actualizado'));
         navigate(`/${id}`);
       }
     } catch (submitError) {
@@ -96,20 +98,20 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
       <div className={styles.header}>
         <div>
           <Link to="/" className={styles.backLink}>
-            Volver a indicadores
+            {t('backToIndicators', 'Volver a indicadores')}
           </Link>
-          <h2>{mode === 'create' ? 'Nuevo indicador' : 'Editar indicador'}</h2>
+          <h2>{mode === 'create' ? t('newIndicator', 'Nuevo indicador') : t('editIndicator', 'Editar indicador')}</h2>
         </div>
       </div>
 
-      {mode === 'edit' && isLoading ? <p>Cargando indicador...</p> : null}
+      {mode === 'edit' && isLoading ? <p>{t('loadingIndicator', 'Cargando indicador...')}</p> : null}
       {mode === 'edit' && error ? (
         <div className={styles.errorBanner}>
           {getUserFacingErrorMessage(error, 'No se pudo cargar el indicador.', indicatorsErrorMessageOptions)}
         </div>
       ) : null}
       {mode === 'edit' && !indicador && !isLoading && !error ? (
-        <div className={styles.errorBanner}>No se encontró el indicador.</div>
+        <div className={styles.errorBanner}>{t('indicatorNotFound', 'No se encontró el indicador.')}</div>
       ) : null}
 
       {mode === 'create' || indicador ? (
@@ -117,8 +119,8 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
           <div className={styles.formPageIntro}>
             <p className={styles.subtitle}>
               {mode === 'create'
-                ? 'Definí la metadata y la lógica base del indicador. Más adelante podemos reemplazar estos campos por selectores clínicos más ricos.'
-                : 'Actualizá el nombre y la descripción. La definición de cálculo se versiona desde el detalle del indicador.'}
+                ? t('createModeIntro', 'Definí la metadata y la lógica base del indicador. Más adelante podemos reemplazar estos campos por selectores clínicos más ricos.')
+                : t('editModeIntro', 'Actualizá el nombre y la descripción. La definición de cálculo se versiona desde el detalle del indicador.')}
             </p>
           </div>
           <IndicadorForm
