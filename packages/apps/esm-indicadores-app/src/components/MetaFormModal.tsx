@@ -241,7 +241,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
 
         <NumberInput
           id="meta-valor"
-          label={t('targetValue', 'Valor de la meta')}
+          label={t('targetValueLabel', 'Valor de la meta')}
           min={0}
           value={valorMeta}
           onChange={(_event, { value }) => {

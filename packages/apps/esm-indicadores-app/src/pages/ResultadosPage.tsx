@@ -19,7 +19,7 @@ import {
   TableRow,
   Tile,
 } from '@carbon/react';
-import { getUserFacingErrorMessage, logError } from '@openmrs/esm-framework';
+import { formatDate, getUserFacingErrorMessage, logError, parseDate } from '@openmrs/esm-framework';
 import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BatchCalcularNowResponse, Granularity, RecalcularAnioResponse } from '../api/types';
@@ -500,7 +500,7 @@ const ResultadosPage: React.FC = () => {
                       </TableCell>
                       <TableCell>{item.valor}</TableCell>
                       <TableCell>{item.es_canonico ? t('yes', 'Sí') : t('no', 'No')}</TableCell>
-                      <TableCell>{new Date(item.calculado_en).toLocaleString('es-PE')}</TableCell>
+                      <TableCell>{formatDate(parseDate(item.calculado_en))}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
