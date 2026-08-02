@@ -327,7 +327,7 @@ const ResultadosPage: React.FC = () => {
         <div>
           <h2>{t('results', 'Resultados')}</h2>
           <p className={styles.subtitle}>
-            {t('resultsSubtitle', 'Consulta resultados calculados y ejecutá el cálculo manual del lote.')}
+            {t('resultsSubtitle', 'Consulte resultados calculados y ejecute el cálculo manual del lote.')}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -469,7 +469,7 @@ const ResultadosPage: React.FC = () => {
           )
         ) : (
           <Tile className={styles.empty}>
-            {t('selectIndicatorForSeries', 'Seleccioná un indicador para ver su serie temporal.')}
+            {t('selectIndicatorForSeries', 'Seleccione un indicador para ver su serie temporal.')}
           </Tile>
         )
       ) : null}

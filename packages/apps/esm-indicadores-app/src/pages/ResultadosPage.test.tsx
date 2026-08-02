@@ -131,7 +131,7 @@ describe('ResultadosPage series granularity', () => {
     renderPage();
 
     // Initially in "series" (default) mode with no indicator selected
-    expect(screen.getByText(/Seleccioná un indicador/)).toBeInTheDocument();
+    expect(screen.getByText(/Seleccione un indicador/)).toBeInTheDocument();
   });
 
   it('renders monthly series rows with periodo_label and valor columns', () => {

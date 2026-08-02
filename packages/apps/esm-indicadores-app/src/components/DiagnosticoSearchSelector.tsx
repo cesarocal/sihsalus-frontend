@@ -19,7 +19,7 @@ const DiagnosticoSearchSelector: React.FC<DiagnosticoSearchSelectorProps> = ({ s
     <SearchMultiSelector
       label={t('diagnostics', 'Diagnósticos')}
       placeholder={t('searchDiagnostics', 'Buscar diagnósticos')}
-      helperText={t('diagnosticsHelperText', 'Agregá uno o más diagnósticos al filtro clínico del indicador.')}
+      helperText={t('diagnosticsHelperText', 'Agregue uno o más diagnósticos al filtro clínico del indicador.')}
       emptyText={t('noDiagnosticsSelected', 'Sin diagnósticos seleccionados.')}
       noResultsText={t('noDiagnosticsFound', 'No se encontraron diagnósticos con ese criterio.')}
       selectedItems={selectedItems}

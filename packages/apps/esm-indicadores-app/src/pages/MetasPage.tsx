@@ -154,7 +154,7 @@ const MetasPage: React.FC = () => {
         <div>
           <h2>{t('metasTitle', 'Metas')}</h2>
           <p className={styles.subtitle}>
-            {t('metasSubtitle', 'Consultá y administrá la meta anual de un indicador.')}
+            {t('metasSubtitle', 'Consulte y administre la meta anual de un indicador.')}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -172,7 +172,7 @@ const MetasPage: React.FC = () => {
           onChange={({ selectedItem }: { selectedItem: Indicador | null | undefined }) =>
             setSelectedIndicatorId(selectedItem?.id ?? '')
           }
-          placeholder={t('selectIndicator', 'Seleccioná un indicador')}
+          placeholder={t('selectIndicator', 'Seleccione un indicador')}
           disabled={indicatorsLoading || Boolean(indicatorsError)}
         />
         <NumberInput
@@ -213,7 +213,7 @@ const MetasPage: React.FC = () => {
 
       {!selectedIndicatorId && !indicatorsLoading && !indicatorsError ? (
         <Tile className={styles.empty}>
-          {t('selectMetaLookup', 'Seleccioná un indicador y un año para consultar su meta.')}
+          {t('selectMetaLookup', 'Seleccione un indicador y un año para consultar su meta.')}
         </Tile>
       ) : null}
 
@@ -292,7 +292,7 @@ const MetasPage: React.FC = () => {
         onRequestSubmit={handleConfirmDelete}
         danger
       >
-        <p>{t('deleteMetaConfirmation', '¿Estás seguro de que querés eliminar esta meta?')}</p>
+        <p>{t('deleteMetaConfirmation', '¿Está seguro de que quiere eliminar esta meta?')}</p>
       </Modal>
     </div>
   );

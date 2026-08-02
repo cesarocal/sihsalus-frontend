@@ -106,7 +106,7 @@ describe('MetasPage', () => {
   it('requires an indicator and year lookup instead of requesting a nonexistent global list', () => {
     renderPage();
 
-    expect(screen.getByText(/Seleccioná un indicador y un año/i)).toBeInTheDocument();
+    expect(screen.getByText(/Seleccione un indicador y un año/i)).toBeInTheDocument();
     expect(mockUseMetaByIndicator).toHaveBeenCalledWith('', null);
   });
 

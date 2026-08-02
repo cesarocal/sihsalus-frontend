@@ -119,10 +119,10 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
 
   const validate = (): string | null => {
     if (!selectedIndicator) {
-      return t('metaValidationIndicator', 'Seleccioná un indicador.');
+      return t('metaValidationIndicator', 'Seleccione un indicador.');
     }
     if (!selectedVersionId) {
-      return t('metaValidationVersion', 'Seleccioná una versión.');
+      return t('metaValidationVersion', 'Seleccione una versión.');
     }
     if (anio === '' || !Number.isInteger(anio) || anio < MIN_YEAR || anio > MAX_YEAR) {
       return t('metaValidationYear', 'El año debe estar entre {{minYear}} y {{maxYear}}.', {
@@ -189,7 +189,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
             title={t('versionsLoadFailed', 'No se pudieron cargar las versiones')}
             subtitle={getUserFacingErrorMessage(
               versionsError,
-              t('retryLater', 'Intentá nuevamente.'),
+              t('retryLater', 'Intente nuevamente.'),
               indicatorsErrorMessageOptions,
             )}
             lowContrast
@@ -207,7 +207,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
             setSelectedIndicator(data.selectedItem ?? null);
             setSelectedVersionId('');
           }}
-          placeholder={t('selectIndicator', 'Seleccioná un indicador')}
+          placeholder={t('selectIndicator', 'Seleccione un indicador')}
           disabled={Boolean(initialMeta) || isSubmitting}
         />
 
@@ -220,7 +220,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
           onChange={(event) => setSelectedVersionId(event.target.value)}
           disabled
         >
-          <SelectItem value="" text={t('selectVersion', 'Seleccioná una versión')} />
+          <SelectItem value="" text={t('selectVersion', 'Seleccione una versión')} />
           {versionOptions.map((version) => (
             <SelectItem key={version.id} value={version.id} text={String(version.version)} />
           ))}

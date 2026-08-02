@@ -133,7 +133,7 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
       return t('editModeHelperText', 'En edición solo se modifica nombre y descripción. Para cambiar la definición, crea una nueva versión.');
     }
 
-    return t('createModeHelperText', 'Usá los buscadores para agregar servicios, diagnósticos y órdenes sin escribir UUIDs manualmente.');
+    return t('createModeHelperText', 'Use los buscadores para agregar servicios, diagnósticos y órdenes sin escribir UUIDs manualmente.');
   }, [isEditMode, t]);
 
   const updateField = <K extends keyof IndicadorFormValues>(field: K, nextValue: IndicadorFormValues[K]) => {
@@ -150,12 +150,12 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
     }
 
     if (values.filtroClinico === 'diagnosticos' && !values.selectedDiagnosticos.length) {
-      setValidationError(t('diagnosisFilterRequired', 'Ingresá al menos un diagnóstico para ese filtro clínico.'));
+      setValidationError(t('diagnosisFilterRequired', 'Ingrese al menos un diagnóstico para ese filtro clínico.'));
       return;
     }
 
     if (values.filtroClinico === 'ordenes' && !values.selectedOrdenes.length) {
-      setValidationError(t('orderFilterRequired', 'Ingresá al menos una orden para ese filtro clínico.'));
+      setValidationError(t('orderFilterRequired', 'Ingrese al menos una orden para ese filtro clínico.'));
       return;
     }
 
@@ -170,13 +170,13 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
 
     const minimumAgeValues = [values.minDias, values.minMeses, values.minAnios].filter((value) => value.trim());
     if (minimumAgeValues.length > 1) {
-      setValidationError(t('minAgeSingleUnit', 'Ingresá la edad mínima en una sola unidad: días, meses o años.'));
+      setValidationError(t('minAgeSingleUnit', 'Ingrese la edad mínima en una sola unidad: días, meses o años.'));
       return;
     }
 
     const maximumAgeValues = [values.maxDias, values.maxMeses, values.maxAnios].filter((value) => value.trim());
     if (maximumAgeValues.length > 1) {
-      setValidationError(t('maxAgeSingleUnit', 'Ingresá la edad máxima en una sola unidad: días, meses o años.'));
+      setValidationError(t('maxAgeSingleUnit', 'Ingrese la edad máxima en una sola unidad: días, meses o años.'));
       return;
     }
 
@@ -252,7 +252,7 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
             <div className={styles.sectionHeader}>
               <h3 className={styles.sectionTitle}>{t('attentionSection', 'Atención')}</h3>
               <p className={styles.sectionHint}>
-                {t('attentionHint', 'Acotá el origen clínico del cálculo: servicios, frecuencia mínima y filtro clínico.')}
+                {t('attentionHint', 'Acote el origen clínico del cálculo: servicios, frecuencia mínima y filtro clínico.')}
               </p>
             </div>
             <div className={styles.formGrid}>
@@ -325,7 +325,7 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
           <section className={styles.formSectionCard}>
             <div className={styles.sectionHeader}>
               <h3 className={styles.sectionTitle}>{t('populationSection', 'Población')}</h3>
-              <p className={styles.sectionHint}>{t('populationHint', 'Filtrá por sexo y rango etario si el indicador lo requiere.')}</p>
+              <p className={styles.sectionHint}>{t('populationHint', 'Filtre por sexo y rango etario si el indicador lo requiere.')}</p>
             </div>
             <div className={styles.populationLayout}>
               <Select
@@ -341,7 +341,7 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
               <div className={styles.ageBlock}>
                 <div className={styles.ageBlockHeader}>
                   <span className={styles.sectionMiniTitle}>{t('minAge', 'Edad mínima')}</span>
-                  <span className={styles.mutedText}>{t('minAgeHint', 'Completá solo lo necesario.')}</span>
+                  <span className={styles.mutedText}>{t('minAgeHint', 'Complete solo lo necesario.')}</span>
                 </div>
                 <div className={styles.ageGrid}>
                   <TextInput

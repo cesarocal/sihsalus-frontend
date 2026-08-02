@@ -119,8 +119,8 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
           <div className={styles.formPageIntro}>
             <p className={styles.subtitle}>
               {mode === 'create'
-                ? t('createModeIntro', 'Definí la metadata y la lógica base del indicador. Más adelante podemos reemplazar estos campos por selectores clínicos más ricos.')
-                : t('editModeIntro', 'Actualizá el nombre y la descripción. La definición de cálculo se versiona desde el detalle del indicador.')}
+                ? t('createModeIntro', 'Defina la metadata y la lógica base del indicador. Más adelante podemos reemplazar estos campos por selectores clínicos más ricos.')
+                : t('editModeIntro', 'Actualice el nombre y la descripción. La definición de cálculo se versiona desde el detalle del indicador.')}
             </p>
           </div>
           <IndicadorForm

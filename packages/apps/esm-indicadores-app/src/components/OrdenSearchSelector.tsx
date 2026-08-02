@@ -19,7 +19,7 @@ const OrdenSearchSelector: React.FC<OrdenSearchSelectorProps> = ({ selectedItems
     <SearchMultiSelector
       label={t('orders', 'Órdenes')}
       placeholder={t('searchOrders', 'Buscar órdenes o conceptos')}
-      helperText={t('ordersHelperText', 'Agregá las órdenes clínicas relevantes para este indicador.')}
+      helperText={t('ordersHelperText', 'Agregue las órdenes clínicas relevantes para este indicador.')}
       emptyText={t('noOrdersSelected', 'Sin órdenes seleccionadas.')}
       noResultsText={t('noOrdersFound', 'No se encontraron órdenes con ese criterio.')}
       selectedItems={selectedItems}

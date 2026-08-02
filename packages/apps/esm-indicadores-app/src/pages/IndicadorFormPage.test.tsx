@@ -102,7 +102,7 @@ describe('IndicadorFormPage — create mode', () => {
   it('shows helper text about defining metadata', () => {
     renderCreatePage();
 
-    expect(screen.getByText(/Definí la metadata y la lógica base del indicador/)).toBeInTheDocument();
+    expect(screen.getByText(/Defina la metadata y la lógica base del indicador/)).toBeInTheDocument();
   });
 
   it('calls createIndicador on form submit with correct payload', async () => {
