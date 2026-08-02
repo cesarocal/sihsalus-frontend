@@ -25,12 +25,14 @@ function ensureQuery(params: Record<string, string | number | boolean | undefine
 
 export async function getResultados(params: GetResultadosParams): Promise<PaginatedResponse<IndicadorResultado>> {
   const reportesSqlBase = await getReportesSqlApiPath();
-  const queryParams: Record<string, string | number | undefined> = {
+  const queryParams: Record<string, string | number | boolean | undefined> = {
     page: params.page,
     size: params.size,
     indicador_id: params.indicador_id,
     periodo_inicio: params.periodo_inicio,
     periodo_fin: params.periodo_fin,
+    include_historicos: params.include_historicos,
+    version_id: params.version_id,
   };
 
   return withMockFallback(

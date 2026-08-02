@@ -225,6 +225,27 @@ describe('ResultadosPage series granularity', () => {
     const granularitySelect = screen.getByLabelText('Granularidad') as HTMLSelectElement;
     expect(granularitySelect.value).toBe('mensual');
   });
+
+  it('requests include_historicos=true when the historical view is active', () => {
+    mockUseResultadosSeries.mockImplementation(
+      () =>
+        ({
+          data: monthlySeries,
+          error: undefined,
+          isLoading: false,
+          isError: false,
+          refetch: vi.fn(),
+        }) as never,
+    );
+
+    renderPage();
+
+    // Switch to the historical view
+    fireEvent.click(screen.getByText('Histórico'));
+
+    const lastResultadosParams = mockUseResultados.mock.calls[mockUseResultados.mock.calls.length - 1][0];
+    expect(lastResultadosParams.include_historicos).toBe(true);
+  });
 });
 
 describe('ResultadosPage period filters', () => {

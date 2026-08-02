@@ -129,6 +129,18 @@ const resultados: Array<IndicadorResultado> = [
   },
   {
     id: uid('res'),
+    indicador_version_id: 'ver-001-1',
+    indicador_nombre: 'Atenciones de control prenatal',
+    indicador_version_num: 2,
+    periodo_inicio: '2026-04-01',
+    periodo_fin: '2026-04-30',
+    valor: 298,
+    calculado_en: '2026-05-03T02:00:00.000Z',
+    mes_referencia: '2026-04-01',
+    es_canonico: false,
+  },
+  {
+    id: uid('res'),
     indicador_version_id: 'ver-002-1',
     indicador_nombre: 'Pacientes con diagnóstico de anemia',
     indicador_version_num: 1,
@@ -233,11 +245,51 @@ export function getSeriesMock(params: GetSeriesParams): SeriesResponse {
   const granularity = params.granularity ?? 'mensual';
 
   const monthlyRows: Array<SerieRow> = [
-    { periodo_label: `${year}-01`, valor: 98, meses_disponibles: 1, anio: year, mes_referencia: `${year}-01-01` },
-    { periodo_label: `${year}-02`, valor: 87, meses_disponibles: 1, anio: year, mes_referencia: `${year}-02-01` },
-    { periodo_label: `${year}-03`, valor: 105, meses_disponibles: 1, anio: year, mes_referencia: `${year}-03-01` },
-    { periodo_label: `${year}-04`, valor: 112, meses_disponibles: 1, anio: year, mes_referencia: `${year}-04-01` },
-    { periodo_label: `${year}-05`, valor: 95, meses_disponibles: 1, anio: year, mes_referencia: `${year}-05-01` },
+    {
+      periodo_label: `${year}-01`,
+      valor: 98,
+      meses_disponibles: 1,
+      anio: year,
+      mes_referencia: `${year}-01-01`,
+      version_id: 'ver-001-1',
+      version_num: 1,
+    },
+    {
+      periodo_label: `${year}-02`,
+      valor: 87,
+      meses_disponibles: 1,
+      anio: year,
+      mes_referencia: `${year}-02-01`,
+      version_id: 'ver-001-1',
+      version_num: 1,
+    },
+    {
+      periodo_label: `${year}-03`,
+      valor: 105,
+      meses_disponibles: 1,
+      anio: year,
+      mes_referencia: `${year}-03-01`,
+      version_id: 'ver-001-1',
+      version_num: 1,
+    },
+    {
+      periodo_label: `${year}-04`,
+      valor: 112,
+      meses_disponibles: 1,
+      anio: year,
+      mes_referencia: `${year}-04-01`,
+      version_id: 'ver-001-1',
+      version_num: 1,
+    },
+    {
+      periodo_label: `${year}-05`,
+      valor: 95,
+      meses_disponibles: 1,
+      anio: year,
+      mes_referencia: `${year}-05-01`,
+      version_id: 'ver-001-1',
+      version_num: 1,
+    },
   ];
 
   if (granularity === 'mensual') {
@@ -247,8 +299,22 @@ export function getSeriesMock(params: GetSeriesParams): SeriesResponse {
   if (granularity === 'trimestral') {
     return {
       items: [
-        { periodo_label: 'Q1', valor: 290, meses_disponibles: 3, anio: year, trimestre: 1 },
-        { periodo_label: 'Q2', valor: 207, meses_disponibles: 2, anio: year, trimestre: 2 },
+        {
+          periodo_label: 'Q1',
+          valor: 290,
+          meses_disponibles: 3,
+          anio: year,
+          trimestre: 1,
+          versiones: [{ version_id: 'ver-001-1', version_num: 1 }],
+        },
+        {
+          periodo_label: 'Q2',
+          valor: 207,
+          meses_disponibles: 2,
+          anio: year,
+          trimestre: 2,
+          versiones: [{ version_id: 'ver-001-1', version_num: 1 }],
+        },
       ],
       indicador_id: params.indicador_id,
       anio: year,
@@ -259,8 +325,22 @@ export function getSeriesMock(params: GetSeriesParams): SeriesResponse {
   if (granularity === 'semestral') {
     return {
       items: [
-        { periodo_label: 'H1', valor: 290, meses_disponibles: 3, anio: year, semestre: 1 },
-        { periodo_label: 'H2', valor: 207, meses_disponibles: 2, anio: year, semestre: 2 },
+        {
+          periodo_label: 'H1',
+          valor: 290,
+          meses_disponibles: 3,
+          anio: year,
+          semestre: 1,
+          versiones: [{ version_id: 'ver-001-1', version_num: 1 }],
+        },
+        {
+          periodo_label: 'H2',
+          valor: 207,
+          meses_disponibles: 2,
+          anio: year,
+          semestre: 2,
+          versiones: [{ version_id: 'ver-001-1', version_num: 1 }],
+        },
       ],
       indicador_id: params.indicador_id,
       anio: year,
@@ -269,7 +349,15 @@ export function getSeriesMock(params: GetSeriesParams): SeriesResponse {
   }
 
   return {
-    items: [{ periodo_label: String(year), valor: 497, meses_disponibles: 5, anio: year }],
+    items: [
+      {
+        periodo_label: String(year),
+        valor: 497,
+        meses_disponibles: 5,
+        anio: year,
+        versiones: [{ version_id: 'ver-001-1', version_num: 1 }],
+      },
+    ],
     indicador_id: params.indicador_id,
     anio: year,
     granularity,
@@ -294,6 +382,10 @@ export function listResultados(params: GetResultadosParams): PaginatedResponse<I
     }
 
     if (params.periodo_fin && item.periodo_inicio > params.periodo_fin) {
+      return false;
+    }
+
+    if (params.include_historicos !== true && item.es_canonico === false) {
       return false;
     }
 

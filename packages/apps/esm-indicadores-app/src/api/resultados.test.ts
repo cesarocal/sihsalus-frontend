@@ -101,6 +101,42 @@ describe('getResultados routing', () => {
     const calledUrl = mockedOpenmrsFetch.mock.calls[0][0] as string;
     expect(calledUrl).not.toContain('/ws/module/indicators/api');
   });
+
+  it('serializes include_historicos=true into the query string when provided', async () => {
+    mockResourcePath('/services/reportes-sql');
+    mockedOpenmrsFetch.mockResolvedValue({
+      data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
+    } as never);
+
+    await getResultados({ page: 1, size: 10, include_historicos: true });
+
+    const calledUrl = mockedOpenmrsFetch.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('include_historicos=true');
+  });
+
+  it('omits include_historicos from the query string when undefined', async () => {
+    mockResourcePath('/services/reportes-sql');
+    mockedOpenmrsFetch.mockResolvedValue({
+      data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
+    } as never);
+
+    await getResultados({ page: 1, size: 10 });
+
+    const calledUrl = mockedOpenmrsFetch.mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain('include_historicos');
+  });
+
+  it('serializes version_id into the query string when provided', async () => {
+    mockResourcePath('/services/reportes-sql');
+    mockedOpenmrsFetch.mockResolvedValue({
+      data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
+    } as never);
+
+    await getResultados({ page: 1, size: 10, version_id: 'v2' });
+
+    const calledUrl = mockedOpenmrsFetch.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('version_id=v2');
+  });
 });
 
 describe('calcularAhora routing', () => {

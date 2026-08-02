@@ -72,6 +72,7 @@ const ResultadosPage: React.FC = () => {
     indicador_id: filters.indicador_id || undefined,
     periodo_inicio: periodRangeInvalid ? undefined : toDateString(periodoInicio),
     periodo_fin: periodRangeInvalid ? undefined : toDateString(periodoFin),
+    include_historicos: true,
   });
 
   // Time-series rollup data
