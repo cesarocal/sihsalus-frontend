@@ -1,7 +1,7 @@
 import { getConfig, openmrsFetch } from '@openmrs/esm-framework';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteMeta, getMetaByIndicator, getMetaByVersion, isMetaNotFoundError, upsertMeta } from './metas';
+import { deleteMeta, getMetaByIndicator, isMetaNotFoundError, upsertMeta } from './metas';
 
 const mockedOpenmrsFetch = vi.mocked(openmrsFetch);
 const mockedGetConfig = vi.mocked(getConfig);
@@ -27,15 +27,6 @@ describe('metas API contract', () => {
 
     await expect(getMetaByIndicator('indicator-a', 2026)).resolves.toEqual(meta);
     expect(mockedOpenmrsFetch.mock.calls[0][0]).toBe('/services/reportes-sql/metas?indicador_id=indicator-a&anio=2026');
-  });
-
-  it('looks up a meta by exact version and year when explicitly requested', async () => {
-    mockedOpenmrsFetch.mockResolvedValue({ data: meta } as never);
-
-    await expect(getMetaByVersion('version-a', 2026)).resolves.toEqual(meta);
-    expect(mockedOpenmrsFetch.mock.calls[0][0]).toBe(
-      '/services/reportes-sql/metas?indicador_version_id=version-a&anio=2026',
-    );
   });
 
   it('does not mistake a 500 response for an absent meta', async () => {

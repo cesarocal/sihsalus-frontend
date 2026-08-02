@@ -1,4 +1,4 @@
-export type TipoIndicador = 'conteo_atenciones' | 'conteo_pacientes';
+type TipoIndicador = 'conteo_atenciones' | 'conteo_pacientes';
 export type TipoDiagnostico = 'definitivo' | 'presuntivo';
 export type Sexo = 'M' | 'F';
 
@@ -23,23 +23,23 @@ export interface Indicador {
   creado_en: string;
 }
 
-export interface FiltroDiagnosticoForm {
+interface FiltroDiagnosticoForm {
   concepto_uuids: Array<string>;
   tipo_diagnostico?: TipoDiagnostico;
 }
 
-export interface FiltroOrdenForm {
+interface FiltroOrdenForm {
   concepto_uuid: string;
 }
 
-export interface FiltrosEventoForm {
+interface FiltrosEventoForm {
   location_uuids?: Array<string>;
   minimo_ocurrencias?: number;
   diagnosticos?: Array<FiltroDiagnosticoForm>;
   ordenes?: Array<FiltroOrdenForm>;
 }
 
-export interface PoblacionForm {
+interface PoblacionForm {
   min_anios?: number;
   max_anios_excl?: number;
   min_meses?: number;
@@ -76,11 +76,6 @@ export interface IndicadorCreatePayload {
 export interface IndicadorUpdatePayload {
   nombre: string;
   descripcion: string | null;
-}
-
-export interface EncounterTypeOption {
-  uuid: string;
-  display: string;
 }
 
 export interface LocationOption {
@@ -121,6 +116,10 @@ export interface SerieRow {
   trimestre?: number;
   semestre?: number;
   meta?: number | null;
+  // Monthly rows carry version_id/version_num; aggregated rows carry `versiones` instead.
+  version_id?: string | null;
+  version_num?: number | null;
+  versiones?: Array<{ version_id: string; version_num: number }>;
 }
 
 export interface SeriesResponse {
@@ -156,7 +155,7 @@ export interface IndicadorMetaCreatePayload {
   valor_meta: number;
 }
 
-export interface ErrorCalculo {
+interface ErrorCalculo {
   indicador_id: string;
   indicador_nombre: string;
   error: string;
@@ -168,7 +167,7 @@ export interface BatchCalcularNowResponse {
   total: number;
 }
 
-export interface ErrorRecalculo {
+interface ErrorRecalculo {
   indicador_id: string;
   indicador_nombre: string;
   mes: number;
@@ -190,7 +189,7 @@ export interface RecalcularAnioResponse {
   total: number;
 }
 
-export interface ResultadosFilters {
+interface ResultadosFilters {
   indicador_id?: string;
   periodo_inicio?: string;
   periodo_fin?: string;
@@ -199,6 +198,8 @@ export interface ResultadosFilters {
 export interface GetResultadosParams extends ResultadosFilters {
   page: number;
   size: number;
+  include_historicos?: boolean;
+  version_id?: string;
 }
 
 export interface IndicadorSQLPreview {

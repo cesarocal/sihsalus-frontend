@@ -563,7 +563,7 @@ const ResultadosPage: React.FC = () => {
         <NumberInput
           id="recalc-anio"
           label={t('year', 'Año')}
-          min={1900}
+          min={2000}
           max={currentYear()}
           value={recalcAnio}
           onChange={(_event, { value }) => {

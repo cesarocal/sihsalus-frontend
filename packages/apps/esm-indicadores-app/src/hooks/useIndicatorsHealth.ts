@@ -3,18 +3,7 @@ import { useEffect } from 'react';
 
 import { activateMockMode, reportBackendUnavailable, resetMockMode } from '../api/mock-mode';
 import { type Config } from '../config-schema';
-
-const moduleName = '@sihsalus/esm-indicadores-app';
-
-const translate = (key: string, defaultValue: string): string => {
-  const i18next = (
-    globalThis as typeof globalThis & {
-      i18next?: { t?: (key: string, options: { defaultValue: string; ns: string }) => string };
-    }
-  ).i18next;
-
-  return typeof i18next?.t === 'function' ? i18next.t(key, { defaultValue, ns: moduleName }) : defaultValue;
-};
+import { translate } from '../i18n';
 
 const DEFAULT_ERROR = translate('indicatorsApiConnectionError', 'No se pudo conectar con el API de indicadores.');
 

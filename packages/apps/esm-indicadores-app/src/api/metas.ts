@@ -29,11 +29,6 @@ export function isMetaNotFoundError(error: unknown): boolean {
   );
 }
 
-export async function getMetaByVersion(indicadorVersionId: string, anio: number): Promise<IndicadorMeta> {
-  const metasPath = await getReportesSqlResourcePath('metas');
-  return fetchJson<IndicadorMeta>(`${metasPath}${ensureQuery({ indicador_version_id: indicadorVersionId, anio })}`);
-}
-
 export async function getMetaByIndicator(indicadorId: string, anio: number): Promise<IndicadorMeta> {
   const metasPath = await getReportesSqlResourcePath('metas');
   return fetchJson<IndicadorMeta>(`${metasPath}${ensureQuery({ indicador_id: indicadorId, anio })}`);

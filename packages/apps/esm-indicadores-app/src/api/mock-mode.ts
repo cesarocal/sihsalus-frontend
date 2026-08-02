@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-export interface MockModeState {
+interface MockModeState {
   isMockMode: boolean;
   isBackendAvailable: boolean;
   errorMessage?: string;
@@ -45,7 +45,7 @@ export function resetMockMode() {
   emit();
 }
 
-export function getMockModeState() {
+function getMockModeState() {
   return state;
 }
 
