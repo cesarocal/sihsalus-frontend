@@ -99,7 +99,11 @@ function SearchMultiSelector<T>({
             <InlineLoading description={t('searching', 'Buscando...')} />
           ) : error ? (
             <div className={styles.errorBanner}>
-              {getUserFacingErrorMessage(error, 'No se pudieron cargar las opciones.', indicatorsErrorMessageOptions)}
+              {getUserFacingErrorMessage(
+                error,
+                t('optionsLoadFailed', 'No se pudieron cargar las opciones.'),
+                indicatorsErrorMessageOptions,
+              )}
             </div>
           ) : filteredResults.length ? (
             <div className={styles.searchResultsList} role="listbox" aria-label={label}>

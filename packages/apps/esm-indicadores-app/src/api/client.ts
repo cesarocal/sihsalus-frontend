@@ -3,6 +3,18 @@ import { type FetchConfig, type FetchResponse, logError, openmrsFetch } from '@o
 import { isDemoDataEnabled } from './config';
 import { activateMockMode, reportBackendUnavailable, resetMockMode } from './mock-mode';
 
+const moduleName = '@sihsalus/esm-indicadores-app';
+
+const translate = (key: string, defaultValue: string): string => {
+  const i18next = (
+    globalThis as typeof globalThis & {
+      i18next?: { t?: (key: string, options: { defaultValue: string; ns: string }) => string };
+    }
+  ).i18next;
+
+  return typeof i18next?.t === 'function' ? i18next.t(key, { defaultValue, ns: moduleName }) : defaultValue;
+};
+
 function normalizeError(error: unknown): Error {
   if (error instanceof Error) {
     return error;
@@ -12,7 +24,7 @@ function normalizeError(error: unknown): Error {
     return new Error(error);
   }
 
-  return new Error('No se pudo completar la solicitud.');
+  return new Error(translate('requestFailed', 'No se pudo completar la solicitud.'));
 }
 
 function getHttpStatus(error: unknown): number | undefined {

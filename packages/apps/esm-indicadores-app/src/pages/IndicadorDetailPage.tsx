@@ -69,7 +69,7 @@ const IndicadorDetailPage: React.FC = () => {
     } catch (createError) {
       const message = getUserFacingErrorMessage(
         createError,
-        'No se pudo crear la versión.',
+        t('versionCreateFailed', 'No se pudo crear la versión.'),
         indicatorsErrorMessageOptions,
       );
       setServerError(message);
@@ -89,7 +89,11 @@ const IndicadorDetailPage: React.FC = () => {
       {isLoading ? <p>{t('loadingIndicator', 'Cargando indicador...')}</p> : null}
       {error ? (
         <div className={styles.errorBanner}>
-          {getUserFacingErrorMessage(error, 'No se pudo cargar el indicador.', indicatorsErrorMessageOptions)}
+          {getUserFacingErrorMessage(
+            error,
+            t('indicatorLoadFailed', 'No se pudo cargar el indicador.'),
+            indicatorsErrorMessageOptions,
+          )}
         </div>
       ) : null}
 

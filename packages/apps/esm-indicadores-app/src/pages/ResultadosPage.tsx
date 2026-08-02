@@ -36,10 +36,15 @@ type SummaryState =
 
 const currentYear = () => new Date().getFullYear();
 
+const toDateString = (date: Date | null): string | undefined =>
+  date ? date.toISOString().slice(0, 10) : undefined;
+
 const ResultadosPage: React.FC = () => {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ indicador_id: '', periodo_inicio: '', periodo_fin: '' });
+  const [filters, setFilters] = useState({ indicador_id: '' });
+  const [periodoInicio, setPeriodoInicio] = useState<Date | null>(null);
+  const [periodoFin, setPeriodoFin] = useState<Date | null>(null);
   const [granularity, setGranularity] = useState<Granularity>('mensual');
   const [viewMode, setViewMode] = useState<'historical' | 'series'>('series');
   const [isCalcularRunning, setCalcularRunning] = useState(false);
@@ -50,6 +55,9 @@ const ResultadosPage: React.FC = () => {
   const [recalcAnioError, setRecalcAnioError] = useState<string | null>(null);
   const actionLockRef = useRef(false);
   const pageSize = 10;
+
+  const currentYearValue = currentYear();
+  const periodRangeInvalid = Boolean(periodoInicio && periodoFin && periodoInicio > periodoFin);
 
   const { data: indicadoresData } = useIndicadores(1, 100);
 
@@ -62,8 +70,8 @@ const ResultadosPage: React.FC = () => {
     page,
     size: pageSize,
     indicador_id: filters.indicador_id || undefined,
-    periodo_inicio: filters.periodo_inicio || undefined,
-    periodo_fin: filters.periodo_fin || undefined,
+    periodo_inicio: periodRangeInvalid ? undefined : toDateString(periodoInicio),
+    periodo_fin: periodRangeInvalid ? undefined : toDateString(periodoFin),
   });
 
   // Time-series rollup data
@@ -72,12 +80,12 @@ const ResultadosPage: React.FC = () => {
       filters.indicador_id
         ? {
             indicador_id: filters.indicador_id,
-            anio: currentYear(),
+            anio: currentYearValue,
             granularity,
             include_meta: true,
           }
         : null,
-    [filters.indicador_id, granularity],
+    [filters.indicador_id, granularity, currentYearValue],
   );
 
   const { data: seriesData, isLoading: seriesLoading, error: seriesError } = useResultadosSeries(seriesParams);
@@ -364,11 +372,10 @@ const ResultadosPage: React.FC = () => {
         <DatePicker
           datePickerType="single"
           dateFormat="Y-m-d"
-          value={filters.periodo_inicio}
+          value={periodoInicio ?? undefined}
           onChange={(dates: Date[]) => {
             setPage(1);
-            const d = dates[0];
-            setFilters((current) => ({ ...current, periodo_inicio: d ? d.toISOString().slice(0, 10) : '' }));
+            setPeriodoInicio(dates[0] ?? null);
           }}
         >
           <DatePickerInput id="resultado-desde" labelText={t('from', 'Desde')} />
@@ -376,16 +383,24 @@ const ResultadosPage: React.FC = () => {
         <DatePicker
           datePickerType="single"
           dateFormat="Y-m-d"
-          value={filters.periodo_fin}
+          value={periodoFin ?? undefined}
           onChange={(dates: Date[]) => {
             setPage(1);
-            const d = dates[0];
-            setFilters((current) => ({ ...current, periodo_fin: d ? d.toISOString().slice(0, 10) : '' }));
+            setPeriodoFin(dates[0] ?? null);
           }}
         >
           <DatePickerInput id="resultado-hasta" labelText={t('to', 'Hasta')} />
         </DatePicker>
       </div>
+
+      {periodRangeInvalid ? (
+        <InlineNotification
+          kind="error"
+          lowContrast
+          hideCloseButton
+          title={t('periodRangeInvalid', 'La fecha de inicio debe ser anterior o igual a la fecha de fin.')}
+        />
+      ) : null}
 
       {/* View mode switcher + granularity */}
       <div className={`${styles.headerActions} ${styles.contentSwitcherRow}`}>

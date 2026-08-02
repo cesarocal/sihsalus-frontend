@@ -227,6 +227,106 @@ describe('ResultadosPage series granularity', () => {
   });
 });
 
+describe('ResultadosPage period filters', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockUseIndicadores.mockReturnValue({
+      data: indicadores,
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    mockUseResultados.mockReturnValue({
+      data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    mockUseResultadosSeries.mockReturnValue({
+      data: undefined,
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    mockUseCalcularAhora.mockReturnValue({
+      calcularAhora: vi.fn().mockResolvedValue({ calculados: 0, errores: [], total: 0 }),
+    });
+
+    mockUseRecalcularAnio.mockReturnValue({
+      recalcularAnio: vi.fn().mockResolvedValue({
+        anio: 2026,
+        indicador_id: null,
+        meses_procesados: 12,
+        indicadores_considerados: 0,
+        recalculados: 0,
+        errores: [],
+        total: 0,
+      }),
+    });
+  });
+
+  const setDate = (label: string, value: string) => {
+    const input = screen.getByLabelText(label) as HTMLInputElement;
+    fireEvent.change(input, { target: { value } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+  };
+
+  const lastResultadosParams = () => mockUseResultados.mock.calls[mockUseResultados.mock.calls.length - 1][0];
+
+  it('rejects an inverted period range: shows a message and does not fire the request with it', () => {
+    renderPage();
+
+    setDate('Desde', '2026-05-01');
+    setDate('Hasta', '2026-03-01');
+
+    expect(screen.getByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/)).toBeInTheDocument();
+    expect(lastResultadosParams().periodo_inicio).toBeUndefined();
+    expect(lastResultadosParams().periodo_fin).toBeUndefined();
+  });
+
+  it('allows an open-ended range with only the start bound set', () => {
+    renderPage();
+
+    setDate('Desde', '2026-05-01');
+
+    expect(screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/)).not.toBeInTheDocument();
+    expect(lastResultadosParams().periodo_inicio).toBe('2026-05-01');
+    expect(lastResultadosParams().periodo_fin).toBeUndefined();
+  });
+
+  it('allows an open-ended range with only the end bound set', () => {
+    renderPage();
+
+    setDate('Hasta', '2026-03-01');
+
+    expect(screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/)).not.toBeInTheDocument();
+    expect(lastResultadosParams().periodo_inicio).toBeUndefined();
+    expect(lastResultadosParams().periodo_fin).toBe('2026-03-01');
+  });
+
+  it('clears the error and fires the request once the range becomes valid', () => {
+    renderPage();
+
+    setDate('Desde', '2026-05-01');
+    setDate('Hasta', '2026-03-01');
+    expect(screen.getByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/)).toBeInTheDocument();
+
+    setDate('Hasta', '2026-06-01');
+    expect(
+      screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/),
+    ).not.toBeInTheDocument();
+    expect(lastResultadosParams().periodo_inicio).toBe('2026-05-01');
+    expect(lastResultadosParams().periodo_fin).toBe('2026-06-01');
+  });
+});
+
 describe('ResultadosPage calculate / recalculate actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -35,7 +35,11 @@ const SQLPreviewSection: React.FC<SQLPreviewSectionProps> = ({ indicadorId, vers
           <InlineLoading description={t('generatingSql', 'Generando SQL...')} />
         ) : error ? (
           <div className={styles.errorBanner}>
-            {getUserFacingErrorMessage(error, 'No se pudo generar la vista previa SQL.', indicatorsErrorMessageOptions)}
+            {getUserFacingErrorMessage(
+              error,
+              t('sqlPreviewFailed', 'No se pudo generar la vista previa SQL.'),
+              indicatorsErrorMessageOptions,
+            )}
           </div>
         ) : data ? (
           <div className={styles.sqlBody}>

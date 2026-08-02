@@ -295,4 +295,69 @@ describe('MetaFormModal', () => {
     expect(screen.queryByText('technical database message')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar/ })).toBeDisabled();
   });
+
+  it('shows an explanation and cannot submit when the selected indicator has no versions', async () => {
+    const onSubmit = vi.fn();
+    const { container } = renderModal({ onSubmit });
+    mockUseIndicador.mockReturnValue({
+      data: { ...indicators[0], versiones: [] },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    fireEvent.input(getIndicatorInput(container), { target: { value: 'Control prenatal' } });
+    fireEvent.click(screen.getByText('Control prenatal'));
+    await waitFor(() =>
+      expect(screen.getByText(/no tiene versiones. Cree una versión antes de definir una meta/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Guardar/ })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Año'), { target: { value: '2026' } });
+    fireEvent.change(screen.getByLabelText('Valor de la meta'), { target: { value: '1500' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Guardar/ })));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('enables saving as soon as the indicator gets a version', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { container, rerender } = renderModal({ onSubmit });
+    mockUseIndicador.mockReturnValue({
+      data: { ...indicators[0], versiones: [] },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    fireEvent.input(getIndicatorInput(container), { target: { value: 'Control prenatal' } });
+    fireEvent.click(screen.getByText('Control prenatal'));
+    await waitFor(() =>
+      expect(screen.getByText(/no tiene versiones. Cree una versión antes de definir una meta/i)).toBeInTheDocument(),
+    );
+
+    mockUseIndicador.mockReturnValue({
+      data: details['indicator-a'],
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    rerender(<MetaFormModal isOpen onClose={vi.fn()} onSubmit={onSubmit} />);
+
+    await waitFor(() => expect(screen.getByLabelText('Versión vigente')).toHaveValue('version-a-2'));
+    expect(screen.queryByText(/no tiene versiones/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Guardar/ })).not.toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Año'), { target: { value: '2026' } });
+    fireEvent.change(screen.getByLabelText('Valor de la meta'), { target: { value: '1500' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Guardar/ })));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      { indicador_version_id: 'version-a-2', anio: 2026, valor_meta: 1500 },
+      'indicator-a',
+    );
+  });
 });

@@ -53,7 +53,7 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
           : t('noFilter', 'Sin filtro')}
       </div>
       <div>
-        <strong>{t('definitionSex', 'Sexo:')}</strong> {definicion.poblacion?.sexo ?? 'Sin filtro'}
+        <strong>{t('definitionSex', 'Sexo:')}</strong> {definicion.poblacion?.sexo ?? t('noFilter', 'Sin filtro')}
       </div>
       <div>
         <strong>{t('definitionAge', 'Edad:')}</strong> {t('ageRangeValue', 'min {{min}} años / max {{max}} años', { min: definicion.poblacion?.min_anios ?? '-', max: definicion.poblacion?.max_anios_excl ?? '-' })}

@@ -42,7 +42,11 @@ const IndicadoresPage: React.FC = () => {
       notifySuccess(t('indicatorDeactivated', 'Indicador desactivado'));
     } catch (deleteError) {
       notifyError(
-        getUserFacingErrorMessage(deleteError, 'No se pudo desactivar el indicador.', indicatorsErrorMessageOptions),
+        getUserFacingErrorMessage(
+          deleteError,
+          t('indicatorDeactivationFailed', 'No se pudo desactivar el indicador.'),
+          indicatorsErrorMessageOptions,
+        ),
       );
     } finally {
       deletingIdsRef.current.delete(id);
@@ -67,7 +71,11 @@ const IndicadoresPage: React.FC = () => {
       {isLoading ? <InlineLoading description={t('loadingIndicators', 'Cargando indicadores...')} /> : null}
       {error ? (
         <div className={styles.errorBanner}>
-          {getUserFacingErrorMessage(error, 'No se pudieron cargar los indicadores.', indicatorsErrorMessageOptions)}
+          {getUserFacingErrorMessage(
+            error,
+            t('indicatorsLoadFailed', 'No se pudieron cargar los indicadores.'),
+            indicatorsErrorMessageOptions,
+          )}
         </div>
       ) : null}
 

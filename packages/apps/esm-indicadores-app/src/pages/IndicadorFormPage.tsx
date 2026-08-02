@@ -69,7 +69,7 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
     try {
       if (mode === 'create') {
         if (!definicion) {
-          throw new Error('La definición es obligatoria para crear un indicador.');
+          throw new Error(t('definitionRequiredCreate', 'La definición es obligatoria para crear un indicador.'));
         }
         const created = await createIndicador({ ...metadata, definicion });
         notifySuccess(t('indicatorCreated', 'Indicador creado'));
@@ -82,7 +82,7 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
     } catch (submitError) {
       const message = getUserFacingErrorMessage(
         submitError,
-        'No se pudo guardar el indicador.',
+        t('indicatorSaveFailed', 'No se pudo guardar el indicador.'),
         indicatorsErrorMessageOptions,
       );
       setServerError(message);
@@ -107,7 +107,11 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
       {mode === 'edit' && isLoading ? <p>{t('loadingIndicator', 'Cargando indicador...')}</p> : null}
       {mode === 'edit' && error ? (
         <div className={styles.errorBanner}>
-          {getUserFacingErrorMessage(error, 'No se pudo cargar el indicador.', indicatorsErrorMessageOptions)}
+          {getUserFacingErrorMessage(
+            error,
+            t('indicatorLoadFailed', 'No se pudo cargar el indicador.'),
+            indicatorsErrorMessageOptions,
+          )}
         </div>
       ) : null}
       {mode === 'edit' && !indicador && !isLoading && !error ? (
