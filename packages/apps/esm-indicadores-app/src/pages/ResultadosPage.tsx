@@ -26,6 +26,7 @@ import type { BatchCalcularNowResponse, Granularity, RecalcularAnioResponse } fr
 import MetaProgressCard from '../components/MetaProgressCard';
 import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
 import { notifyError, notifySuccess, useIndicadores } from '../features/indicadores/hooks';
+import { isBatchTotalFailure } from '../features/resultados/batch-results';
 import { useCalcularAhora, useRecalcularAnio, useResultados, useResultadosSeries } from '../features/resultados/hooks';
 import styles from '../indicators-dashboard.module.scss';
 
@@ -115,7 +116,11 @@ const ResultadosPage: React.FC = () => {
       // item. This is safer than requiring `failed >= total` because the
       // backend's `total` may exceed the number of reported errors (e.g.
       // it represents attempted recalculations/months).
-      const isTotalFailure = result.calculados === 0 && failed > 0 && result.total > 0;
+      const isTotalFailure = isBatchTotalFailure({
+        successes: result.calculados,
+        errorCount: failed,
+        total: result.total,
+      });
       const baseMessage = t('indicatorsCalculated', '{{count}} indicadores calculados', {
         count: result.calculados,
       });
@@ -188,7 +193,11 @@ const ResultadosPage: React.FC = () => {
       // Safer than `failed >= total` because the backend's `total` may be
       // greater than the reported `errores.length` for the annual batch
       // (e.g. total = attempted months/indicators combinations).
-      const isTotalFailure = result.recalculados === 0 && failed > 0 && result.total > 0;
+      const isTotalFailure = isBatchTotalFailure({
+        successes: result.recalculados,
+        errorCount: failed,
+        total: result.total,
+      });
       const baseMessage = t('recalcDone', '{{count}} resultados recalculados para el año {{anio}}', {
         count: result.recalculados,
         anio: recalcAnio,
@@ -221,11 +230,11 @@ const ResultadosPage: React.FC = () => {
     if (summary.kind === 'calcular') {
       const { result } = summary;
       const hasErrors = result.errores.length > 0;
-      // Mirrors handleCalcular: total failure means 0 successes with at
-      // least one error on a non-empty batch. Do NOT require
-      // `errores.length >= total` since `total` may exceed the reported
-      // error count.
-      const isTotalFailure = result.calculados === 0 && hasErrors && result.total > 0;
+      const isTotalFailure = isBatchTotalFailure({
+        successes: result.calculados,
+        errorCount: result.errores.length,
+        total: result.total,
+      });
       const kind: 'success' | 'warning' | 'error' = isTotalFailure ? 'error' : hasErrors ? 'warning' : 'success';
       const subtitle = isTotalFailure
         ? t('recalcSummaryTotalError', '{{calculados}} de {{total}} calculados, todos con error', {
@@ -274,11 +283,11 @@ const ResultadosPage: React.FC = () => {
     }
     const { result, anio } = summary;
     const hasErrors = result.errores.length > 0;
-    // Mirrors handleRecalcularConfirm: total failure means 0 recalculated
-    // with at least one error on a non-empty batch. Do NOT require
-    // `errores.length >= total` since the backend may report fewer
-    // errors than the total attempted (months × indicators).
-    const isTotalFailure = result.recalculados === 0 && hasErrors && result.total > 0;
+    const isTotalFailure = isBatchTotalFailure({
+      successes: result.recalculados,
+      errorCount: result.errores.length,
+      total: result.total,
+    });
     const kind: 'success' | 'warning' | 'error' = isTotalFailure ? 'error' : hasErrors ? 'warning' : 'success';
     const subtitle = isTotalFailure
       ? t('recalcSummaryRecalcTotalError', '{{anio}}: {{recalculados}} recalculados, todos con error', {
