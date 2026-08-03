@@ -1,8 +1,7 @@
 import { type FetchConfig, type FetchResponse, logError, openmrsFetch } from '@openmrs/esm-framework';
-
-import { isDemoDataEnabled } from './config';
-import { activateMockMode, reportBackendUnavailable, resetMockMode } from './mock-mode';
 import { translate } from '../i18n';
+import { isDemoDataEnabled } from './config';
+import { settleBackendOperation, startBackendOperation } from './mock-mode';
 
 function normalizeError(error: unknown): Error {
   if (error instanceof Error) {
@@ -45,21 +44,28 @@ export async function fetchJson<T>(url: string, init?: FetchConfig): Promise<T> 
 }
 
 export async function withMockFallback<T>(request: () => Promise<T>, fallback: () => T | Promise<T>): Promise<T> {
+  startBackendOperation();
   try {
     const data = await request();
-    resetMockMode();
+    settleBackendOperation(true);
     return data;
   } catch (error) {
     const normalized = normalizeError(error);
     logError(error, 'Indicadores: consulta a reportes-sql');
     const backendUnavailable = canUseDemoFallback(error);
     if (backendUnavailable && (await isDemoDataEnabled())) {
-      activateMockMode(normalized.message);
+      // The batch verdict decides if demo mode flips on; settle now so a
+      // later-successful sibling read cannot override this failure.
+      settleBackendOperation(false, normalized.message, true);
       return fallback();
     }
 
     if (backendUnavailable) {
-      reportBackendUnavailable(normalized.message);
+      settleBackendOperation(false, normalized.message, false);
+    } else {
+      // Non-qualifying error (4xx, app TypeError): do not flip the backend
+      // verdict either way — let the rest of the batch decide.
+      settleBackendOperation(true);
     }
     throw error;
   }
@@ -75,9 +81,18 @@ export async function withMockFallback<T>(request: () => Promise<T>, fallback: (
  * on success so the rest of the app reflects a healthy backend.
  */
 export async function mutateJson<T>(url: string, init?: FetchConfig): Promise<T> {
-  const response = (await openmrsFetch(url, init)) as FetchResponse<T>;
-  resetMockMode();
-  return response.data;
+  startBackendOperation();
+  try {
+    const response = (await openmrsFetch(url, init)) as FetchResponse<T>;
+    settleBackendOperation(true);
+    return response.data;
+  } catch (error) {
+    // Mutations never fall back to demo data, but they still feed the batch
+    // verdict: a failing write means the backend is not healthy.
+    const normalized = normalizeError(error);
+    settleBackendOperation(false, normalized.message, false);
+    throw error;
+  }
 }
 
 export function toJsonBody(payload: unknown): Pick<FetchConfig, 'headers' | 'body'> {
