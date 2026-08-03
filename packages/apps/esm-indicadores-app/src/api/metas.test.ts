@@ -37,6 +37,27 @@ describe('metas API contract', () => {
     expect(isMetaNotFoundError(error)).toBe(false);
   });
 
+  it('uses deterministic demo data for a qualifying backend failure when enabled', async () => {
+    mockedGetConfig.mockResolvedValue({ reportesSqlApiPath: '/services/reportes-sql', enableDemoData: true });
+    mockedOpenmrsFetch.mockRejectedValue(Object.assign(new Error('database failed'), { response: { status: 500 } }));
+
+    await expect(getMetaByIndicator('ind-001', 2026)).resolves.toMatchObject({
+      id: 'meta-001-2026',
+      indicador_version_id: 'ver-001-1',
+      anio: 2026,
+      valor_meta: 350,
+    });
+  });
+
+  it('keeps unknown demo meta lookups as contractual missing-meta errors', async () => {
+    mockedGetConfig.mockResolvedValue({ reportesSqlApiPath: '/services/reportes-sql', enableDemoData: true });
+    mockedOpenmrsFetch.mockRejectedValue(Object.assign(new Error('database failed'), { response: { status: 500 } }));
+
+    const error = await getMetaByIndicator('ind-002', 2026).catch((lookupError) => lookupError);
+
+    expect(isMetaNotFoundError(error)).toBe(true);
+  });
+
   it('recognizes only the contractual missing-meta 404 as an absent meta', () => {
     const detail = { field: 'indicador_version_id', message: 'Meta no encontrada' };
 

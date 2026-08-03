@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Indicador, IndicadorMeta, IndicadorMetaCreatePayload, IndicadorVersion } from '../api/types';
 import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
-import { useIndicador, useIndicadores } from '../features/indicadores/hooks';
+import { useAllIndicadores, useIndicador } from '../features/indicadores/hooks';
 import styles from '../indicators-dashboard.module.scss';
 
 interface MetaFormModalProps {
@@ -29,8 +29,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
   onSubmit,
 }) => {
   const { t } = useTranslation();
-  const { data: indicadoresData } = useIndicadores(1, 100);
-  const indicators = indicadoresData?.items ?? [];
+  const { data: indicators = [] } = useAllIndicadores();
 
   const initialIndicator = useMemo(
     () => indicators.find((indicator) => indicator.id === initialIndicatorId),
@@ -192,7 +191,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
             subtitle={getUserFacingErrorMessage(
               versionsError,
               t('retryLater', 'Intente nuevamente.'),
-              indicatorsErrorMessageOptions,
+              indicatorsErrorMessageOptions(t),
             )}
             lowContrast
             hideCloseButton

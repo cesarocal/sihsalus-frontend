@@ -48,6 +48,20 @@ describe('IndicadoresPage backend contract', () => {
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
   });
 
+  it('renders inactive indicators returned by the data source', () => {
+    vi.mocked(useIndicadores).mockReturnValue({
+      data: { items: [{ ...indicator, activo: false }], total: 1, page: 1, size: 10, pages: 1 },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Inactivo')).toBeInTheDocument();
+  });
+
   it('reports deactivation success only after DELETE resolves', async () => {
     const deleteIndicador = vi.fn().mockResolvedValue(undefined);
     vi.mocked(useDeleteIndicador).mockReturnValue({ deleteIndicador });

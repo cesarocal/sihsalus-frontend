@@ -5,6 +5,7 @@ import type {
   GetSeriesParams,
   Indicador,
   IndicadorDetail,
+  IndicadorMeta,
   IndicadorResultado,
   IndicadorSQLPreview,
   LocationOption,
@@ -131,7 +132,7 @@ const resultados: Array<IndicadorResultado> = [
     id: uid('res'),
     indicador_version_id: 'ver-001-1',
     indicador_nombre: 'Atenciones de control prenatal',
-    indicador_version_num: 2,
+    indicador_version_num: 1,
     periodo_inicio: '2026-04-01',
     periodo_fin: '2026-04-30',
     valor: 298,
@@ -200,10 +201,8 @@ function definitionToSql(definicion: DefinicionIndicadorForm) {
 }
 
 export function listIndicadores(page: number, size: number): PaginatedResponse<Indicador> {
-  const activeIndicators = indicadores
-    .filter((indicator) => indicator.activo)
-    .map(({ versiones: _versiones, ...indicator }) => indicator);
-  return toPaginatedResponse(activeIndicators, page, size);
+  const list = indicadores.map(({ versiones: _versiones, ...indicator }) => indicator);
+  return toPaginatedResponse(list, page, size);
 }
 
 export function getIndicadorById(id: string): IndicadorDetail {
@@ -212,6 +211,28 @@ export function getIndicadorById(id: string): IndicadorDetail {
     throw new Error('Indicador no encontrado');
   }
   return indicador;
+}
+
+export function getMetaByIndicatorMock(indicadorId: string, anio: number): IndicadorMeta {
+  if (indicadorId !== 'ind-001' || anio !== 2026) {
+    throw Object.assign(new Error('Meta no encontrada'), {
+      status: 404,
+      responseBody: { detail: { field: 'indicador_version_id', message: 'Meta no encontrada' } },
+    });
+  }
+
+  const indicador = getIndicadorById(indicadorId);
+  const version = latestVersion(indicador);
+
+  return {
+    id: 'meta-001-2026',
+    indicador_version_id: version.id,
+    anio,
+    valor_meta: 350,
+    creado_en: '2026-01-20T10:00:00.000Z',
+    indicador_nombre: indicador.nombre,
+    version_numero: version.version,
+  };
 }
 
 export function getSqlPreviewMock(id: string, versionId?: string): IndicadorSQLPreview {

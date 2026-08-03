@@ -45,7 +45,7 @@ const IndicadoresPage: React.FC = () => {
         getUserFacingErrorMessage(
           deleteError,
           t('indicatorDeactivationFailed', 'No se pudo desactivar el indicador.'),
-          indicatorsErrorMessageOptions,
+          indicatorsErrorMessageOptions(t),
         ),
       );
     } finally {
@@ -74,7 +74,7 @@ const IndicadoresPage: React.FC = () => {
           {getUserFacingErrorMessage(
             error,
             t('indicatorsLoadFailed', 'No se pudieron cargar los indicadores.'),
-            indicatorsErrorMessageOptions,
+            indicatorsErrorMessageOptions(t),
           )}
         </div>
       ) : null}

@@ -1,4 +1,4 @@
-import { resolveOrdenesMock } from './indicators-data';
+import { getIndicadorById, listIndicadores, listResultados, resolveOrdenesMock } from './indicators-data';
 
 describe('resolveOrdenesMock', () => {
   it('returns correct Record for known UUIDs', () => {
@@ -25,5 +25,27 @@ describe('resolveOrdenesMock', () => {
       'ord-fluor': 'Aplicación de flúor',
     });
     expect(result['ord-unknown']).toBeUndefined();
+  });
+});
+
+describe('indicator demo data contracts', () => {
+  it('keeps every mocked result version aligned with its indicator version', () => {
+    const results = listResultados({ page: 1, size: 100, include_historicos: true });
+
+    for (const result of results.items) {
+      const indicator = ['ind-001', 'ind-002', 'ind-003']
+        .map((id) => getIndicadorById(id))
+        .find((item) => item.versiones.some((version) => version.id === result.indicador_version_id));
+      const version = indicator?.versiones.find((item) => item.id === result.indicador_version_id);
+
+      expect(version).toBeDefined();
+      expect(result.indicador_version_num).toBe(version?.version);
+    }
+  });
+
+  it('returns inactive indicators in demo list responses', () => {
+    const response = listIndicadores(1, 100);
+
+    expect(response.items.some((indicator) => indicator.id === 'ind-003' && !indicator.activo)).toBe(true);
   });
 });

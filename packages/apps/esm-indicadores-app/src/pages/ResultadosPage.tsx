@@ -146,7 +146,7 @@ const ResultadosPage: React.FC = () => {
         getUserFacingErrorMessage(
           calculationError,
           'No se pudieron calcular los indicadores.',
-          indicatorsErrorMessageOptions,
+          indicatorsErrorMessageOptions(t),
         ),
       );
     } finally {
@@ -224,7 +224,7 @@ const ResultadosPage: React.FC = () => {
         getUserFacingErrorMessage(
           recalcError,
           t('recalcFailed', 'No se pudo recalcular el año'),
-          indicatorsErrorMessageOptions,
+          indicatorsErrorMessageOptions(t),
         ),
       );
     } finally {
@@ -454,7 +454,7 @@ const ResultadosPage: React.FC = () => {
           {getUserFacingErrorMessage(
             error,
             t('resultsLoadFailed', 'No se pudieron cargar los resultados.'),
-            indicatorsErrorMessageOptions,
+            indicatorsErrorMessageOptions(t),
           )}
         </div>
       ) : null}

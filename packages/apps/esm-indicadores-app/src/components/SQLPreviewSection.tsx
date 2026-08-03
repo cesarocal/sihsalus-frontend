@@ -38,7 +38,7 @@ const SQLPreviewSection: React.FC<SQLPreviewSectionProps> = ({ indicadorId, vers
             {getUserFacingErrorMessage(
               error,
               t('sqlPreviewFailed', 'No se pudo generar la vista previa SQL.'),
-              indicatorsErrorMessageOptions,
+              indicatorsErrorMessageOptions(t),
             )}
           </div>
         ) : data ? (

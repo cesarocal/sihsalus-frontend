@@ -112,7 +112,7 @@ const MetasPage: React.FC = () => {
         getUserFacingErrorMessage(
           submitError,
           t('metaSaveFailed', 'No se pudo guardar la meta.'),
-          indicatorsErrorMessageOptions,
+          indicatorsErrorMessageOptions(t),
         ),
       );
     } finally {
@@ -137,7 +137,7 @@ const MetasPage: React.FC = () => {
         getUserFacingErrorMessage(
           deleteError,
           t('metaDeleteFailed', 'No se pudo eliminar la meta.'),
-          indicatorsErrorMessageOptions,
+          indicatorsErrorMessageOptions(t),
         ),
       );
     } finally {
@@ -195,7 +195,7 @@ const MetasPage: React.FC = () => {
           {getUserFacingErrorMessage(
             indicatorsError,
             t('indicatorsLoadFailed', 'No se pudieron cargar los indicadores.'),
-            indicatorsErrorMessageOptions,
+            indicatorsErrorMessageOptions(t),
           )}
         </div>
       ) : null}
@@ -205,7 +205,7 @@ const MetasPage: React.FC = () => {
           {getUserFacingErrorMessage(
             metaError,
             t('metasLoadFailed', 'No se pudo consultar la meta.'),
-            indicatorsErrorMessageOptions,
+            indicatorsErrorMessageOptions(t),
           )}
         </div>
       ) : null}

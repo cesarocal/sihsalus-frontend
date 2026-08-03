@@ -102,7 +102,7 @@ function SearchMultiSelector<T>({
               {getUserFacingErrorMessage(
                 error,
                 t('optionsLoadFailed', 'No se pudieron cargar las opciones.'),
-                indicatorsErrorMessageOptions,
+                indicatorsErrorMessageOptions(t),
               )}
             </div>
           ) : filteredResults.length ? (

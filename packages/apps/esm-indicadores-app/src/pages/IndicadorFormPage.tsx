@@ -111,7 +111,7 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
       const message = getUserFacingErrorMessage(
         submitError,
         t('indicatorSaveFailed', 'No se pudo guardar el indicador.'),
-        indicatorsErrorMessageOptions,
+        indicatorsErrorMessageOptions(t),
       );
       setServerError(message);
       notifyError(message);
@@ -138,7 +138,7 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
           {getUserFacingErrorMessage(
             error,
             t('indicatorLoadFailed', 'No se pudo cargar el indicador.'),
-            indicatorsErrorMessageOptions,
+            indicatorsErrorMessageOptions(t),
           )}
         </div>
       ) : null}
