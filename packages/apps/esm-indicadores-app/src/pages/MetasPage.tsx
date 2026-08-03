@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import type { Indicador, IndicadorMeta, IndicadorMetaCreatePayload } from '../api/types';
 import MetaFormModal from '../components/MetaFormModal';
 import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
-import { notifyError, notifySuccess, useIndicadores } from '../features/indicadores/hooks';
+import { notifyError, notifySuccess, useAllIndicadores } from '../features/indicadores/hooks';
 import { useDeleteMeta, useMetaByIndicator, useUpsertMeta } from '../features/metas/hooks';
 import styles from '../indicators-dashboard.module.scss';
 
@@ -40,9 +40,8 @@ const MetasPage: React.FC = () => {
   const submitLockRef = useRef(false);
   const deleteLockRef = useRef(false);
 
-  const { data: indicatorsData, isLoading: indicatorsLoading, error: indicatorsError } = useIndicadores(1, 100);
-  const indicators = indicatorsData?.items ?? [];
-  const selectedIndicator = indicators.find((indicator) => indicator.id === selectedIndicatorId) ?? null;
+  const { data: indicators, isLoading: indicatorsLoading, error: indicatorsError } = useAllIndicadores();
+  const selectedIndicator = indicators?.find((indicator) => indicator.id === selectedIndicatorId) ?? null;
   const {
     data: meta,
     isLoading: metaLoading,

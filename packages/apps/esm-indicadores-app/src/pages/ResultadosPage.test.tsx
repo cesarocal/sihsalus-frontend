@@ -7,7 +7,7 @@ import ResultadosPage from './ResultadosPage';
 
 vi.mock('../features/indicadores/hooks', async () => ({
   ...(await vi.importActual('../features/indicadores/hooks')),
-  useIndicadores: vi.fn(),
+  useAllIndicadores: vi.fn(),
   notifyError: vi.fn(),
   notifySuccess: vi.fn(),
   getIndicatorsErrorMessage: vi.fn((_error, fallback) => fallback),
@@ -21,26 +21,20 @@ vi.mock('../features/resultados/hooks', async () => ({
   useRecalcularAnio: vi.fn(),
 }));
 
-import { useIndicadores, notifyError, notifySuccess } from '../features/indicadores/hooks';
+import { useAllIndicadores, notifyError, notifySuccess } from '../features/indicadores/hooks';
 import { useCalcularAhora, useRecalcularAnio, useResultados, useResultadosSeries } from '../features/resultados/hooks';
 
-const mockUseIndicadores = vi.mocked(useIndicadores);
+const mockUseAllIndicadores = vi.mocked(useAllIndicadores);
 const mockUseResultados = vi.mocked(useResultados);
 const mockUseResultadosSeries = vi.mocked(useResultadosSeries);
 const mockUseCalcularAhora = vi.mocked(useCalcularAhora);
 const mockUseRecalcularAnio = vi.mocked(useRecalcularAnio);
 const mockLogError = vi.mocked(logError);
 
-const indicadores = {
-  items: [
-    { id: 'ind-001', nombre: 'Control prenatal', descripcion: null, activo: true, creado_en: '2026-01-01' },
-    { id: 'ind-002', nombre: 'Anemia', descripcion: null, activo: true, creado_en: '2026-02-01' },
-  ],
-  total: 2,
-  page: 1,
-  size: 100,
-  pages: 1,
-};
+const indicadores = [
+  { id: 'ind-001', nombre: 'Control prenatal', descripcion: null, activo: true, creado_en: '2026-01-01' },
+  { id: 'ind-002', nombre: 'Anemia', descripcion: null, activo: true, creado_en: '2026-02-01' },
+];
 
 const monthlySeries: SeriesResponse = {
   items: [
@@ -74,7 +68,7 @@ describe('ResultadosPage series granularity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockUseIndicadores.mockReturnValue({
+    mockUseAllIndicadores.mockReturnValue({
       data: indicadores,
       error: undefined,
       isLoading: false,
@@ -252,7 +246,7 @@ describe('ResultadosPage period filters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockUseIndicadores.mockReturnValue({
+    mockUseAllIndicadores.mockReturnValue({
       data: indicadores,
       error: undefined,
       isLoading: false,
@@ -299,10 +293,18 @@ describe('ResultadosPage period filters', () => {
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
   };
 
+  // The historical fetch only fires when `viewMode === 'historical'`. The
+  // series view (default) passes `null` to `useResultados` so the params
+  // object is never built. Switch to historical before asserting params.
+  const renderHistoricalPage = () => {
+    renderPage();
+    fireEvent.click(screen.getByText('Histórico'));
+  };
+
   const lastResultadosParams = () => mockUseResultados.mock.calls[mockUseResultados.mock.calls.length - 1][0];
 
   it('rejects an inverted period range: shows a message and does not fire the request with it', () => {
-    renderPage();
+    renderHistoricalPage();
 
     setDate('Desde', '2026-05-01');
     setDate('Hasta', '2026-03-01');
@@ -313,7 +315,7 @@ describe('ResultadosPage period filters', () => {
   });
 
   it('allows an open-ended range with only the start bound set', () => {
-    renderPage();
+    renderHistoricalPage();
 
     setDate('Desde', '2026-05-01');
 
@@ -323,7 +325,7 @@ describe('ResultadosPage period filters', () => {
   });
 
   it('allows an open-ended range with only the end bound set', () => {
-    renderPage();
+    renderHistoricalPage();
 
     setDate('Hasta', '2026-03-01');
 
@@ -333,7 +335,7 @@ describe('ResultadosPage period filters', () => {
   });
 
   it('clears the error and fires the request once the range becomes valid', () => {
-    renderPage();
+    renderHistoricalPage();
 
     setDate('Desde', '2026-05-01');
     setDate('Hasta', '2026-03-01');
@@ -352,7 +354,7 @@ describe('ResultadosPage calculate / recalculate actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockUseIndicadores.mockReturnValue({
+    mockUseAllIndicadores.mockReturnValue({
       data: indicadores,
       error: undefined,
       isLoading: false,

@@ -34,10 +34,19 @@ const IndicadorDetailPage: React.FC = () => {
   const { data, isLoading, error } = useIndicador(id);
   const { createVersion } = useCreateVersion(id);
 
-  const latestVersion = useMemo(
-    () => data?.versiones.reduce((max, version) => (version.version > max.version ? version : max), data.versiones[0]),
-    [data],
-  );
+  const latestVersion = useMemo(() => {
+    // `Array.prototype.reduce` with no initial value throws `TypeError` on an
+    // empty array, and `data.versiones[0]` would be `undefined`. Guard the
+    // empty/absent case and return `undefined` — the render at L177 already
+    // treats a falsy `latestVersion` as "no current definition".
+    if (!data?.versiones.length) {
+      return undefined;
+    }
+    return data.versiones.reduce(
+      (max, version) => (version.version > max.version ? version : max),
+      data.versiones[0],
+    );
+  }, [data]);
 
   const ordenUuids = useMemo(() => {
     if (!latestVersion) {

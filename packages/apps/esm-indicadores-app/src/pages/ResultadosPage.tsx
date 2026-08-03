@@ -22,10 +22,10 @@ import {
 import { formatDate, getUserFacingErrorMessage, logError, parseDate } from '@openmrs/esm-framework';
 import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { BatchCalcularNowResponse, Granularity, RecalcularAnioResponse } from '../api/types';
+import type { BatchCalcularNowResponse, GetResultadosParams, Granularity, RecalcularAnioResponse } from '../api/types';
 import MetaProgressCard from '../components/MetaProgressCard';
 import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
-import { notifyError, notifySuccess, useIndicadores } from '../features/indicadores/hooks';
+import { notifyError, notifySuccess, useAllIndicadores } from '../features/indicadores/hooks';
 import { isBatchTotalFailure } from '../features/resultados/batch-results';
 import { useCalcularAhora, useRecalcularAnio, useResultados, useResultadosSeries } from '../features/resultados/hooks';
 import styles from '../indicators-dashboard.module.scss';
@@ -60,21 +60,31 @@ const ResultadosPage: React.FC = () => {
   const currentYearValue = currentYear();
   const periodRangeInvalid = Boolean(periodoInicio && periodoFin && periodoInicio > periodoFin);
 
-  const { data: indicadoresData } = useIndicadores(1, 100);
+  const { data: indicadores } = useAllIndicadores();
 
-  // Historical paginated results
+  // Historical paginated results. Only fetch when the historical view is
+  // active — passing `null` uses SWR's null-key pattern so the fetcher is
+  // never invoked in the series view (avoids wasted backend bandwidth/rows).
+  const historicalParams = useMemo<GetResultadosParams | null>(
+    () =>
+      viewMode === 'historical'
+        ? {
+            page,
+            size: pageSize,
+            indicador_id: filters.indicador_id || undefined,
+            periodo_inicio: periodRangeInvalid ? undefined : toDateString(periodoInicio),
+            periodo_fin: periodRangeInvalid ? undefined : toDateString(periodoFin),
+            include_historicos: true,
+          }
+        : null,
+    [viewMode, page, filters.indicador_id, periodRangeInvalid, periodoInicio, periodoFin],
+  );
+
   const {
     data: historicalData,
     isLoading: historicalLoading,
     error: historicalError,
-  } = useResultados({
-    page,
-    size: pageSize,
-    indicador_id: filters.indicador_id || undefined,
-    periodo_inicio: periodRangeInvalid ? undefined : toDateString(periodoInicio),
-    periodo_fin: periodRangeInvalid ? undefined : toDateString(periodoFin),
-    include_historicos: true,
-  });
+  } = useResultados(historicalParams);
 
   // Time-series rollup data
   const seriesParams = useMemo(
@@ -375,7 +385,7 @@ const ResultadosPage: React.FC = () => {
           }}
         >
           <SelectItem value="" text={t('allIndicators', 'Todos los indicadores')} />
-          {(indicadoresData?.items ?? []).map((indicador) => (
+          {(indicadores ?? []).map((indicador) => (
             <SelectItem key={indicador.id} value={indicador.id} text={indicador.nombre} />
           ))}
         </Select>
@@ -590,7 +600,7 @@ const ResultadosPage: React.FC = () => {
         {filters.indicador_id ? (
           <p className={styles.scopeHint}>
             {t('recalcModalScopeHint', 'Se recalculará solo el indicador seleccionado: {{nombre}}.', {
-              nombre: indicadoresData?.items.find((i) => i.id === filters.indicador_id)?.nombre ?? filters.indicador_id,
+              nombre: indicadores?.find((i) => i.id === filters.indicador_id)?.nombre ?? filters.indicador_id,
             })}
           </p>
         ) : null}

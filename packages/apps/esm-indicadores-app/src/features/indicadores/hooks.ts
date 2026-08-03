@@ -47,6 +47,47 @@ export function useIndicadores(page: number, size: number) {
   };
 }
 
+// Safety cap to prevent runaway pagination loops against a malicious or
+// buggy backend that always reports more items than it returns. 1000 is
+// well above any realistic indicador count for this domain.
+const ALL_INDICADORES_MAX = 1000;
+const ALL_INDICADORES_PAGE_SIZE = 100;
+const allIndicadoresKey = () => ['indicadores', 'all'] as const;
+
+export function useAllIndicadores() {
+  const { data, error, isLoading, mutate } = useSWR<Array<Indicador>, Error>(allIndicadoresKey(), async () => {
+    const items: Array<Indicador> = [];
+    let page = 1;
+    while (true) {
+      const response = await getIndicadores(page, ALL_INDICADORES_PAGE_SIZE);
+      items.push(...response.items);
+      // Stop when we've collected every item the backend reports, or when a
+      // page returns fewer than `size` (final page / no more rows).
+      if (items.length >= response.total || response.items.length < ALL_INDICADORES_PAGE_SIZE) {
+        break;
+      }
+      // Backstop against an adversarial backend that reports a huge total but
+      // keeps returning full pages forever.
+      if (items.length >= ALL_INDICADORES_MAX) {
+        console.warn(
+          `useAllIndicadores: reached the ${ALL_INDICADORES_MAX}-item safety cap before exhausting the backend list (total reported: ${response.total}). Stopping pagination.`,
+        );
+        break;
+      }
+      page += 1;
+    }
+    return items;
+  });
+
+  return {
+    data,
+    error,
+    isLoading,
+    isError: Boolean(error),
+    refetch: mutate,
+  };
+}
+
 export function useIndicador(id: string) {
   const { data, error, isLoading, mutate } = useSWR<IndicadorDetail, Error>(id ? indicadorKey(id) : null, () =>
     getIndicador(id),

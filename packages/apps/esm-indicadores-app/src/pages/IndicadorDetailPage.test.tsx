@@ -230,6 +230,29 @@ describe('IndicadorDetailPage', () => {
     expect(screen.getByText('Versión #2')).toBeInTheDocument();
   });
 
+  it('renders without throwing when the indicator has an empty versiones array', () => {
+    mockUseIndicador.mockReturnValue({
+      data: { ...sampleIndicator, versiones: [] },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    // Regression: previously `latestVersion` called `.reduce()` without an
+    // initial value on an empty array, throwing
+    // `TypeError: Reduce of empty array with no initial value`.
+    expect(() => renderPage()).not.toThrow();
+
+    // The page should still render the indicator header and the (empty)
+    // version history list, without a "current definition" section.
+    expect(screen.getByText('Atenciones de control prenatal')).toBeInTheDocument();
+    expect(screen.getByText('Historial de versiones')).toBeInTheDocument();
+    expect(screen.queryByText('Definición actual')).not.toBeInTheDocument();
+    // No version summary items should be present
+    expect(screen.queryByText('Versión #1')).not.toBeInTheDocument();
+  });
+
   it('calls createVersion on form submit and shows success notification', async () => {
     const createVersionMock = vi.fn().mockResolvedValue(undefined);
     mockUseCreateVersion.mockReturnValue({ createVersion: createVersionMock });
