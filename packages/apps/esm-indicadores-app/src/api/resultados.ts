@@ -1,6 +1,7 @@
 import { getSeriesMock, listResultados } from '../mocks/indicators-data';
 import { fetchJson, mutateJson, toJsonBody, withMockFallback } from './client';
 import { getReportesSqlApiPath } from './config';
+import { assertShape, isPaginatedResponse, isSeriesResponse } from './validate';
 import type {
   BatchCalcularNowResponse,
   GetResultadosParams,
@@ -36,7 +37,10 @@ export async function getResultados(params: GetResultadosParams): Promise<Pagina
   };
 
   return withMockFallback(
-    () => fetchJson<PaginatedResponse<IndicadorResultado>>(`${reportesSqlBase}/resultados/${ensureQuery(queryParams)}`),
+    () =>
+      fetchJson<PaginatedResponse<IndicadorResultado>>(`${reportesSqlBase}/resultados/${ensureQuery(queryParams)}`).then(
+        (data) => assertShape(data, isPaginatedResponse, 'resultados'),
+      ),
     () => listResultados(params),
   );
 }
@@ -64,7 +68,10 @@ export async function getResultadosSeries(params: GetSeriesParams): Promise<Seri
   };
 
   return withMockFallback(
-    () => fetchJson<SeriesResponse>(`${reportesSqlBase}/resultados/series${ensureQuery(queryParams)}`),
+    () =>
+      fetchJson<SeriesResponse>(`${reportesSqlBase}/resultados/series${ensureQuery(queryParams)}`).then((data) =>
+        assertShape(data, isSeriesResponse, 'series'),
+      ),
     () => getSeriesMock(params),
   );
 }

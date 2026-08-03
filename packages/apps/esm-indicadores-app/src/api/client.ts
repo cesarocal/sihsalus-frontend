@@ -31,8 +31,12 @@ function canUseDemoFallback(error: unknown): boolean {
     return status >= 500;
   }
 
+  // Only network-level failures qualify. Matching the message keeps genuine
+  // fetch errors (e.g. "Failed to fetch", "fetch failed") covered while
+  // excluding arbitrary TypeErrors thrown by application bugs — otherwise a
+  // code defect would silently flip the whole app into demo mode.
   const message = normalizeError(error).message;
-  return error instanceof TypeError || /network|failed to fetch|fetch failed|load failed/i.test(message);
+  return /network|failed to fetch|fetch failed|load failed/i.test(message);
 }
 
 export async function fetchJson<T>(url: string, init?: FetchConfig): Promise<T> {

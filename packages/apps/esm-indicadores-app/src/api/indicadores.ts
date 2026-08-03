@@ -11,6 +11,7 @@ import {
 } from '../mocks/indicators-data';
 import { fetchJson, mutateJson, toJsonBody, withMockFallback } from './client';
 import { getReportesSqlApiPath, getReportesSqlResourcePath } from './config';
+import { assertShape, isPaginatedResponse, isSQLPreview } from './validate';
 import type {
   DefinicionIndicadorForm,
   DiagnosticoOption,
@@ -56,7 +57,10 @@ export async function getIndicadores(page: number, size: number): Promise<Pagina
   const indicadoresPath = await getReportesSqlResourcePath('indicadores');
   const url = ensureQuery(`${indicadoresPath}/`, { page, size });
   return withMockFallback(
-    () => fetchJson<PaginatedResponse<Indicador>>(url),
+    () =>
+      fetchJson<PaginatedResponse<Indicador>>(url).then((data) =>
+        assertShape(data, isPaginatedResponse, 'indicadores'),
+      ),
     () => listIndicadores(page, size),
   );
 }
@@ -96,7 +100,9 @@ export async function previewSql(id: string, versionId?: string): Promise<Indica
   const reportesSqlBase = await getReportesSqlApiPath();
   return withMockFallback(
     () =>
-      fetchJson<IndicadorSQLPreview>(ensureQuery(`${reportesSqlBase}/indicadores/${id}/preview-sql`, { versionId })),
+      fetchJson<IndicadorSQLPreview>(ensureQuery(`${reportesSqlBase}/indicadores/${id}/preview-sql`, { versionId })).then(
+        (data) => assertShape(data, isSQLPreview, 'preview-sql'),
+      ),
     () => getSqlPreviewMock(id, versionId),
   );
 }

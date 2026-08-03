@@ -1,4 +1,4 @@
-import { Button, Tag, Tile } from '@carbon/react';
+import { Button, InlineLoading, Tag, Tile } from '@carbon/react';
 import { formatDate, getUserFacingErrorMessage, parseDate } from '@openmrs/esm-framework';
 import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,10 +13,13 @@ import {
   notifySuccess,
   useCreateVersion,
   useIndicador,
+  useResolvedDiagnosticos,
+  useResolvedLocations,
   useResolvedOrdenes,
 } from '../features/indicadores/hooks';
 import { parseDefinicion } from '../features/indicadores/parseDefinicion';
 import styles from '../indicators-dashboard.module.scss';
+import type { ResolvedDefinitionNames } from '../components/DefinicionView';
 
 const formatVersionDate = (iso: string) => formatDate(parseDate(iso));
 
@@ -44,6 +47,40 @@ const IndicadorDetailPage: React.FC = () => {
   }, [latestVersion]);
 
   const { data: ordenesData } = useResolvedOrdenes(ordenUuids);
+
+  // Resolve names for EVERY version definition once, at page level, instead
+  // of letting each DefinicionView fire its own resolve requests (N×3
+  // fetches for N versions). SWR dedupes only identical keys, so distinct
+  // uuid subsets still produce distinct network calls.
+  const allLocationUuids = useMemo(
+    () => Array.from(new Set(data?.versiones.flatMap((v) => v.definicion.evento?.location_uuids ?? []) ?? [])),
+    [data],
+  );
+  const allDiagnosticoUuids = useMemo(
+    () =>
+      Array.from(
+        new Set(data?.versiones.flatMap((v) => v.definicion.evento?.diagnosticos?.flatMap((d) => d.concepto_uuids) ?? []) ?? []),
+      ),
+    [data],
+  );
+  const allOrdenUuids = useMemo(
+    () =>
+      Array.from(
+        new Set(data?.versiones.flatMap((v) => v.definicion.evento?.ordenes?.map((o) => o.concepto_uuid) ?? []) ?? []),
+      ),
+    [data],
+  );
+
+  const { displayMap: locationNames } = useResolvedLocations(allLocationUuids);
+  const { resolveMap: diagnosticoNames } = useResolvedDiagnosticos(allDiagnosticoUuids);
+  const { displayMap: ordenNames } = useResolvedOrdenes(allOrdenUuids);
+
+  const resolved: ResolvedDefinitionNames = useMemo(
+    () => ({ locationNames, diagnosticoNames, ordenNames }),
+    [locationNames, diagnosticoNames, ordenNames],
+  );
+
+  const ordenesReady = ordenUuids.length === 0 || Boolean(ordenesData);
 
   const handleCreateVersion = async ({
     definicion,
@@ -120,14 +157,18 @@ const IndicadorDetailPage: React.FC = () => {
           {showVersionForm ? (
             <Tile className={styles.section}>
               <h3 className={styles.sectionTitle}>{t('createNewVersion', 'Crear nueva versión')}</h3>
-              <IndicadorForm
-                mode="version"
-                defaultValues={latestVersion ? parseDefinicion(latestVersion.definicion, ordenesData) : undefined}
-                initialMetadata={{ nombre: data.nombre, descripcion: data.descripcion }}
-                serverError={serverError}
-                isSubmitting={isSubmittingVersion}
-                onSubmit={handleCreateVersion}
-              />
+              {ordenesReady ? (
+                <IndicadorForm
+                  mode="version"
+                  defaultValues={latestVersion ? parseDefinicion(latestVersion.definicion, ordenesData) : undefined}
+                  initialMetadata={{ nombre: data.nombre, descripcion: data.descripcion }}
+                  serverError={serverError}
+                  isSubmitting={isSubmittingVersion}
+                  onSubmit={handleCreateVersion}
+                />
+              ) : (
+                <InlineLoading description={t('loadingOrders', 'Cargando órdenes...')} />
+              )}
             </Tile>
           ) : null}
 
@@ -144,7 +185,7 @@ const IndicadorDetailPage: React.FC = () => {
                       {t('createdLabel', 'Creado:')} {formatVersionDate(latestVersion.creado_en)}
                     </span>
                   </div>
-                  <DefinicionView definicion={latestVersion.definicion} />
+                  <DefinicionView definicion={latestVersion.definicion} resolved={resolved} />
                   <SQLPreviewSection
                     indicadorId={data.id}
                     versionId={latestVersion.id}
@@ -167,7 +208,7 @@ const IndicadorDetailPage: React.FC = () => {
                         </span>
                       </summary>
                       <div className={styles.historyDetailsBody}>
-                        <DefinicionView definicion={version.definicion} />
+                        <DefinicionView definicion={version.definicion} resolved={resolved} />
                       </div>
                     </details>
                   </li>

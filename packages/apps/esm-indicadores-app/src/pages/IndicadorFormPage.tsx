@@ -1,3 +1,4 @@
+import { InlineLoading } from '@carbon/react';
 import { getUserFacingErrorMessage } from '@openmrs/esm-framework';
 import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +40,11 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
   }, [indicador]);
 
   const { data: ordenesData } = useResolvedOrdenes(ordenUuids);
+
+  // Mount the form only once every async input it needs is available:
+  // parseDefinicion falls back to raw UUIDs when order names are missing,
+  // and the form state freezes at first mount (useState initializer).
+  const ordenesReady = ordenUuids.length === 0 || Boolean(ordenesData);
 
   const defaultValues = useMemo(() => {
     if (!indicador?.versiones.length) {
@@ -118,7 +124,11 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
         <div className={styles.errorBanner}>{t('indicatorNotFound', 'No se encontró el indicador.')}</div>
       ) : null}
 
-      {mode === 'create' || indicador ? (
+      {mode === 'edit' && indicador && !ordenesReady ? (
+        <InlineLoading description={t('loadingOrders', 'Cargando órdenes...')} />
+      ) : null}
+
+      {mode === 'create' || (indicador && ordenesReady) ? (
         <div className={styles.formPageShell}>
           <div className={styles.formPageIntro}>
             <p className={styles.subtitle}>

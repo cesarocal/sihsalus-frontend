@@ -43,6 +43,15 @@ describe('metas API contract', () => {
     expect(isMetaNotFoundError({ response: { status: 404 }, responseBody: { detail } })).toBe(true);
     expect(isMetaNotFoundError({ status: 404, responseBody: { detail } })).toBe(true);
     expect(isMetaNotFoundError({ response: { status: 404 } })).toBe(false);
+
+    expect(
+      isMetaNotFoundError({
+        response: { status: 404 },
+        responseBody: {
+          detail: { field: 'indicador_version_id', message: 'No encontrado' },
+        },
+      }),
+    ).toBe(true);
     expect(
       isMetaNotFoundError({
         response: { status: 404 },

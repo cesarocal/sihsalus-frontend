@@ -1,15 +1,27 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { DefinicionIndicadorForm } from '../api/types';
+import type { DefinicionIndicadorForm, DiagnosticoOption } from '../api/types';
 import { useResolvedDiagnosticos, useResolvedLocations, useResolvedOrdenes } from '../features/indicadores/hooks';
 import styles from '../indicators-dashboard.module.scss';
 
-interface DefinicionViewProps {
-  definicion: DefinicionIndicadorForm;
+export interface ResolvedDefinitionNames {
+  locationNames: Map<string, string>;
+  diagnosticoNames: Map<string, DiagnosticoOption>;
+  ordenNames: Map<string, string>;
 }
 
-const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
+interface DefinicionViewProps {
+  definicion: DefinicionIndicadorForm;
+  /**
+   * Pre-resolved uuid → name maps (e.g. provided by the detail page for all
+   * version definitions at once). When present, no resolve hooks run and no
+   * additional network requests are made for this view.
+   */
+  resolved?: ResolvedDefinitionNames;
+}
+
+const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved }) => {
   const { t } = useTranslation();
   const locationUuids = useMemo(() => definicion.evento?.location_uuids ?? [], [definicion.evento?.location_uuids]);
   const diagnosticoUuids = useMemo(
@@ -21,9 +33,20 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
     [definicion.evento?.ordenes],
   );
 
-  const { displayMap } = useResolvedLocations(locationUuids);
-  const { resolveMap } = useResolvedDiagnosticos(diagnosticoUuids);
-  const { data: ordenesData } = useResolvedOrdenes(ordenUuids);
+  // With pre-resolved maps the hooks receive an empty list, so their SWR
+  // keys stay null and no requests are issued.
+  const { displayMap } = useResolvedLocations(resolved ? [] : locationUuids);
+  const { resolveMap } = useResolvedDiagnosticos(resolved ? [] : diagnosticoUuids);
+  const { data: ordenesData } = useResolvedOrdenes(resolved ? [] : ordenUuids);
+
+  const locationNames = resolved?.locationNames ?? displayMap;
+  const diagnosticoNames = resolved?.diagnosticoNames ?? resolveMap;
+  // Order names arrive as a Record from the hook but as a Map when
+  // pre-resolved; normalize to a Map so the render path is uniform.
+  const ordenNames = useMemo(
+    () => resolved?.ordenNames ?? (ordenesData ? new Map(Object.entries(ordenesData)) : new Map<string, string>()),
+    [resolved, ordenesData],
+  );
 
   return (
     <div className={styles.definitionList}>
@@ -33,7 +56,7 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
       </div>
       <div>
         <strong>{t('definitionLocations', 'Servicios:')}</strong>{' '}
-        {locationUuids.length ? locationUuids.map((uuid) => displayMap.get(uuid) ?? uuid).join(', ') : t('all', 'Todos')}
+        {locationUuids.length ? locationUuids.map((uuid) => locationNames.get(uuid) ?? uuid).join(', ') : t('all', 'Todos')}
       </div>
       <div>
         <strong>{t('definitionMinOccurrences', 'Mínimo de ocurrencias:')}</strong> {definicion.evento?.minimo_ocurrencias ?? 1}
@@ -42,14 +65,14 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion }) => {
         <strong>{t('definitionDiagnostics', 'Diagnósticos:')}</strong>{' '}
         {definicion.evento?.diagnosticos?.length
           ? definicion.evento.diagnosticos
-              .map((item) => item.concepto_uuids.map((uuid) => resolveMap.get(uuid)?.nombre ?? uuid).join(', '))
+              .map((item) => item.concepto_uuids.map((uuid) => diagnosticoNames.get(uuid)?.nombre ?? uuid).join(', '))
               .join(', ')
           : t('noFilter', 'Sin filtro')}
       </div>
       <div>
         <strong>{t('definitionOrders', 'Órdenes:')}</strong>{' '}
         {definicion.evento?.ordenes?.length
-          ? definicion.evento.ordenes.map((item) => ordenesData?.[item.concepto_uuid] ?? item.concepto_uuid).join(', ')
+          ? definicion.evento.ordenes.map((item) => ordenNames.get(item.concepto_uuid) ?? item.concepto_uuid).join(', ')
           : t('noFilter', 'Sin filtro')}
       </div>
       <div>

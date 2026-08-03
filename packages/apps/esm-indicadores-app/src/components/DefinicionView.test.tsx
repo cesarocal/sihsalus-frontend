@@ -116,6 +116,56 @@ describe('DefinicionView orden rendering', () => {
   });
 });
 
+describe('DefinicionView with pre-resolved names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseResolvedLocations.mockReturnValue({
+      data: [],
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useResolvedLocations>);
+    mockUseResolvedDiagnosticos.mockReturnValue({
+      data: [],
+      resolveMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useResolvedDiagnosticos>);
+    mockUseResolvedOrdenes.mockReturnValue({
+      data: undefined,
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+  });
+
+  it('renders resolved names and issues no resolve requests when resolved maps are provided', () => {
+    const definicion: DefinicionIndicadorForm = {
+      tipo: 'conteo_atenciones',
+      evento: {
+        location_uuids: ['loc-a'],
+        ordenes: [{ concepto_uuid: 'ord-a' }],
+      },
+    };
+    render(
+      <DefinicionView
+        definicion={definicion}
+        resolved={{
+          locationNames: new Map([['loc-a', 'Servicio A']]),
+          diagnosticoNames: new Map(),
+          ordenNames: new Map([['ord-a', 'Hemograma']]),
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Servicio A')).toBeInTheDocument();
+    expect(screen.getByText('Hemograma')).toBeInTheDocument();
+    expect(mockUseResolvedOrdenes).toHaveBeenCalledWith([]);
+    expect(mockUseResolvedLocations).toHaveBeenCalledWith([]);
+    expect(mockUseResolvedDiagnosticos).toHaveBeenCalledWith([]);
+  });
+});
+
 describe('DefinicionView periodo removal', () => {
   beforeEach(() => {
     vi.clearAllMocks();

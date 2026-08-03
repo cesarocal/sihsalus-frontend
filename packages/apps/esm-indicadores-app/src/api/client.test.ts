@@ -65,6 +65,18 @@ describe('indicators API client', () => {
     expect(activateMockMode).toHaveBeenCalledWith('Network Error');
   });
 
+  it('never treats an arbitrary application TypeError as a network failure', async () => {
+    const error = new TypeError('Cannot read properties of undefined (reading "items")');
+    const fallback = vi.fn(() => ({ demo: true }));
+    mockIsDemoDataEnabled.mockResolvedValue(true);
+    mockOpenmrsFetch.mockRejectedValue(error);
+
+    await expect(withMockFallback(() => fetchJson('/resource'), fallback)).rejects.toBe(error);
+    expect(fallback).not.toHaveBeenCalled();
+    expect(activateMockMode).not.toHaveBeenCalled();
+    expect(reportBackendUnavailable).not.toHaveBeenCalled();
+  });
+
   it('never invokes a fallback for mutations, even when demo mode is enabled', async () => {
     const error = Object.assign(new Error('write rejected'), { response: { status: 422 } });
     mockIsDemoDataEnabled.mockResolvedValue(true);
