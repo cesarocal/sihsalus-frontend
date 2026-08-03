@@ -11,6 +11,8 @@ import {
   notifySuccess,
   useCreateIndicador,
   useIndicador,
+  useResolvedDiagnosticos,
+  useResolvedLocations,
   useResolvedOrdenes,
   useUpdateIndicador,
 } from '../features/indicadores/hooks';
@@ -32,19 +34,35 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
   const { updateIndicador } = useUpdateIndicador();
   const { data: indicador, isLoading, error } = useIndicador(mode === 'edit' ? (id ?? '') : '');
 
-  const ordenUuids = useMemo(() => {
-    if (!indicador?.versiones.length) {
-      return [];
-    }
-    return indicador.versiones[0].definicion.evento?.ordenes?.map((item) => item.concepto_uuid) ?? [];
-  }, [indicador]);
+  const firstVersion = indicador?.versiones?.[0]?.definicion;
 
-  const { data: ordenesData } = useResolvedOrdenes(ordenUuids);
+  const ordenUuids = useMemo(
+    () => firstVersion?.evento?.ordenes?.map((item) => item.concepto_uuid) ?? [],
+    [firstVersion],
+  );
+  const locationUuids = useMemo(() => firstVersion?.evento?.location_uuids ?? [], [firstVersion]);
+  const diagnosticoUuids = useMemo(
+    () => firstVersion?.evento?.diagnosticos?.flatMap((item) => item.concepto_uuids) ?? [],
+    [firstVersion],
+  );
 
-  // Mount the form only once every async input it needs is available:
-  // parseDefinicion falls back to raw UUIDs when order names are missing,
-  // and the form state freezes at first mount (useState initializer).
-  const ordenesReady = ordenUuids.length === 0 || Boolean(ordenesData);
+  // Resolve every clinical-filter uuid to its display name BEFORE mounting the
+  // form. The form state freezes at first mount (useState initializer), so the
+  // pills would otherwise render raw UUIDs and never refresh. SWR isLoading
+  // is true only on the first fetch without data; on error it goes false and
+  // parseDefinicion falls back to the raw UUID (graceful degrade).
+  const { displayMap: locationsMap, isLoading: locationsLoading } = useResolvedLocations(locationUuids);
+  const { resolveMap: diagnosticosMap, isLoading: diagnosticosLoading } = useResolvedDiagnosticos(diagnosticoUuids);
+  const { data: ordenesData, isLoading: ordenesLoading } = useResolvedOrdenes(ordenUuids);
+  const ordenesMap = useMemo(() => (ordenesData ? new Map(Object.entries(ordenesData)) : undefined), [ordenesData]);
+
+  // Mount the form only once every async name resolution it needs is available
+  // (or there is nothing to resolve). parseDefinicion falls back to raw UUIDs
+  // when a name is missing, and the form state freezes at first mount.
+  const locationsReady = locationUuids.length === 0 || !locationsLoading;
+  const diagnosticosReady = diagnosticoUuids.length === 0 || !diagnosticosLoading;
+  const ordenesReady = ordenUuids.length === 0 || !ordenesLoading;
+  const namesReady = locationsReady && diagnosticosReady && ordenesReady;
 
   const defaultValues = useMemo(() => {
     if (!indicador?.versiones.length) {
@@ -54,9 +72,13 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
     return {
       nombre: indicador.nombre,
       descripcion: indicador.descripcion ?? '',
-      ...parseDefinicion(indicador.versiones[0].definicion, ordenesData),
+      ...parseDefinicion(indicador.versiones[0].definicion, {
+        locations: locationsMap,
+        diagnosticos: diagnosticosMap,
+        ordenes: ordenesMap,
+      }),
     };
-  }, [indicador, ordenesData]);
+  }, [indicador, locationsMap, diagnosticosMap, ordenesMap]);
 
   const handleSubmit = async ({
     metadata,
@@ -124,17 +146,23 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
         <div className={styles.errorBanner}>{t('indicatorNotFound', 'No se encontró el indicador.')}</div>
       ) : null}
 
-      {mode === 'edit' && indicador && !ordenesReady ? (
-        <InlineLoading description={t('loadingOrders', 'Cargando órdenes...')} />
+      {mode === 'edit' && indicador && !namesReady ? (
+        <InlineLoading description={t('loadingNames', 'Cargando nombres clínicos...')} />
       ) : null}
 
-      {mode === 'create' || (indicador && ordenesReady) ? (
+      {mode === 'create' || (indicador && namesReady) ? (
         <div className={styles.formPageShell}>
           <div className={styles.formPageIntro}>
             <p className={styles.subtitle}>
               {mode === 'create'
-                ? t('createModeIntro', 'Defina la metadata y la lógica base del indicador. Más adelante podemos reemplazar estos campos por selectores clínicos más ricos.')
-                : t('editModeIntro', 'Actualice el nombre y la descripción. La definición de cálculo se versiona desde el detalle del indicador.')}
+                ? t(
+                    'createModeIntro',
+                    'Defina la metadata y la lógica base del indicador. Más adelante podemos reemplazar estos campos por selectores clínicos más ricos.',
+                  )
+                : t(
+                    'editModeIntro',
+                    'Actualice el nombre y la descripción. La definición de cálculo se versiona desde el detalle del indicador.',
+                  )}
             </p>
           </div>
           <IndicadorForm

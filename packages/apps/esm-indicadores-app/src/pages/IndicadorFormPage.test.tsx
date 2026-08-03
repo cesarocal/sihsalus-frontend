@@ -1,14 +1,16 @@
+import { act, fireEvent, screen } from '@testing-library/react';
+import { MemoryRouter, useNavigate, useParams } from 'react-router-dom';
+import { renderWithSwr } from 'test-utils';
 import {
   notifyError,
   notifySuccess,
   useCreateIndicador,
   useIndicador,
+  useResolvedDiagnosticos,
+  useResolvedLocations,
   useResolvedOrdenes,
   useUpdateIndicador,
 } from '../features/indicadores/hooks';
-import { act, fireEvent, screen } from '@testing-library/react';
-import { MemoryRouter, useNavigate, useParams } from 'react-router-dom';
-import { renderWithSwr } from 'test-utils';
 import IndicadorFormPage from './IndicadorFormPage';
 
 vi.mock('../features/indicadores/hooks', () => ({
@@ -17,6 +19,8 @@ vi.mock('../features/indicadores/hooks', () => ({
   useCreateIndicador: vi.fn(),
   useUpdateIndicador: vi.fn(),
   useResolvedOrdenes: vi.fn(),
+  useResolvedLocations: vi.fn(),
+  useResolvedDiagnosticos: vi.fn(),
   useLocationSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   useDiagnosticoSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   useOrdenSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
@@ -88,6 +92,18 @@ describe('IndicadorFormPage — create mode', () => {
     vi.mocked(useResolvedOrdenes).mockReturnValue({
       data: undefined,
       displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+    vi.mocked(useResolvedLocations).mockReturnValue({
+      data: [],
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+    vi.mocked(useResolvedDiagnosticos).mockReturnValue({
+      data: [],
+      resolveMap: new Map(),
       error: undefined,
       isLoading: false,
     });
@@ -183,6 +199,18 @@ describe('IndicadorFormPage — edit mode', () => {
     vi.mocked(useResolvedOrdenes).mockReturnValue({
       data: {},
       displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+    vi.mocked(useResolvedLocations).mockReturnValue({
+      data: [],
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+    vi.mocked(useResolvedDiagnosticos).mockReturnValue({
+      data: [],
+      resolveMap: new Map(),
       error: undefined,
       isLoading: false,
     });
