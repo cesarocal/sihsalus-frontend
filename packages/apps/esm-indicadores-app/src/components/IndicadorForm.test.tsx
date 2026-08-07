@@ -147,4 +147,42 @@ describe('IndicadorForm reportes-sql contract', () => {
     expect(screen.getByText(/enteros mayores o iguales a 0/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it('rejects min age greater than max age when both use the same unit', async () => {
+    const onSubmit = vi.fn();
+    render(<IndicadorForm mode="create" defaultValues={{ nombre: 'Rango invertido' }} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText('Edad mínima años'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Edad máxima años'), { target: { value: '5' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Guardar' })));
+
+    expect(screen.getByText(/la edad mínima no puede ser mayor que la edad máxima/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects min age greater than max age across different units (months vs years)', async () => {
+    const onSubmit = vi.fn();
+    render(<IndicadorForm mode="create" defaultValues={{ nombre: 'Rango invertido mixto' }} onSubmit={onSubmit} />);
+
+    // 72 months (≈2160 days) > 1 year (365 days) → inverted range
+    fireEvent.change(screen.getByLabelText('Edad mínima meses'), { target: { value: '72' } });
+    fireEvent.change(screen.getByLabelText('Edad máxima años'), { target: { value: '1' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Guardar' })));
+
+    expect(screen.getByText(/la edad mínima no puede ser mayor que la edad máxima/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts min age less than max age across different units (months vs years)', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<IndicadorForm mode="create" defaultValues={{ nombre: 'Rango válido mixto' }} onSubmit={onSubmit} />);
+
+    // 6 months (≈180 days) < 6 years (2190 days) → valid
+    fireEvent.change(screen.getByLabelText('Edad mínima meses'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('Edad máxima años'), { target: { value: '6' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Guardar' })));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/la edad mínima no puede ser mayor que la edad máxima/i)).not.toBeInTheDocument();
+  });
 });

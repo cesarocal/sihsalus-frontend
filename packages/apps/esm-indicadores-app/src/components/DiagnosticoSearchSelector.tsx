@@ -12,7 +12,7 @@ interface DiagnosticoSearchSelectorProps {
 
 const DiagnosticoSearchSelector: React.FC<DiagnosticoSearchSelectorProps> = ({ selectedItems, onChange }) => {
   const { t } = useTranslation();
-      const [query, setQuery] = useState('');
+  const [query, setQuery] = useState('');
   const { data, isLoading, error } = useDiagnosticoSearch(query);
 
   return (

@@ -2,7 +2,7 @@ import { logError, openmrsFetch, useConfig } from '@openmrs/esm-framework';
 import { renderHook } from '@testing-library/react';
 import { act } from 'react';
 import { settleBackendOperation, startBackendOperation } from '../api/mock-mode';
-import { type Config } from '../config-schema';
+import { type ConfigObject } from '../config-schema';
 import { useIndicatorsHealth } from './useIndicatorsHealth';
 
 vi.mock('@openmrs/esm-framework', () => ({
@@ -21,7 +21,7 @@ const mockUseConfig = vi.mocked(useConfig);
 const mockStart = vi.mocked(startBackendOperation);
 const mockSettle = vi.mocked(settleBackendOperation);
 
-const defaultConfig: Config = {
+const defaultConfig: ConfigObject = {
   indicatorsApiPath: '/ws/module/indicators/api',
   reportesSqlApiPath: '/services/reportes-sql',
   enableDemoData: false,

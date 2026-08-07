@@ -5,6 +5,7 @@ import {
   createIndicador,
   createVersion,
   deleteIndicador,
+  getIndicador,
   getIndicadores,
   resolveOrdenes,
   updateIndicador,
@@ -123,6 +124,67 @@ describe('indicadores API contract', () => {
       mockedOpenmrsFetch.mockRejectedValueOnce(error);
       await expect(invoke()).rejects.toBe(error);
     }
+  });
+
+  describe('getIndicador detail shape validation', () => {
+    const validDetail = {
+      id: 'indicator-a',
+      nombre: 'Indicador A',
+      descripcion: 'desc',
+      activo: true,
+      creado_en: '2026-01-01',
+      versiones: [
+        {
+          id: 'ver-a',
+          indicador_id: 'indicator-a',
+          version: 1,
+          creado_en: '2026-01-01',
+          definicion: { tipo: 'conteo_atenciones' },
+        },
+      ],
+    };
+
+    it('resolves when the detail envelope conforms to the contract', async () => {
+      mockedOpenmrsFetch.mockResolvedValue({ data: validDetail } as never);
+
+      await expect(getIndicador('indicator-a')).resolves.toEqual(validDetail);
+      expect(mockedOpenmrsFetch).toHaveBeenCalledWith('/services/reportes-sql/indicadores/indicator-a', undefined);
+    });
+
+    it('accepts a null descripcion in the detail envelope', async () => {
+      const withNull = { ...validDetail, descripcion: null };
+      mockedOpenmrsFetch.mockResolvedValue({ data: withNull } as never);
+
+      await expect(getIndicador('indicator-a')).resolves.toEqual(withNull);
+    });
+
+    it('throws a contract error when the detail envelope is malformed (activo missing)', async () => {
+      const { activo: _activo, ...malformed } = validDetail;
+      mockedOpenmrsFetch.mockResolvedValue({ data: malformed } as never);
+
+      await expect(getIndicador('indicator-a')).rejects.toThrow(
+        /reportes-sql devolvió una respuesta inesperada para indicadores\/indicator-a\./,
+      );
+    });
+
+    it('throws a contract error when a version is missing its definicion record', async () => {
+      const malformed = {
+        ...validDetail,
+        versiones: [{ ...validDetail.versiones[0], definicion: undefined }],
+      };
+      mockedOpenmrsFetch.mockResolvedValue({ data: malformed } as never);
+
+      await expect(getIndicador('indicator-a')).rejects.toThrow(
+        /reportes-sql devolvió una respuesta inesperada para indicadores\/indicator-a\./,
+      );
+    });
+
+    it('throws a contract error when versiones is not an array', async () => {
+      const malformed = { ...validDetail, versiones: { oops: true } };
+      mockedOpenmrsFetch.mockResolvedValue({ data: malformed } as never);
+
+      await expect(getIndicador('indicator-a')).rejects.toThrow(/indicadores\/indicator-a/);
+    });
   });
 });
 

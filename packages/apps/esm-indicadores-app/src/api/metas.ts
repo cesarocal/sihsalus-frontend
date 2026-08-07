@@ -25,10 +25,7 @@ export function isMetaNotFoundError(error: unknown): boolean {
 
   // The 404 + field name is the structural contract; the human message is
   // not — the backend may reword it without changing the semantics.
-  return (
-    (candidate.status === 404 || candidate.response?.status === 404) &&
-    detail?.field === 'indicador_version_id'
-  );
+  return (candidate.status === 404 || candidate.response?.status === 404) && detail?.field === 'indicador_version_id';
 }
 
 export async function getMetaByIndicator(indicadorId: string, anio: number): Promise<IndicadorMeta> {

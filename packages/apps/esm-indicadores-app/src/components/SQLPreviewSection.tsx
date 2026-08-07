@@ -23,7 +23,9 @@ const SQLPreviewSection: React.FC<SQLPreviewSectionProps> = ({ indicadorId, vers
       <div className={styles.sqlHeader}>
         <div>
           <strong>{t('generatedSql', 'SQL generado')}</strong>
-          {versionNum ? <span className={styles.mutedText}> {t('sqlVersion', 'versión #{{num}}', { num: versionNum })}</span> : null}
+          {versionNum ? (
+            <span className={styles.mutedText}> {t('sqlVersion', 'versión #{{num}}', { num: versionNum })}</span>
+          ) : null}
         </div>
         <Button kind="ghost" size="sm" onClick={() => setExpanded((value) => !value)}>
           {expanded ? t('hide', 'Ocultar') : t('view', 'Ver')}

@@ -12,14 +12,17 @@ interface LocationSearchSelectorProps {
 
 const LocationSearchSelector: React.FC<LocationSearchSelectorProps> = ({ selectedItems, onChange }) => {
   const { t } = useTranslation();
-      const [query, setQuery] = useState('');
+  const [query, setQuery] = useState('');
   const { data, isLoading, error } = useLocationSearch(query);
 
   return (
     <SearchMultiSelector
       label={t('locations', 'Servicios')}
       placeholder={t('searchLocations', 'Buscar servicios')}
-      helperText={t('locationsHelperText', 'Este buscador consulta locations nativas de OpenMRS y las usa como servicios del indicador.')}
+      helperText={t(
+        'locationsHelperText',
+        'Este buscador consulta locations nativas de OpenMRS y las usa como servicios del indicador.',
+      )}
       emptyText={t('noLocationsSelected', 'Sin servicios seleccionados.')}
       noResultsText={t('noLocationsFound', 'No se encontraron servicios con ese criterio.')}
       selectedItems={selectedItems}

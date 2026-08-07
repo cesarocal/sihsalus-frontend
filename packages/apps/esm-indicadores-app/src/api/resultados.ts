@@ -38,9 +38,9 @@ export async function getResultados(params: GetResultadosParams): Promise<Pagina
 
   return withMockFallback(
     () =>
-      fetchJson<PaginatedResponse<IndicadorResultado>>(`${reportesSqlBase}/resultados/${ensureQuery(queryParams)}`).then(
-        (data) => assertShape(data, isPaginatedResponse, 'resultados'),
-      ),
+      fetchJson<PaginatedResponse<IndicadorResultado>>(
+        `${reportesSqlBase}/resultados/${ensureQuery(queryParams)}`,
+      ).then((data) => assertShape(data, isPaginatedResponse, 'resultados')),
     () => listResultados(params),
   );
 }

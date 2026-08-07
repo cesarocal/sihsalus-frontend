@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertShape, isPaginatedResponse, isSeriesResponse, isSQLPreview } from './validate';
+import { assertShape, isIndicadorDetail, isPaginatedResponse, isSeriesResponse, isSQLPreview } from './validate';
 
 describe('isPaginatedResponse', () => {
   const valid = { items: [], total: 0, page: 1, size: 20, pages: 1 };
@@ -84,6 +84,55 @@ describe('isSQLPreview', () => {
     ['version_num not a number', { ...valid, version_num: '1' }],
   ])('rejects %s', (_name, value) => {
     expect(isSQLPreview(value)).toBe(false);
+  });
+});
+
+describe('isIndicadorDetail', () => {
+  const validVersion = {
+    id: 'ver-1',
+    indicador_id: 'ind-1',
+    version: 1,
+    creado_en: '2026-01-01',
+    definicion: { tipo: 'conteo_atenciones' },
+  };
+  const valid = {
+    id: 'ind-1',
+    nombre: 'Indicador',
+    descripcion: 'desc',
+    activo: true,
+    creado_en: '2026-01-01',
+    versiones: [validVersion],
+  };
+
+  it('accepts a well-formed indicator detail', () => {
+    expect(isIndicadorDetail(valid)).toBe(true);
+  });
+
+  it('accepts a detail with null descripcion', () => {
+    expect(isIndicadorDetail({ ...valid, descripcion: null })).toBe(true);
+  });
+
+  it('accepts extra non-strict fields', () => {
+    expect(isIndicadorDetail({ ...valid, links: ['/self'] })).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['an array', []],
+    ['id not a string', { ...valid, id: 1 }],
+    ['nombre not a string', { ...valid, nombre: 2 }],
+    ['descripcion not string|null', { ...valid, descripcion: 3 }],
+    ['activo not a boolean', { ...valid, activo: 'true' }],
+    ['creado_en not a string', { ...valid, creado_en: 20260101 }],
+    ['versiones not an array', { ...valid, versiones: { oops: true } }],
+    ['version missing id', { ...valid, versiones: [{ ...validVersion, id: undefined }] }],
+    ['version indicador_id not a string', { ...valid, versiones: [{ ...validVersion, indicador_id: 1 }] }],
+    ['version not a number', { ...valid, versiones: [{ ...validVersion, version: '1' }] }],
+    ['version creado_en not a string', { ...valid, versiones: [{ ...validVersion, creado_en: 1 }] }],
+    ['version definicion not a record', { ...valid, versiones: [{ ...validVersion, definicion: [] }] }],
+  ])('rejects %s', (_name, value) => {
+    expect(isIndicadorDetail(value)).toBe(false);
   });
 });
 

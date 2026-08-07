@@ -37,8 +37,7 @@ type SummaryState =
 
 const currentYear = () => new Date().getFullYear();
 
-const toDateString = (date: Date | null): string | undefined =>
-  date ? date.toISOString().slice(0, 10) : undefined;
+const toDateString = (date: Date | null): string | undefined => (date ? date.toISOString().slice(0, 10) : undefined);
 
 const ResultadosPage: React.FC = () => {
   const { t } = useTranslation();
@@ -51,6 +50,7 @@ const ResultadosPage: React.FC = () => {
   const [isCalcularRunning, setCalcularRunning] = useState(false);
   const [isRecalcularRunning, setRecalcularRunning] = useState(false);
   const [summary, setSummary] = useState<SummaryState>(null);
+  const [isCalculateModalOpen, setCalculateModalOpen] = useState(false);
   const [isRecalcModalOpen, setRecalcModalOpen] = useState(false);
   const [recalcAnio, setRecalcAnio] = useState<number>(currentYear());
   const [recalcAnioError, setRecalcAnioError] = useState<string | null>(null);
@@ -107,6 +107,12 @@ const ResultadosPage: React.FC = () => {
 
   const anyActionRunning = isCalcularRunning || isRecalcularRunning;
 
+  const openCalculateModal = () => {
+    if (!anyActionRunning) {
+      setCalculateModalOpen(true);
+    }
+  };
+
   const handleCalcular = async () => {
     if (actionLockRef.current) {
       return;
@@ -152,6 +158,7 @@ const ResultadosPage: React.FC = () => {
     } finally {
       setCalcularRunning(false);
       actionLockRef.current = false;
+      setCalculateModalOpen(false);
     }
   };
 
@@ -349,6 +356,13 @@ const ResultadosPage: React.FC = () => {
   const isLoading = viewMode === 'historical' ? historicalLoading : seriesLoading;
   const error = viewMode === 'historical' ? historicalError : seriesError;
 
+  const granularityLabels: Record<Granularity, string> = {
+    mensual: t('monthly', 'Mensual'),
+    trimestral: t('quarterly', 'Trimestral'),
+    semestral: t('semiannual', 'Semestral'),
+    anual: t('annual', 'Anual'),
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -362,7 +376,7 @@ const ResultadosPage: React.FC = () => {
           <Button kind="tertiary" onClick={openRecalcularModal} disabled={anyActionRunning}>
             {t('recalculateYear', 'Recalcular año')}
           </Button>
-          <Button onClick={handleCalcular} disabled={anyActionRunning}>
+          <Button onClick={openCalculateModal} disabled={anyActionRunning}>
             {isCalcularRunning ? (
               <InlineLoading description={t('calculating', 'Calculando...')} />
             ) : (
@@ -478,7 +492,11 @@ const ResultadosPage: React.FC = () => {
         filters.indicador_id ? (
           seriesData?.items.length ? (
             <div className={styles.tableSurface}>
-              <Table aria-label={`Serie temporal — ${granularity}`}>
+              <Table
+                aria-label={t('seriesTableAria', 'Serie temporal — {{granularity}}', {
+                  granularity: granularityLabels[granularity],
+                })}
+              >
                 <TableHead>
                   <TableRow>
                     <TableHeader>{t('period', 'Periodo')}</TableHeader>
@@ -514,7 +532,7 @@ const ResultadosPage: React.FC = () => {
         historicalData?.items.length ? (
           <>
             <div className={styles.tableSurface}>
-              <Table aria-label="Resultados de indicadores">
+              <Table aria-label={t('historicalTableAria', 'Resultados de indicadores')}>
                 <TableHead>
                   <TableRow>
                     <TableHeader>{t('indicator', 'Indicador')}</TableHeader>
@@ -554,6 +572,33 @@ const ResultadosPage: React.FC = () => {
           <Tile className={styles.empty}>{t('noResults', 'No hay resultados para los filtros seleccionados.')}</Tile>
         )
       ) : null}
+
+      <Modal
+        open={isCalculateModalOpen}
+        modalHeading={t('calculateNow', 'Calcular ahora')}
+        primaryButtonText={
+          isCalcularRunning ? (
+            <InlineLoading description={t('calculating', 'Calculando...')} />
+          ) : (
+            t('calculate', 'Calcular')
+          )
+        }
+        primaryButtonDisabled={isCalcularRunning}
+        secondaryButtonText={t('cancelCalculation', 'Cancelar cálculo')}
+        onRequestClose={() => {
+          if (!isCalcularRunning) {
+            setCalculateModalOpen(false);
+          }
+        }}
+        onRequestSubmit={() => void handleCalcular()}
+      >
+        <p className={styles.modalBodyText}>
+          {t(
+            'calculateNowConfirmation',
+            'Esta acción calculará los indicadores activos y actualizará sus resultados. ¿Desea continuar?',
+          )}
+        </p>
+      </Modal>
 
       <Modal
         open={isRecalcModalOpen}

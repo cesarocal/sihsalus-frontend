@@ -108,7 +108,7 @@ function SearchMultiSelector<T>({
           ) : filteredResults.length ? (
             <div className={styles.searchResultsList} role="listbox" aria-label={label}>
               {filteredResults.map((item) => (
-                <Tile key={itemKey(item)} className={styles.searchResultItem}>
+                <Tile key={itemKey(item)} className={styles.searchResultItem} role="option" aria-selected={false}>
                   <div className={styles.searchResultContent}>
                     <span>{itemLabel(item)}</span>
                     <Button size="sm" kind="ghost" onClick={() => handleAdd(item)}>

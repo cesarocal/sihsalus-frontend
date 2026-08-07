@@ -12,9 +12,11 @@
     "build": "rspack --mode=production",
     "analyze": "rspack --mode=production --env analyze=true",
     "lint": "node ../../tooling/scripts/run-biome.js lint .",
+    "prettier": "node ../../tooling/scripts/run-biome.js format --write src",
     "typescript": "tsc",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest watch",
+    "verify": "turbo run lint test typescript",
     "coverage": "vitest run --coverage --passWithNoTests",
     "extract-translations": "i18next 'src/**/*.{ts,tsx}' '!src/**/*.test.{ts,tsx}' '!src/**/*.spec.{ts,tsx}' --config ../../tooling/scripts/i18next-parser.config.js"
   },
@@ -67,6 +69,7 @@
     "react-i18next": "^17.0.11",
     "react-router-dom": "7.18.2",
     "rxjs": "^6.6.7",
+    "turbo": "^2.9.14",
     "typescript": "6.0.3",
     "vite": "8.0.16",
     "vitest": "^5.0.0"

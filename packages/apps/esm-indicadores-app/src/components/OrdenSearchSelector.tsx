@@ -12,7 +12,7 @@ interface OrdenSearchSelectorProps {
 
 const OrdenSearchSelector: React.FC<OrdenSearchSelectorProps> = ({ selectedItems, onChange }) => {
   const { t } = useTranslation();
-      const [query, setQuery] = useState('');
+  const [query, setQuery] = useState('');
   const { data, isLoading, error } = useOrdenSearch(query);
 
   return (

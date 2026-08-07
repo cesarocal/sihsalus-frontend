@@ -23,6 +23,22 @@ interface DefinicionViewProps {
 
 const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved }) => {
   const { t } = useTranslation();
+  const formatAgeBound = (bound: 'min' | 'max') => {
+    const population = definicion.poblacion;
+    const values = [
+      population?.[bound === 'min' ? 'min_anios' : 'max_anios_excl'] !== undefined
+        ? `${population[bound === 'min' ? 'min_anios' : 'max_anios_excl']} ${t('ageYears', 'años')}`
+        : null,
+      population?.[bound === 'min' ? 'min_meses' : 'max_meses_excl'] !== undefined
+        ? `${population[bound === 'min' ? 'min_meses' : 'max_meses_excl']} ${t('ageMonths', 'meses')}`
+        : null,
+      population?.[bound === 'min' ? 'min_dias' : 'max_dias'] !== undefined
+        ? `${population[bound === 'min' ? 'min_dias' : 'max_dias']} ${t('ageDays', 'días')}`
+        : null,
+    ].filter(Boolean);
+
+    return values.length ? values.join(', ') : '-';
+  };
   const locationUuids = useMemo(() => definicion.evento?.location_uuids ?? [], [definicion.evento?.location_uuids]);
   const diagnosticoUuids = useMemo(
     () => definicion.evento?.diagnosticos?.flatMap((item) => item.concepto_uuids) ?? [],
@@ -51,15 +67,20 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved })
   return (
     <div className={styles.definitionList}>
       <div>
-        <strong>{t('definitionType', 'Tipo:')}</strong> 
-            {definicion.tipo === 'conteo_atenciones' ? t('countEncounters', 'Conteo de atenciones') : t('countPatients', 'Conteo de pacientes')}
+        <strong>{t('definitionType', 'Tipo:')}</strong>
+        {definicion.tipo === 'conteo_atenciones'
+          ? t('countEncounters', 'Conteo de atenciones')
+          : t('countPatients', 'Conteo de pacientes')}
       </div>
       <div>
         <strong>{t('definitionLocations', 'Servicios:')}</strong>{' '}
-        {locationUuids.length ? locationUuids.map((uuid) => locationNames.get(uuid) ?? uuid).join(', ') : t('all', 'Todos')}
+        {locationUuids.length
+          ? locationUuids.map((uuid) => locationNames.get(uuid) ?? uuid).join(', ')
+          : t('all', 'Todos')}
       </div>
       <div>
-        <strong>{t('definitionMinOccurrences', 'Mínimo de ocurrencias:')}</strong> {definicion.evento?.minimo_ocurrencias ?? 1}
+        <strong>{t('definitionMinOccurrences', 'Mínimo de ocurrencias:')}</strong>{' '}
+        {definicion.evento?.minimo_ocurrencias ?? 1}
       </div>
       <div>
         <strong>{t('definitionDiagnostics', 'Diagnósticos:')}</strong>{' '}
@@ -79,7 +100,11 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved })
         <strong>{t('definitionSex', 'Sexo:')}</strong> {definicion.poblacion?.sexo ?? t('noFilter', 'Sin filtro')}
       </div>
       <div>
-        <strong>{t('definitionAge', 'Edad:')}</strong> {t('ageRangeValue', 'min {{min}} años / max {{max}} años', { min: definicion.poblacion?.min_anios ?? '-', max: definicion.poblacion?.max_anios_excl ?? '-' })}
+        <strong>{t('definitionAge', 'Edad:')}</strong>{' '}
+        {t('ageRangeValue', 'min {{min}} / max {{max}}', {
+          min: formatAgeBound('min'),
+          max: formatAgeBound('max'),
+        })}
       </div>
     </div>
   );

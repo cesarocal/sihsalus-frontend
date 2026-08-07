@@ -230,6 +230,98 @@ describe('IndicadorDetailPage', () => {
     expect(screen.getByText('Versión #2')).toBeInTheDocument();
   });
 
+  it('hydrates all new-version resource selectors with resolved names', () => {
+    mockUseIndicador.mockReturnValue({
+      data: {
+        ...sampleIndicator,
+        versiones: [
+          {
+            ...sampleIndicator.versiones[1],
+            definicion: {
+              tipo: 'conteo_atenciones',
+              evento: {
+                location_uuids: ['loc-001'],
+                diagnosticos: [{ concepto_uuids: ['dx-001'], tipo_diagnostico: 'presuntivo' }],
+                ordenes: [{ concepto_uuid: 'ord-001' }],
+              },
+            },
+          },
+        ],
+      },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+    mockUseResolvedLocations.mockReturnValue({
+      data: [{ uuid: 'loc-001', display: 'Centro Obstétrico' }],
+      displayMap: new Map([['loc-001', 'Centro Obstétrico']]),
+      error: undefined,
+      isLoading: false,
+    } as never);
+    mockUseResolvedDiagnosticos.mockReturnValue({
+      data: [{ uuid: 'dx-001', nombre: 'Anemia ferropénica' }],
+      resolveMap: new Map([['dx-001', { uuid: 'dx-001', nombre: 'Anemia ferropénica' }]]),
+      error: undefined,
+      isLoading: false,
+    } as never);
+    mockUseResolvedOrdenes.mockImplementation(
+      (uuids) =>
+        ({
+          data: uuids.length ? { 'ord-001': 'Hemograma' } : {},
+          displayMap: uuids.length ? new Map([['ord-001', 'Hemograma']]) : new Map(),
+          error: undefined,
+          isLoading: false,
+        }) as never,
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva versión' }));
+
+    const selectedPills = Array.from(document.querySelectorAll('.selectedItemPill'));
+    expect(selectedPills.some((pill) => pill.textContent?.includes('Centro Obstétrico'))).toBe(true);
+    expect(selectedPills.some((pill) => pill.textContent?.includes('Anemia ferropénica'))).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Órdenes' }));
+    expect(
+      Array.from(document.querySelectorAll('.selectedItemPill')).some((pill) =>
+        pill.textContent?.includes('Hemograma'),
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps the new-version form unmounted while selected definition names are loading', () => {
+    mockUseIndicador.mockReturnValue({
+      data: {
+        ...sampleIndicator,
+        versiones: [
+          {
+            ...sampleIndicator.versiones[1],
+            definicion: {
+              tipo: 'conteo_atenciones',
+              evento: { location_uuids: ['loc-001'] },
+            },
+          },
+        ],
+      },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+    mockUseResolvedLocations.mockReturnValue({
+      data: [],
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: true,
+    } as never);
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva versión' }));
+
+    expect(screen.queryByRole('button', { name: 'Crear versión' })).not.toBeInTheDocument();
+    expect(screen.getByText('Cargando nombres clínicos...')).toBeInTheDocument();
+  });
+
   it('renders without throwing when the indicator has an empty versiones array', () => {
     mockUseIndicador.mockReturnValue({
       data: { ...sampleIndicator, versiones: [] },

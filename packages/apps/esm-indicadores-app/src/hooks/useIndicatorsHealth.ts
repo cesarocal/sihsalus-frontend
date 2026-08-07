@@ -2,7 +2,7 @@ import { logError, openmrsFetch, useConfig } from '@openmrs/esm-framework';
 import { useEffect } from 'react';
 
 import { settleBackendOperation, startBackendOperation } from '../api/mock-mode';
-import { type Config } from '../config-schema';
+import { type ConfigObject } from '../config-schema';
 import { translate } from '../i18n';
 
 const DEFAULT_ERROR = translate('indicatorsApiConnectionError', 'No se pudo conectar con el API de indicadores.');
@@ -21,7 +21,7 @@ function normalizeErrorMessage(error: unknown): string {
 
 /** Side-effect hook that checks backend health on mount and updates the mock-mode store. */
 export function useIndicatorsHealth(): void {
-  const config = useConfig<Config>();
+  const config = useConfig<ConfigObject>();
 
   useEffect(() => {
     let settled = false;

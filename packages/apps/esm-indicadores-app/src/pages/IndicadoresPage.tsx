@@ -1,6 +1,7 @@
 import {
   Button,
   InlineLoading,
+  Modal,
   Pagination,
   Table,
   TableBody,
@@ -16,6 +17,7 @@ import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
+import type { Indicador } from '../api/types';
 import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
 import { notifyError, notifySuccess, useDeleteIndicador, useIndicadores } from '../features/indicadores/hooks';
 import styles from '../indicators-dashboard.module.scss';
@@ -24,22 +26,25 @@ const IndicadoresPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
+  const [deactivationTarget, setDeactivationTarget] = useState<Indicador | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const deletingIdsRef = useRef(new Set<string>());
   const pageSize = 10;
   const { data, isLoading, error } = useIndicadores(page, pageSize);
   const { deleteIndicador } = useDeleteIndicador();
 
-  const handleDelete = async (id: string) => {
-    if (deletingIdsRef.current.has(id)) {
+  const handleDelete = async () => {
+    const target = deactivationTarget;
+    if (!target || deletingIdsRef.current.has(target.id)) {
       return;
     }
 
-    deletingIdsRef.current.add(id);
+    deletingIdsRef.current.add(target.id);
     setDeletingIds(new Set(deletingIdsRef.current));
     try {
-      await deleteIndicador(id);
+      await deleteIndicador(target.id);
       notifySuccess(t('indicatorDeactivated', 'Indicador desactivado'));
+      setDeactivationTarget(null);
     } catch (deleteError) {
       notifyError(
         getUserFacingErrorMessage(
@@ -49,7 +54,7 @@ const IndicadoresPage: React.FC = () => {
         ),
       );
     } finally {
-      deletingIdsRef.current.delete(id);
+      deletingIdsRef.current.delete(target.id);
       setDeletingIds(new Set(deletingIdsRef.current));
     }
   };
@@ -60,8 +65,8 @@ const IndicadoresPage: React.FC = () => {
         <div>
           <h2>{t('indicators', 'Indicadores')}</h2>
           <p className={styles.subtitle}>
-                {t('indicatorsPageSubtitle', 'Listado principal del módulo, con acceso a detalle, edición y versionado.')}
-              </p>
+            {t('indicatorsPageSubtitle', 'Listado principal del módulo, con acceso a detalle, edición y versionado.')}
+          </p>
         </div>
         <div className={styles.headerActions}>
           <Button onClick={() => navigate('/new')}>{t('newIndicator', 'Nuevo indicador')}</Button>
@@ -104,20 +109,30 @@ const IndicadoresPage: React.FC = () => {
                       <TableCell>{indicador.descripcion ?? t('noDescription', 'Sin descripción')}</TableCell>
                       <TableCell>
                         <Tag type={indicador.activo ? 'green' : 'gray'}>
-                              {indicador.activo ? t('active', 'Activo') : t('inactive', 'Inactivo')}
-                            </Tag>
+                          {indicador.activo ? t('active', 'Activo') : t('inactive', 'Inactivo')}
+                        </Tag>
                       </TableCell>
                       <TableCell>{formatDate(parseDate(indicador.creado_en))}</TableCell>
                       <TableCell>
                         <div className={styles.tableActions}>
-                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}`)}>{t('view', 'Ver')}</Button>
-                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}/edit`)}>{t('edit', 'Editar')}</Button>
+                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}`)}>
+                            {t('view', 'Ver')}
+                          </Button>
+                          <Button size="sm" kind="ghost" onClick={() => navigate(`/${indicador.id}/edit`)}>
+                            {t('edit', 'Editar')}
+                          </Button>
                           <Button
                             size="sm"
                             kind="danger--ghost"
-                            onClick={() => handleDelete(indicador.id)}
+                            onClick={() => {
+                              if (!deletingIdsRef.current.has(indicador.id)) {
+                                setDeactivationTarget(indicador);
+                              }
+                            }}
                             disabled={deletingIds.has(indicador.id)}
-                          >{t('deactivate', 'Desactivar')}</Button>
+                          >
+                            {t('deactivate', 'Desactivar')}
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -138,6 +153,35 @@ const IndicadoresPage: React.FC = () => {
           <Tile className={styles.empty}>{t('noIndicatorsYet', 'No hay indicadores definidos aún.')}</Tile>
         )
       ) : null}
+
+      <Modal
+        open={Boolean(deactivationTarget)}
+        modalHeading={t('deactivateIndicator', 'Desactivar indicador')}
+        primaryButtonText={
+          deletingIds.has(deactivationTarget?.id ?? '') ? (
+            <InlineLoading description={t('deactivating', 'Desactivando...')} />
+          ) : (
+            t('deactivate', 'Desactivar')
+          )
+        }
+        primaryButtonDisabled={deletingIds.has(deactivationTarget?.id ?? '')}
+        secondaryButtonText={t('cancel', 'Cancelar')}
+        onRequestClose={() => {
+          if (!deletingIds.has(deactivationTarget?.id ?? '')) {
+            setDeactivationTarget(null);
+          }
+        }}
+        onRequestSubmit={() => void handleDelete()}
+        danger
+      >
+        <p>
+          {t(
+            'deactivateIndicatorConfirmation',
+            'The indicator "{{name}}" will be deactivated and will no longer be included in active calculations. Do you want to continue?',
+            { name: deactivationTarget?.nombre ?? '' },
+          )}
+        </p>
+      </Modal>
     </div>
   );
 };

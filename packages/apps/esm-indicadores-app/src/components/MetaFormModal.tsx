@@ -171,9 +171,7 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
       open={isOpen}
       modalHeading={initialMeta ? t('editMeta', 'Editar meta') : t('newMeta', 'Nueva meta')}
       primaryButtonText={primaryButton}
-      primaryButtonDisabled={
-        isSubmitting || versionsLoading || Boolean(versionsError) || versionOptions.length === 0
-      }
+      primaryButtonDisabled={isSubmitting || versionsLoading || Boolean(versionsError) || versionOptions.length === 0}
       secondaryButtonText={t('cancel', 'Cancelar')}
       onRequestClose={onClose}
       onRequestSubmit={handleSubmit}
@@ -217,7 +215,10 @@ const MetaFormModal: React.FC<MetaFormModalProps> = ({
         {selectedIndicator && !versionsLoading && !versionsError && versionOptions.length === 0 ? (
           <InlineNotification
             kind="info"
-            title={t('metaNoVersions', 'Este indicador no tiene versiones. Cree una versión antes de definir una meta.')}
+            title={t(
+              'metaNoVersions',
+              'Este indicador no tiene versiones. Cree una versión antes de definir una meta.',
+            )}
             lowContrast
             hideCloseButton
           />

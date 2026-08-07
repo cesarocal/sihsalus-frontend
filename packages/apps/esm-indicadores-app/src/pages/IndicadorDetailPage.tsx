@@ -17,7 +17,7 @@ import {
   useResolvedLocations,
   useResolvedOrdenes,
 } from '../features/indicadores/hooks';
-import { parseDefinicion } from '../features/indicadores/parseDefinicion';
+import { parseDefinicion, type DefinicionResolvableNames } from '../features/indicadores/parseDefinicion';
 import styles from '../indicators-dashboard.module.scss';
 import type { ResolvedDefinitionNames } from '../components/DefinicionView';
 
@@ -42,10 +42,7 @@ const IndicadorDetailPage: React.FC = () => {
     if (!data?.versiones.length) {
       return undefined;
     }
-    return data.versiones.reduce(
-      (max, version) => (version.version > max.version ? version : max),
-      data.versiones[0],
-    );
+    return data.versiones.reduce((max, version) => (version.version > max.version ? version : max), data.versiones[0]);
   }, [data]);
 
   const ordenUuids = useMemo(() => {
@@ -55,7 +52,13 @@ const IndicadorDetailPage: React.FC = () => {
     return latestVersion.definicion.evento?.ordenes?.map((item) => item.concepto_uuid) ?? [];
   }, [latestVersion]);
 
-  const { data: ordenesData } = useResolvedOrdenes(ordenUuids);
+  const latestLocationUuids = useMemo(() => latestVersion?.definicion.evento?.location_uuids ?? [], [latestVersion]);
+  const latestDiagnosticoUuids = useMemo(
+    () => latestVersion?.definicion.evento?.diagnosticos?.flatMap((item) => item.concepto_uuids) ?? [],
+    [latestVersion],
+  );
+
+  const { data: ordenesData, isLoading: ordenesLoading } = useResolvedOrdenes(ordenUuids);
 
   // Resolve names for EVERY version definition once, at page level, instead
   // of letting each DefinicionView fire its own resolve requests (N×3
@@ -68,7 +71,10 @@ const IndicadorDetailPage: React.FC = () => {
   const allDiagnosticoUuids = useMemo(
     () =>
       Array.from(
-        new Set(data?.versiones.flatMap((v) => v.definicion.evento?.diagnosticos?.flatMap((d) => d.concepto_uuids) ?? []) ?? []),
+        new Set(
+          data?.versiones.flatMap((v) => v.definicion.evento?.diagnosticos?.flatMap((d) => d.concepto_uuids) ?? []) ??
+            [],
+        ),
       ),
     [data],
   );
@@ -80,16 +86,26 @@ const IndicadorDetailPage: React.FC = () => {
     [data],
   );
 
-  const { displayMap: locationNames } = useResolvedLocations(allLocationUuids);
-  const { resolveMap: diagnosticoNames } = useResolvedDiagnosticos(allDiagnosticoUuids);
-  const { displayMap: ordenNames } = useResolvedOrdenes(allOrdenUuids);
+  const { displayMap: locationNames, isLoading: locationNamesLoading } = useResolvedLocations(allLocationUuids);
+  const { resolveMap: diagnosticoNames, isLoading: diagnosticoNamesLoading } =
+    useResolvedDiagnosticos(allDiagnosticoUuids);
+  const { displayMap: ordenNames, isLoading: ordenNamesLoading } = useResolvedOrdenes(allOrdenUuids);
+
+  const formNames: DefinicionResolvableNames = useMemo(
+    () => ({ locations: locationNames, diagnosticos: diagnosticoNames, ordenes: ordenNames }),
+    [locationNames, diagnosticoNames, ordenNames],
+  );
 
   const resolved: ResolvedDefinitionNames = useMemo(
     () => ({ locationNames, diagnosticoNames, ordenNames }),
     [locationNames, diagnosticoNames, ordenNames],
   );
 
-  const ordenesReady = ordenUuids.length === 0 || Boolean(ordenesData);
+  const ordenesReady = ordenUuids.length === 0 || (!ordenesLoading && Boolean(ordenesData));
+  const formNamesReady =
+    (latestLocationUuids.length === 0 || !locationNamesLoading) &&
+    (latestDiagnosticoUuids.length === 0 || !diagnosticoNamesLoading) &&
+    (ordenUuids.length === 0 || !ordenNamesLoading);
 
   const handleCreateVersion = async ({
     definicion,
@@ -151,7 +167,9 @@ const IndicadorDetailPage: React.FC = () => {
                 <h2>{data.nombre}</h2>
                 <p className={styles.subtitle}>{data.descripcion ?? t('noDescription', 'Sin descripción')}</p>
               </div>
-              <Tag type={data.activo ? 'green' : 'gray'}>{data.activo ? t('active', 'Activo') : t('inactive', 'Inactivo')}</Tag>
+              <Tag type={data.activo ? 'green' : 'gray'}>
+                {data.activo ? t('active', 'Activo') : t('inactive', 'Inactivo')}
+              </Tag>
             </div>
             <div className={styles.headerActions}>
               <Button size="sm" onClick={() => navigate(`/${data.id}/edit`)}>
@@ -166,17 +184,22 @@ const IndicadorDetailPage: React.FC = () => {
           {showVersionForm ? (
             <Tile className={styles.section}>
               <h3 className={styles.sectionTitle}>{t('createNewVersion', 'Crear nueva versión')}</h3>
-              {ordenesReady ? (
+              {ordenesReady && formNamesReady ? (
                 <IndicadorForm
                   mode="version"
-                  defaultValues={latestVersion ? parseDefinicion(latestVersion.definicion, ordenesData) : undefined}
+                  defaultValues={latestVersion ? parseDefinicion(latestVersion.definicion, formNames) : undefined}
                   initialMetadata={{ nombre: data.nombre, descripcion: data.descripcion }}
                   serverError={serverError}
                   isSubmitting={isSubmittingVersion}
                   onSubmit={handleCreateVersion}
                 />
               ) : (
-                <InlineLoading description={t('loadingOrders', 'Cargando órdenes...')} />
+                <InlineLoading
+                  description={t(
+                    ordenesReady ? 'loadingNames' : 'loadingOrders',
+                    ordenesReady ? 'Cargando nombres clínicos...' : 'Cargando órdenes...',
+                  )}
+                />
               )}
             </Tile>
           ) : null}

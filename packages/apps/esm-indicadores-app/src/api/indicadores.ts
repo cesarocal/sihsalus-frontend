@@ -11,7 +11,7 @@ import {
 } from '../mocks/indicators-data';
 import { fetchJson, mutateJson, toJsonBody, withMockFallback } from './client';
 import { getReportesSqlApiPath, getReportesSqlResourcePath } from './config';
-import { assertShape, isPaginatedResponse, isSQLPreview } from './validate';
+import { assertShape, isIndicadorDetail, isPaginatedResponse, isSQLPreview } from './validate';
 import type {
   DefinicionIndicadorForm,
   DiagnosticoOption,
@@ -68,7 +68,10 @@ export async function getIndicadores(page: number, size: number): Promise<Pagina
 export async function getIndicador(id: string): Promise<IndicadorDetail> {
   const indicadoresPath = await getReportesSqlResourcePath('indicadores');
   return withMockFallback(
-    () => fetchJson<IndicadorDetail>(`${indicadoresPath}/${id}`),
+    () =>
+      fetchJson<IndicadorDetail>(`${indicadoresPath}/${id}`).then((data) =>
+        assertShape(data, isIndicadorDetail, `indicadores/${id}`),
+      ),
     () => getIndicadorById(id),
   );
 }
@@ -100,9 +103,9 @@ export async function previewSql(id: string, versionId?: string): Promise<Indica
   const reportesSqlBase = await getReportesSqlApiPath();
   return withMockFallback(
     () =>
-      fetchJson<IndicadorSQLPreview>(ensureQuery(`${reportesSqlBase}/indicadores/${id}/preview-sql`, { versionId })).then(
-        (data) => assertShape(data, isSQLPreview, 'preview-sql'),
-      ),
+      fetchJson<IndicadorSQLPreview>(
+        ensureQuery(`${reportesSqlBase}/indicadores/${id}/preview-sql`, { versionId }),
+      ).then((data) => assertShape(data, isSQLPreview, 'preview-sql')),
     () => getSqlPreviewMock(id, versionId),
   );
 }
@@ -148,7 +151,9 @@ export async function resolveLocations(uuids: Array<string>): Promise<Array<Loca
   return withMockFallback(
     async () => {
       const conceptosPath = await getReportesSqlResourcePath('conceptos');
-      return fetchJson<Array<LocationOption>>(`${conceptosPath}/locations/resolve?uuids=${uuids.join(',')}`);
+      return fetchJson<Array<LocationOption>>(
+        ensureQuery(`${conceptosPath}/locations/resolve`, { uuids: uuids.join(',') }),
+      );
     },
     () => resolveLocationsMock(uuids),
   );
@@ -162,7 +167,9 @@ export async function resolveDiagnosticos(uuids: Array<string>): Promise<Array<D
   return withMockFallback(
     async () => {
       const conceptosPath = await getReportesSqlResourcePath('conceptos');
-      return fetchJson<Array<DiagnosticoOption>>(`${conceptosPath}/diagnosticos/resolve?uuids=${uuids.join(',')}`);
+      return fetchJson<Array<DiagnosticoOption>>(
+        ensureQuery(`${conceptosPath}/diagnosticos/resolve`, { uuids: uuids.join(',') }),
+      );
     },
     () => resolveDiagnosticosMock(uuids),
   );
@@ -176,7 +183,9 @@ export async function resolveOrdenes(uuids: Array<string>): Promise<Record<strin
   return withMockFallback(
     async () => {
       const conceptosPath = await getReportesSqlResourcePath('conceptos');
-      return fetchJson<Record<string, string>>(`${conceptosPath}/buscar/resolve?uuids=${uuids.join(',')}`);
+      return fetchJson<Record<string, string>>(
+        ensureQuery(`${conceptosPath}/buscar/resolve`, { uuids: uuids.join(',') }),
+      );
     },
     () => resolveOrdenesMock(uuids),
   );

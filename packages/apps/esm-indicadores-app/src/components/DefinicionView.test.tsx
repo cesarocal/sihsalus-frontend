@@ -166,6 +166,62 @@ describe('DefinicionView with pre-resolved names', () => {
   });
 });
 
+describe('DefinicionView age rendering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseResolvedLocations.mockReturnValue({
+      data: [],
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useResolvedLocations>);
+    mockUseResolvedDiagnosticos.mockReturnValue({
+      data: [],
+      resolveMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useResolvedDiagnosticos>);
+    mockUseResolvedOrdenes.mockReturnValue({
+      data: undefined,
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+  });
+
+  it('renders year-based age bounds', () => {
+    render(
+      <DefinicionView definicion={{ tipo: 'conteo_atenciones', poblacion: { min_anios: 10, max_anios_excl: 50 } }} />,
+    );
+
+    expect(screen.getByText(/min 10 años \/ max 50 años/)).toBeInTheDocument();
+  });
+
+  it('renders month and day constraints instead of hiding them', () => {
+    render(
+      <DefinicionView
+        definicion={{
+          tipo: 'conteo_atenciones',
+          poblacion: {
+            min_meses: 6,
+            min_dias: 2,
+            max_meses_excl: 12,
+            max_dias: 4,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/min 6 meses, 2 días \/ max 12 meses, 4 días/)).toBeInTheDocument();
+  });
+
+  it('renders a placeholder when no age bounds are defined', () => {
+    render(<DefinicionView definicion={{ tipo: 'conteo_atenciones' }} />);
+
+    expect(screen.getByText(/min - \/ max -/)).toBeInTheDocument();
+  });
+});
+
 describe('DefinicionView periodo removal', () => {
   beforeEach(() => {
     vi.clearAllMocks();

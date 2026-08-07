@@ -64,6 +64,11 @@ function renderPage() {
   );
 }
 
+function confirmCalculateNow() {
+  fireEvent.click(screen.getByRole('button', { name: /Calcular ahora/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Calcular' }));
+}
+
 describe('ResultadosPage series granularity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -319,7 +324,9 @@ describe('ResultadosPage period filters', () => {
 
     setDate('Desde', '2026-05-01');
 
-    expect(screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/),
+    ).not.toBeInTheDocument();
     expect(lastResultadosParams().periodo_inicio).toBe('2026-05-01');
     expect(lastResultadosParams().periodo_fin).toBeUndefined();
   });
@@ -329,7 +336,9 @@ describe('ResultadosPage period filters', () => {
 
     setDate('Hasta', '2026-03-01');
 
-    expect(screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/La fecha de inicio debe ser anterior o igual a la fecha de fin/),
+    ).not.toBeInTheDocument();
     expect(lastResultadosParams().periodo_inicio).toBeUndefined();
     expect(lastResultadosParams().periodo_fin).toBe('2026-03-01');
   });
@@ -401,9 +410,8 @@ describe('ResultadosPage calculate / recalculate actions', () => {
 
     renderPage();
 
-    const button = screen.getByRole('button', { name: /Calcular ahora/ });
     await act(async () => {
-      fireEvent.click(button);
+      confirmCalculateNow();
     });
 
     expect(calcularMock).toHaveBeenCalledTimes(1);
@@ -420,11 +428,10 @@ describe('ResultadosPage calculate / recalculate actions', () => {
     );
     mockUseCalcularAhora.mockReturnValue({ calcularAhora: calcularMock });
     renderPage();
-    const button = screen.getByRole('button', { name: /Calcular ahora/ });
-
     act(() => {
-      fireEvent.click(button);
-      fireEvent.click(button);
+      fireEvent.click(screen.getByRole('button', { name: /Calcular ahora/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Calcular' }));
     });
 
     expect(calcularMock).toHaveBeenCalledTimes(1);
@@ -442,9 +449,8 @@ describe('ResultadosPage calculate / recalculate actions', () => {
 
     renderPage();
 
-    const button = screen.getByRole('button', { name: /Calcular ahora/ });
     await act(async () => {
-      fireEvent.click(button);
+      confirmCalculateNow();
     });
 
     expect(notifySuccess).toHaveBeenCalled();
@@ -469,9 +475,8 @@ describe('ResultadosPage calculate / recalculate actions', () => {
 
     renderPage();
 
-    const button = screen.getByRole('button', { name: /Calcular ahora/ });
     await act(async () => {
-      fireEvent.click(button);
+      confirmCalculateNow();
     });
 
     expect(notifyError).toHaveBeenCalled();
@@ -491,9 +496,8 @@ describe('ResultadosPage calculate / recalculate actions', () => {
 
     renderPage();
 
-    const button = screen.getByRole('button', { name: /Calcular ahora/ });
     await act(async () => {
-      fireEvent.click(button);
+      confirmCalculateNow();
     });
 
     expect(notifyError).toHaveBeenCalledWith('No se pudieron calcular los indicadores.');
@@ -508,8 +512,8 @@ describe('ResultadosPage calculate / recalculate actions', () => {
     // The Carbon modal renders a heading matching the title
     expect(screen.getByRole('heading', { name: /Recalcular año/ })).toBeInTheDocument();
     // Confirm/Cancel buttons should be visible
-    expect(screen.getByRole('button', { name: /Confirmar/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Cancelar/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
   });
 
   it('submits recalcularAnio with the selected year when confirming the modal', async () => {
@@ -754,9 +758,8 @@ describe('ResultadosPage calculate / recalculate actions', () => {
 
     renderPage();
 
-    const button = screen.getByRole('button', { name: /Calcular ahora/ });
     await act(async () => {
-      fireEvent.click(button);
+      confirmCalculateNow();
     });
 
     expect(notifyError).toHaveBeenCalled();
@@ -764,6 +767,23 @@ describe('ResultadosPage calculate / recalculate actions', () => {
     expect(screen.getByText(/0 de 5 calculados, todos con error/)).toBeInTheDocument();
     expect(screen.getByText('(ind-001): No se pudo calcular este indicador.')).toBeInTheDocument();
     expect(screen.queryByText(/timeout/)).not.toBeInTheDocument();
+  });
+
+  it('opens the calculate-now confirmation and does not call the hook when cancelled', async () => {
+    const calcularMock = vi.fn();
+    mockUseCalcularAhora.mockReturnValue({ calcularAhora: calcularMock });
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Calcular ahora/ }));
+    expect(screen.getByRole('heading', { name: /Calcular ahora/ })).toBeInTheDocument();
+    expect(screen.getByText(/Esta acción calculará los indicadores activos/)).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar cálculo' }));
+    });
+
+    expect(calcularMock).not.toHaveBeenCalled();
   });
 
   it('closes the recalculate-year modal via Cancel without calling the hook', async () => {
@@ -778,7 +798,7 @@ describe('ResultadosPage calculate / recalculate actions', () => {
 
     // Click Cancel
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Cancelar/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     });
 
     // The hook must NOT have been called

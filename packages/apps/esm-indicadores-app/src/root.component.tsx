@@ -81,7 +81,10 @@ const IndicatorsContent: React.FC = () => {
           <InlineNotification
             kind="warning"
             title={t('demoDataActiveTitle', 'Datos de demostración activos')}
-            subtitle={t('demoDataActiveBody', 'La API no respondió. Los datos visibles son ejemplos y ninguna escritura se simulará.')}
+            subtitle={t(
+              'demoDataActiveBody',
+              'La API no respondió. Los datos visibles son ejemplos y ninguna escritura se simulará.',
+            )}
             lowContrast
           />
         ) : null}

@@ -4,6 +4,19 @@ App para tableros e indicadores de gestión.
 
 Terminología de dominio: visita = consulta, encounter = atención, appointment = cita.
 
+## Desarrollo local
+
+```bash
+# Desde la raíz del monorepo
+yarn install
+
+# Levantar el microfrontend en modo desarrollo (se registra en el shell de OpenMRS)
+yarn --cwd packages/apps/esm-indicadores-app start
+```
+
+- El módulo apunta a `reportesSqlApiPath` (`/services/reportes-sql` por defecto). Para desarrollo contra un backend reportes-sql independiente, configurar `reportesSqlApiPath` como URL absoluta (p. ej. `http://127.0.0.1:8000`) en `config/frontend.json` del shell.
+- Verificación: `yarn --cwd packages/apps/esm-indicadores-app verify` (lint + tests + typescript), `yarn --cwd packages/apps/esm-indicadores-app prettier` para formatear.
+
 ## Marco normativo
 - Ley N.° 26842, Ley General de Salud (Perú).
 
