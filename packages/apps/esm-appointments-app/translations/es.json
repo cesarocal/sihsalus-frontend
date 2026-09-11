@@ -1,4 +1,6 @@
 {
+  "appointmentDurationMaximum": "La duraci?n no puede superar 720 minutos (12 horas)",
+  "appointmentDateRequired": "Ingrese una fecha v?lida para la cita",
   "action": "Acción",
   "actions": "Acciones",
   "actionsForPatient": "Acciones para {{patient}}",

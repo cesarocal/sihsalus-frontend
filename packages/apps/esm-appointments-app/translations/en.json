@@ -1,4 +1,6 @@
 {
+  "appointmentDurationMaximum": "Duration cannot exceed 720 minutes (12 hours)",
+  "appointmentDateRequired": "Enter a valid appointment date",
   "action": "Action",
   "actions": "Actions",
   "actionsForPatient": "Actions for {{patient}}",
