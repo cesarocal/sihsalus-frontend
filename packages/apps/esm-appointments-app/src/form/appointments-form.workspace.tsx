@@ -1119,15 +1119,6 @@ const AppointmentsForm: React.FC<
     <Workspace2 title={title} hasUnsavedChanges={isDirty && !isSuccessful}>
       <Form className={styles.form} onSubmit={handleSubmit(handleSaveAppointment, handleAppointmentValidationErrors)}>
         <Stack gap={4}>
-          {Object.keys(errors).length > 0 && (
-            <InlineNotification
-              className={styles.formErrorSummary}
-              kind="error"
-              lowContrast={false}
-              title={t('appointmentFormValidationTitle', 'Revise los campos marcados')}
-              subtitle={getAppointmentValidationSummary(errors, t)}
-            />
-          )}
           {patient && (
             <ExtensionSlot
               name="patient-header-slot"
@@ -1796,13 +1787,6 @@ function TimeAndDuration({ t, watch: _watch, control, services: _services, error
       </ResponsiveWrapper>
     </>
   );
-}
-
-function getAppointmentValidationSummary(
-  errors: Record<string, unknown>,
-  t: (key: string, fallback: string) => string,
-) {
-  return getAppointmentValidationMessages(errors, t).join(' • ');
 }
 
 function getAppointmentValidationMessages(

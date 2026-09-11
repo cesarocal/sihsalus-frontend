@@ -307,6 +307,9 @@ describe('AppointmentForm', () => {
     const notification = mockShowSnackbar.mock.calls.at(-1)?.[0];
     expect(JSON.stringify(notification?.subtitle)).toContain('UPSS');
     expect(JSON.stringify(notification?.subtitle)).toContain('serviceRequired');
+    expect(screen.queryByText('Revise los campos marcados')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /select a UPSS/i })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('locationRequired')).toBeInTheDocument();
     expect(mockSaveAppointment).not.toHaveBeenCalled();
   });
 
