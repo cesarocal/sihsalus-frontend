@@ -60,7 +60,7 @@ test("workspace rail reserves desktop chart space without changing overlay or ta
     ),
     devtool: false,
     performance: false,
-  });
+  }, rspack);
   const context = await browser.newContext({ offline: true });
   t.after(() => context.close());
   const page = await context.newPage();
