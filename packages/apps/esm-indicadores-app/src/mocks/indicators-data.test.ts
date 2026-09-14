@@ -1,4 +1,26 @@
-import { getIndicadorById, listIndicadores, listResultados, resolveOrdenesMock } from './indicators-data';
+import { getIndicadorById, listIndicadores, listResultados, resolveOrdenesMock, searchEncounterTypesMock } from './indicators-data';
+
+describe('searchEncounterTypesMock', () => {
+  it('filters the full list by display name client-side', () => {
+    const result = searchEncounterTypesMock('CRED');
+
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.every((item) => item.display.toLowerCase().includes('cred'))).toBe(true);
+  });
+
+  it('is case-insensitive and trims the query', () => {
+    const result = searchEncounterTypesMock('  cred neonato ');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].display).toBe('CRED Neonato');
+  });
+
+  it('returns the full list for an empty query', () => {
+    const result = searchEncounterTypesMock('');
+
+    expect(result.length).toBeGreaterThan(1);
+  });
+});
 
 describe('resolveOrdenesMock', () => {
   it('returns correct Record for known UUIDs', () => {

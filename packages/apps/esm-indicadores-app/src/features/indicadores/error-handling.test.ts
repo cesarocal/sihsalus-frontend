@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { getUserFacingErrorMessage } from '@openmrs/esm-framework';
+import { describe, expect, it, vi } from 'vitest';
 
-import { indicatorsErrorMessageOptions } from './error-handling';
+import { getIndicadorSaveErrorMessage, indicatorsErrorMessageOptions } from './error-handling';
+
+vi.mock('@openmrs/esm-framework', () => ({
+  getUserFacingErrorMessage: vi.fn((_error: unknown, fallback: string) => fallback),
+}));
+
+const mockedGetUserFacingErrorMessage = vi.mocked(getUserFacingErrorMessage);
 
 describe('indicatorsErrorMessageOptions', () => {
   it('uses the active locale for HTTP status messages', () => {
@@ -32,5 +39,63 @@ describe('indicatorsErrorMessageOptions', () => {
       503: englishMessages.indicatorsError503,
       504: englishMessages.indicatorsError504,
     });
+  });
+});
+
+describe('getIndicadorSaveErrorMessage', () => {
+  const t = (key: string, defaultValue: string) => (key === 'encounterTypesUnknownUuids' ? `custom: ${defaultValue}` : defaultValue);
+
+  beforeEach(() => {
+    mockedGetUserFacingErrorMessage.mockClear();
+  });
+
+  it('surfaces the unknown encounter-type uuids from the 422 detail', () => {
+    const error = Object.assign(new Error('validation'), {
+      responseBody: {
+        detail: { field: 'encounter_type_uuids', unknown_uuids: ['enc-ghost-1', 'enc-ghost-2'] },
+      },
+    });
+
+    const message = getIndicadorSaveErrorMessage(error, t, 'fallback');
+
+    expect(message).toContain('enc-ghost-1, enc-ghost-2');
+    expect(mockedGetUserFacingErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores a 422 detail for a different field', () => {
+    const error = Object.assign(new Error('validation'), {
+      responseBody: {
+        detail: { field: 'location_uuids', unknown_uuids: ['loc-ghost'] },
+      },
+    });
+
+    const message = getIndicadorSaveErrorMessage(error, t, 'fallback');
+
+    expect(message).toBe('fallback');
+    expect(mockedGetUserFacingErrorMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a detail without unknown_uuids', () => {
+    const error = Object.assign(new Error('validation'), {
+      responseBody: { detail: { field: 'encounter_type_uuids' } },
+    });
+
+    const message = getIndicadorSaveErrorMessage(error, t, 'fallback');
+
+    expect(message).toBe('fallback');
+  });
+
+  it('delegates to getUserFacingErrorMessage for 502 gateway failures', () => {
+    const error = Object.assign(new Error('gateway'), { response: { status: 502 } });
+    mockedGetUserFacingErrorMessage.mockReturnValueOnce('El servicio de indicadores no está disponible en este momento.');
+
+    const message = getIndicadorSaveErrorMessage(error, t, 'fallback');
+
+    expect(message).toBe('El servicio de indicadores no está disponible en este momento.');
+    expect(mockedGetUserFacingErrorMessage).toHaveBeenCalledWith(
+      error,
+      'fallback',
+      expect.objectContaining({ statusMessages: expect.any(Object) }),
+    );
   });
 });

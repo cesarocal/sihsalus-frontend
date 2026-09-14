@@ -141,8 +141,7 @@ describe('parseDefinicion diagnosticos name map', () => {
 });
 
 describe('parseDefinicion combined', () => {
-  it('resolves all three name sets at once and sets filtroClinico by diagnosticos precedence', () => {
-    const definicion: DefinicionIndicadorForm = {
+  it('resolves all three name sets at once and sets filtroClinico by diagnosticos precedence', () => {    const definicion: DefinicionIndicadorForm = {
       tipo: 'conteo_atenciones',
       evento: {
         location_uuids: ['loc-001'],
@@ -163,5 +162,64 @@ describe('parseDefinicion combined', () => {
     expect(result.selectedOrdenes).toEqual([{ uuid: 'ord-hemograma', display: 'Hemograma' }]);
     expect(result.filtroClinico).toBe('diagnosticos');
     expect(result.diagnosticoTipo).toBe('presuntivo');
+  });
+});
+
+describe('parseDefinicion encounter types', () => {
+  function makeDefinicionWithEncounterTypes(uuids: Array<string>): DefinicionIndicadorForm {
+    return {
+      tipo: 'conteo_pacientes_ventana',
+      evento: { encounter_type_uuids: uuids, minimo_ocurrencias: 4 },
+      poblacion: { max_dias: 28 },
+    };
+  }
+
+  it('hydrates selectedEncounterTypes.display from the encounterTypes map', () => {
+    const definicion = makeDefinicionWithEncounterTypes(['enc-cred', 'enc-control']);
+    const encounterTypes = new Map([
+      ['enc-cred', 'CRED Neonato'],
+      ['enc-control', 'Control de niño sano'],
+    ]);
+
+    const result = parseDefinicion(definicion, { encounterTypes });
+
+    expect(result.tipo).toBe('conteo_pacientes_ventana');
+    expect(result.minimoOcurrencias).toBe('4');
+    expect(result.maxDias).toBe('28');
+    expect(result.selectedEncounterTypes).toEqual([
+      { uuid: 'enc-cred', display: 'CRED Neonato' },
+      { uuid: 'enc-control', display: 'Control de niño sano' },
+    ]);
+  });
+
+  it('falls back to UUID when encounterTypes map entry is missing', () => {
+    const definicion = makeDefinicionWithEncounterTypes(['enc-cred', 'enc-unknown']);
+    const encounterTypes = new Map([['enc-cred', 'CRED Neonato']]);
+
+    const result = parseDefinicion(definicion, { encounterTypes });
+
+    expect(result.selectedEncounterTypes).toEqual([
+      { uuid: 'enc-cred', display: 'CRED Neonato' },
+      { uuid: 'enc-unknown', display: 'enc-unknown' },
+    ]);
+  });
+
+  it('uses raw UUID as display when no encounterTypes map is provided', () => {
+    const definicion = makeDefinicionWithEncounterTypes(['enc-cred']);
+
+    const result = parseDefinicion(definicion);
+
+    expect(result.selectedEncounterTypes).toEqual([{ uuid: 'enc-cred', display: 'enc-cred' }]);
+  });
+
+  it('keeps encounter types optional for the other indicator types', () => {
+    const definicion: DefinicionIndicadorForm = {
+      tipo: 'conteo_atenciones',
+      evento: { location_uuids: ['loc-001'] },
+    };
+
+    const result = parseDefinicion(definicion);
+
+    expect(result.selectedEncounterTypes).toEqual([]);
   });
 });

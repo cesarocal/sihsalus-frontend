@@ -2,7 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { DefinicionIndicadorForm } from '../api/types';
-import { useResolvedDiagnosticos, useResolvedLocations, useResolvedOrdenes } from '../features/indicadores/hooks';
+import {
+  useResolvedDiagnosticos,
+  useResolvedEncounterTypes,
+  useResolvedLocations,
+  useResolvedOrdenes,
+} from '../features/indicadores/hooks';
 import DefinicionView from './DefinicionView';
 
 vi.mock('../features/indicadores/hooks', async () => ({
@@ -10,11 +15,34 @@ vi.mock('../features/indicadores/hooks', async () => ({
   useResolvedOrdenes: vi.fn(),
   useResolvedDiagnosticos: vi.fn(),
   useResolvedLocations: vi.fn(),
+  useResolvedEncounterTypes: vi.fn(),
 }));
 
 const mockUseResolvedOrdenes = vi.mocked(useResolvedOrdenes);
 const mockUseResolvedLocations = vi.mocked(useResolvedLocations);
 const mockUseResolvedDiagnosticos = vi.mocked(useResolvedDiagnosticos);
+const mockUseResolvedEncounterTypes = vi.mocked(useResolvedEncounterTypes);
+
+function mockDefaultResolvedHooks() {
+  mockUseResolvedLocations.mockReturnValue({
+    data: [],
+    displayMap: new Map(),
+    error: undefined,
+    isLoading: false,
+  } as ReturnType<typeof useResolvedLocations>);
+  mockUseResolvedDiagnosticos.mockReturnValue({
+    data: [],
+    resolveMap: new Map(),
+    error: undefined,
+    isLoading: false,
+  } as ReturnType<typeof useResolvedDiagnosticos>);
+  mockUseResolvedEncounterTypes.mockReturnValue({
+    data: [],
+    displayMap: new Map(),
+    error: undefined,
+    isLoading: false,
+  } as ReturnType<typeof useResolvedEncounterTypes>);
+}
 
 function makeDefinicionWithOrdenes(uuids: Array<string>): DefinicionIndicadorForm {
   return {
@@ -37,18 +65,7 @@ function makeDefinicionWithoutOrdenes(): DefinicionIndicadorForm {
 describe('DefinicionView orden rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseResolvedLocations.mockReturnValue({
-      data: [],
-      displayMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedLocations>);
-    mockUseResolvedDiagnosticos.mockReturnValue({
-      data: [],
-      resolveMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedDiagnosticos>);
+    mockDefaultResolvedHooks();
   });
 
   it('renders resolved orden names when resolution succeeds', () => {
@@ -119,18 +136,7 @@ describe('DefinicionView orden rendering', () => {
 describe('DefinicionView with pre-resolved names', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseResolvedLocations.mockReturnValue({
-      data: [],
-      displayMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedLocations>);
-    mockUseResolvedDiagnosticos.mockReturnValue({
-      data: [],
-      resolveMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedDiagnosticos>);
+    mockDefaultResolvedHooks();
     mockUseResolvedOrdenes.mockReturnValue({
       data: undefined,
       displayMap: new Map(),
@@ -145,6 +151,7 @@ describe('DefinicionView with pre-resolved names', () => {
       evento: {
         location_uuids: ['loc-a'],
         ordenes: [{ concepto_uuid: 'ord-a' }],
+        encounter_type_uuids: ['enc-a'],
       },
     };
     render(
@@ -154,33 +161,25 @@ describe('DefinicionView with pre-resolved names', () => {
           locationNames: new Map([['loc-a', 'Servicio A']]),
           diagnosticoNames: new Map(),
           ordenNames: new Map([['ord-a', 'Hemograma']]),
+          encounterTypeNames: new Map([['enc-a', 'CRED Neonato']]),
         }}
       />,
     );
 
     expect(screen.getByText('Servicio A')).toBeInTheDocument();
     expect(screen.getByText('Hemograma')).toBeInTheDocument();
+    expect(screen.getByText('CRED Neonato')).toBeInTheDocument();
     expect(mockUseResolvedOrdenes).toHaveBeenCalledWith([]);
     expect(mockUseResolvedLocations).toHaveBeenCalledWith([]);
     expect(mockUseResolvedDiagnosticos).toHaveBeenCalledWith([]);
+    expect(mockUseResolvedEncounterTypes).toHaveBeenCalledWith([]);
   });
 });
 
 describe('DefinicionView age rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseResolvedLocations.mockReturnValue({
-      data: [],
-      displayMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedLocations>);
-    mockUseResolvedDiagnosticos.mockReturnValue({
-      data: [],
-      resolveMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedDiagnosticos>);
+    mockDefaultResolvedHooks();
     mockUseResolvedOrdenes.mockReturnValue({
       data: undefined,
       displayMap: new Map(),
@@ -225,18 +224,7 @@ describe('DefinicionView age rendering', () => {
 describe('DefinicionView periodo removal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseResolvedLocations.mockReturnValue({
-      data: [],
-      displayMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedLocations>);
-    mockUseResolvedDiagnosticos.mockReturnValue({
-      data: [],
-      resolveMap: new Map(),
-      error: undefined,
-      isLoading: false,
-    } as ReturnType<typeof useResolvedDiagnosticos>);
+    mockDefaultResolvedHooks();
     mockUseResolvedOrdenes.mockReturnValue({
       data: undefined,
       displayMap: new Map(),
@@ -267,5 +255,59 @@ describe('DefinicionView periodo removal', () => {
 
     expect(screen.getByText(/Tipo:/)).toBeInTheDocument();
     expect(screen.getByText('Conteo de pacientes')).toBeInTheDocument();
+  });
+});
+
+describe('DefinicionView encounter types', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDefaultResolvedHooks();
+    mockUseResolvedOrdenes.mockReturnValue({
+      data: undefined,
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+  });
+
+  it('renders resolved encounter-type names and the window tipo label', () => {
+    mockUseResolvedEncounterTypes.mockReturnValue({
+      data: [],
+      displayMap: new Map([['enc-cred', 'CRED Neonato']]),
+      error: undefined,
+      isLoading: false,
+    });
+
+    const definicion: DefinicionIndicadorForm = {
+      tipo: 'conteo_pacientes_ventana',
+      evento: {
+        encounter_type_uuids: ['enc-cred'],
+        minimo_ocurrencias: 4,
+      },
+      poblacion: { max_dias: 28 },
+    };
+    render(<DefinicionView definicion={definicion} />);
+
+    expect(screen.getByText('Conteo de pacientes en ventana etaria')).toBeInTheDocument();
+    expect(screen.getByText(/Tipos de encuentro:/)).toBeInTheDocument();
+    expect(screen.getByText('CRED Neonato')).toBeInTheDocument();
+    expect(screen.getByText(/min - \/ max 28 días/)).toBeInTheDocument();
+  });
+
+  it('renders raw UUIDs when encounter-type names are unavailable', () => {
+    mockUseResolvedEncounterTypes.mockReturnValue({
+      data: [],
+      displayMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+
+    const definicion: DefinicionIndicadorForm = {
+      tipo: 'conteo_pacientes_ventana',
+      evento: { encounter_type_uuids: ['enc-unknown'] },
+    };
+    render(<DefinicionView definicion={definicion} />);
+
+    expect(screen.getByText('enc-unknown')).toBeInTheDocument();
   });
 });

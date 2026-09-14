@@ -4,6 +4,7 @@ import {
   useCreateVersion,
   useIndicador,
   useResolvedDiagnosticos,
+  useResolvedEncounterTypes,
   useResolvedLocations,
   useResolvedOrdenes,
 } from '../features/indicadores/hooks';
@@ -19,6 +20,7 @@ vi.mock('../features/indicadores/hooks', () => ({
   useResolvedLocations: vi.fn(),
   useResolvedDiagnosticos: vi.fn(),
   useResolvedOrdenes: vi.fn(),
+  useResolvedEncounterTypes: vi.fn(),
   useSQLPreview: vi.fn(() => ({
     data: undefined,
     error: undefined,
@@ -29,6 +31,7 @@ vi.mock('../features/indicadores/hooks', () => ({
   useLocationSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   useDiagnosticoSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   useOrdenSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
+  useEncounterTypeSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   notifyError: vi.fn(),
   notifySuccess: vi.fn(),
 }));
@@ -38,6 +41,7 @@ const mockUseCreateVersion = vi.mocked(useCreateVersion);
 const mockUseResolvedLocations = vi.mocked(useResolvedLocations);
 const mockUseResolvedDiagnosticos = vi.mocked(useResolvedDiagnosticos);
 const mockUseResolvedOrdenes = vi.mocked(useResolvedOrdenes);
+const mockUseResolvedEncounterTypes = vi.mocked(useResolvedEncounterTypes);
 
 const sampleIndicator = {
   id: 'ind-001',
@@ -97,6 +101,12 @@ describe('IndicadorDetailPage', () => {
     mockUseResolvedDiagnosticos.mockReturnValue({
       data: [],
       resolveMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    } as never);
+    mockUseResolvedEncounterTypes.mockReturnValue({
+      data: [],
+      displayMap: new Map(),
       error: undefined,
       isLoading: false,
     } as never);
@@ -287,6 +297,45 @@ describe('IndicadorDetailPage', () => {
         pill.textContent?.includes('Hemograma'),
       ),
     ).toBe(true);
+  });
+
+  it('hydrates the new-version form with a window definition and its encounter types', () => {
+    mockUseIndicador.mockReturnValue({
+      data: {
+        ...sampleIndicator,
+        versiones: [
+          {
+            id: 'ver-001-1',
+            indicador_id: 'ind-001',
+            version: 1,
+            creado_en: '2026-01-15T10:00:00.000Z',
+            definicion: {
+              tipo: 'conteo_pacientes_ventana',
+              evento: { encounter_type_uuids: ['enc-cred-neonato'], minimo_ocurrencias: 4 },
+              poblacion: { max_dias: 28 },
+            },
+          },
+        ],
+      },
+      error: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+    mockUseResolvedEncounterTypes.mockReturnValue({
+      data: [{ uuid: 'enc-cred-neonato', display: 'CRED Neonato' }],
+      displayMap: new Map([['enc-cred-neonato', 'CRED Neonato']]),
+      error: undefined,
+      isLoading: false,
+    } as never);
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva versión' }));
+
+    const selectedPills = Array.from(document.querySelectorAll('.selectedItemPill'));
+    expect(selectedPills.some((pill) => pill.textContent?.includes('CRED Neonato'))).toBe(true);
+    expect(screen.getByLabelText('Mínimo de ocurrencias')).toHaveValue(4);
+    expect(screen.getByLabelText('Edad máxima días')).toHaveValue(28);
   });
 
   it('keeps the new-version form unmounted while selected definition names are loading', () => {

@@ -5,6 +5,7 @@ import {
   createIndicador,
   createVersion,
   deleteIndicador,
+  getEncounterTypes,
   getIndicador,
   getIndicadores,
   resolveOrdenes,
@@ -188,8 +189,7 @@ describe('indicadores API contract', () => {
   });
 });
 
-describe('resolveOrdenes', () => {
-  beforeEach(() => {
+describe('resolveOrdenes', () => {  beforeEach(() => {
     vi.clearAllMocks();
     mockedGetConfig.mockResolvedValue({
       reportesSqlApiPath: '/services/reportes-sql',
@@ -226,5 +226,46 @@ describe('resolveOrdenes', () => {
     await expect(resolveOrdenes(['ord-hemograma', 'unknown'])).resolves.toEqual({
       'ord-hemograma': 'Hemograma',
     });
+  });
+});
+
+describe('getEncounterTypes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedGetConfig.mockResolvedValue({
+      reportesSqlApiPath: '/services/reportes-sql',
+      enableDemoData: false,
+    });
+  });
+
+  it('fetches the full encounter-type list without a query param', async () => {
+    const data = [
+      { uuid: 'enc-cred', display: 'CRED Neonato' },
+      { uuid: 'enc-control', display: 'Control de niño sano' },
+    ];
+    mockedOpenmrsFetch.mockResolvedValue({ data } as never);
+
+    await expect(getEncounterTypes()).resolves.toEqual(data);
+    expect(mockedOpenmrsFetch).toHaveBeenCalledWith('/services/reportes-sql/conceptos/encounter-types', undefined);
+  });
+
+  it('fails closed on network errors when demo data is disabled', async () => {
+    const error = new TypeError('Failed to fetch');
+    mockedOpenmrsFetch.mockRejectedValue(error);
+
+    await expect(getEncounterTypes()).rejects.toBe(error);
+  });
+
+  it('returns the full example list on network errors only when demo data is enabled', async () => {
+    mockedGetConfig.mockResolvedValue({
+      reportesSqlApiPath: '/services/reportes-sql',
+      enableDemoData: true,
+    });
+    mockedOpenmrsFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await getEncounterTypes();
+
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.every((item) => typeof item.uuid === 'string' && typeof item.display === 'string')).toBe(true);
   });
 });

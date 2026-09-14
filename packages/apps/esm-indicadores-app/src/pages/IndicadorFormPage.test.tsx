@@ -7,6 +7,7 @@ import {
   useCreateIndicador,
   useIndicador,
   useResolvedDiagnosticos,
+  useResolvedEncounterTypes,
   useResolvedLocations,
   useResolvedOrdenes,
   useUpdateIndicador,
@@ -21,9 +22,11 @@ vi.mock('../features/indicadores/hooks', () => ({
   useResolvedOrdenes: vi.fn(),
   useResolvedLocations: vi.fn(),
   useResolvedDiagnosticos: vi.fn(),
+  useResolvedEncounterTypes: vi.fn(),
   useLocationSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   useDiagnosticoSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   useOrdenSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
+  useEncounterTypeSearch: vi.fn(() => ({ data: [], error: undefined, isLoading: false })),
   notifyError: vi.fn(),
   notifySuccess: vi.fn(),
 }));
@@ -104,6 +107,12 @@ describe('IndicadorFormPage — create mode', () => {
     vi.mocked(useResolvedDiagnosticos).mockReturnValue({
       data: [],
       resolveMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+    vi.mocked(useResolvedEncounterTypes).mockReturnValue({
+      data: [],
+      displayMap: new Map(),
       error: undefined,
       isLoading: false,
     });
@@ -211,6 +220,12 @@ describe('IndicadorFormPage — edit mode', () => {
     vi.mocked(useResolvedDiagnosticos).mockReturnValue({
       data: [],
       resolveMap: new Map(),
+      error: undefined,
+      isLoading: false,
+    });
+    vi.mocked(useResolvedEncounterTypes).mockReturnValue({
+      data: [],
+      displayMap: new Map(),
       error: undefined,
       isLoading: false,
     });
