@@ -1,15 +1,73 @@
-@use '@carbon/layout';
-@use '@openmrs/esm-styleguide/src/vars' as *;
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.page {
+  background-color: $ui-02;
+  min-height: calc(100vh - var(--omrs-topnav-height));
+  min-width: 0;
+}
+
+.pageHeader {
+  background-color: $ui-02;
+  border-bottom: 1px solid $ui-03;
+  align-items: center;
+  gap: layout.$spacing-05;
+  height: auto;
+  min-height: layout.$spacing-12;
+  padding: layout.$spacing-05;
+  flex-wrap: wrap;
+}
+
+.locationFilter {
+  width: 24rem;
+  max-width: 100%;
+  min-width: 0;
+
+  :global(.cds--list-box__menu-item),
+  :global(.cds--list-box__menu-item__option) {
+    block-size: auto;
+    min-block-size: layout.$spacing-09;
+  }
+
+  :global(.cds--list-box__menu-item__option) {
+    padding-block: layout.$spacing-03;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+.pageState {
+  padding: layout.$spacing-05;
+}
+
+.selectionPrompt {
+  border: 1px solid $ui-03;
+  background-color: $ui-02;
+  padding: layout.$spacing-07;
+
+  h2 {
+    @include type.type-style("heading-compact-02");
+    margin-bottom: layout.$spacing-05;
+  }
+
+  p {
+    @include type.type-style("body-01");
+    color: $text-02;
+  }
+}
+
+@media (max-width: $breakpoint-tablet-max) {
+  .locationFilter {
+    width: 100%;
+  }
+}
 
 .wardView {
   background-color: #e4e4e4;
   display: flex;
   flex-direction: column;
   padding: 0 layout.$spacing-05;
-
-  &.verticalTiling {
-    height: calc(100vh - var(--omrs-topnav-height));
-  }
 }
 
 .wardViewMain {
@@ -22,7 +80,6 @@
     display: block;
     column-width: 280px;
     overflow-x: auto;
-    height: calc(100% - 4rem);
 
     > div {
       break-inside: avoid;
