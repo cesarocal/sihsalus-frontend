@@ -6,6 +6,7 @@ import {
   InlineLoading,
   Layer,
   Pagination,
+  Search,
   Table,
   TableBody,
   TableCell,
@@ -13,10 +14,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
-  Tile,
 } from '@carbon/react';
 import { Add, Reset } from '@carbon/react/icons';
 import {
@@ -305,22 +302,20 @@ const EmergencyQueueTable: React.FC<EmergencyQueueTableProps> = ({ queueUuid }) 
     <div className={styles.defaultQueueTable}>
       <Layer className={styles.tableSection}>
         <div className={styles.headerContainer}>
-          <div className={!isDesktop(layout) ? styles.tabletHeading : styles.desktopHeading}>
-            <h4>{t('patientsCurrentlyInQueue', 'Patients currently in queue')}</h4>
-          </div>
+          <h2 className={styles.heading}>{t('patientsCurrentlyInQueue', 'Patients in queue')}</h2>
           <div className={styles.headerButtons}>
             {canEdit && (
               <Button
-                kind="secondary"
+                kind="primary"
                 renderIcon={(props) => <Add size={16} {...props} />}
-                size={isDesktop(layout) ? 'sm' : 'lg'}
+                size="md"
                 onClick={() => {
                   launchWorkspace(emergencyWorkflowWorkspace, {
-                    workspaceTitle: t('newEmergencyPatient', 'New Emergency Patient'),
+                    workspaceTitle: t('newEmergencyPatient', 'Add patient'),
                   });
                 }}
               >
-                {t('newEmergencyPatient', 'New Emergency Patient')}
+                {t('newEmergencyPatient', 'Add patient')}
               </Button>
             )}
           </div>
@@ -333,22 +328,36 @@ const EmergencyQueueTable: React.FC<EmergencyQueueTableProps> = ({ queueUuid }) 
           size={responsiveSize}
           useZebraStyles={columns.length > 1}
         >
-          {({ rows, headers, getTableProps, getHeaderProps, getRowProps, getToolbarProps }) => (
+          {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
             <>
               <TableContainer className={styles.tableContainer}>
-                <div className={styles.toolbarContainer}>
-                  {isValidating && (
-                    <div className={styles.loaderContainer}>
-                      <InlineLoading />
-                    </div>
-                  )}
-                  <TableToolbar {...getToolbarProps()}>
-                    <TableToolbarContent className={styles.toolbarContent}>
+                <div className={styles.controls}>
+                  <div className={styles.searchRow}>
+                    <Search
+                      id="emergency-queue-search"
+                      className={styles.queueSearch}
+                      labelText={t('searchThisList', 'Search queue')}
+                      closeButtonLabelText={t('clearSearch', 'Clear search')}
+                      value={searchTerm}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        setSearchTerm(e.target.value);
+                        goTo(1);
+                      }}
+                      placeholder={t('enterNameIdOrDni', 'Name, medical record or document')}
+                      size="md"
+                    />
+                    <div className={styles.controlActions}>
+                      {isValidating && <InlineLoading description={t('updatingQueue', 'Updating queue...')} />}
+                      {hasActiveFilters && (
+                        <Button kind="ghost" size="md" renderIcon={Reset} onClick={clearAllFilters}>
+                          {t('clearFilters', 'Limpiar filtros')}
+                        </Button>
+                      )}
                       {canEdit && filteredQueueEntries.length > 0 && (
                         <Button
                           className={styles.clearQueueButton}
                           kind="ghost"
-                          size={isDesktop(layout) ? 'sm' : 'lg'}
+                          size="md"
                           onClick={() => {
                             const dispose = showModal('emergency-clear-queue-entries-modal', {
                               closeModal: () => dispose(),
@@ -359,165 +368,146 @@ const EmergencyQueueTable: React.FC<EmergencyQueueTableProps> = ({ queueUuid }) 
                           {t('clearQueueEntries', 'Limpiar cola')}
                         </Button>
                       )}
-                      <div className={styles.filterContainer}>
-                        <Dropdown
-                          id="statusFilter"
-                          items={[{ uuid: '', display: t('any', 'Any') }, ...availableStatuses]}
-                          selectedItem={selectedStatus}
-                          itemToString={(item) => (item ? item.display : '')}
-                          label={t('all', 'All')}
-                          onChange={({ selectedItem }) => {
-                            setSelectedStatus(selectedItem?.uuid ? selectedItem : null);
-                            goTo(1);
-                          }}
-                          size={isDesktop(layout) ? 'sm' : 'lg'}
-                          titleText={t('showPatientsWithStatus', 'Show patients with status:')}
-                          type="inline"
-                        />
-                      </div>
-                      <div className={styles.filterContainer}>
-                        <Dropdown
-                          id="priorityFilter"
-                          items={[{ uuid: '', display: t('any', 'Any') }, ...availablePriorities]}
-                          selectedItem={selectedPriority}
-                          itemToString={(item) => (item ? item.display : '')}
-                          label={t('all', 'All')}
-                          onChange={({ selectedItem }) => {
-                            setSelectedPriority(selectedItem?.uuid ? selectedItem : null);
-                            goTo(1);
-                          }}
-                          size={isDesktop(layout) ? 'sm' : 'lg'}
-                          titleText={t('filterByPriority', 'Prioridad:')}
-                          type="inline"
-                        />
-                      </div>
-                      {(availableProviders.length > 0 || selectedProvider) && (
-                        <div className={styles.filterContainer}>
-                          <Dropdown
-                            id="providerFilter"
-                            items={[{ uuid: '', display: t('any', 'Any') }, ...availableProviders]}
-                            selectedItem={selectedProvider}
-                            itemToString={(item) => (item ? item.display : '')}
-                            label={t('all', 'All')}
-                            onChange={({ selectedItem }) => {
-                              setSelectedProvider(selectedItem?.uuid ? selectedItem : null);
-                              goTo(1);
-                            }}
-                            size={isDesktop(layout) ? 'sm' : 'lg'}
-                            titleText={t('filterByProvider', 'Prestador:')}
-                            type="inline"
-                          />
-                        </div>
-                      )}
-                      <div className={styles.filterContainer}>
-                        <Dropdown
-                          id="identificationStatusFilter"
-                          items={[
-                            { id: '', label: t('any', 'Any') },
-                            ...availableIdentificationStatuses.map((status) => ({ id: status, label: status })),
-                          ]}
-                          itemToString={(item) => item?.label ?? ''}
-                          selectedItem={
-                            selectedIdentificationStatus
-                              ? { id: selectedIdentificationStatus, label: selectedIdentificationStatus }
-                              : null
-                          }
-                          label={selectedIdentificationStatus || t('all', 'All')}
-                          onChange={({ selectedItem }) => {
-                            setSelectedIdentificationStatus(selectedItem?.id || null);
-                            goTo(1);
-                          }}
-                          size={isDesktop(layout) ? 'sm' : 'lg'}
-                          titleText={t('filterByIdentificationStatus', 'Identificación:')}
-                          type="inline"
-                        />
-                      </div>
-                      <div className={styles.filterContainer}>
-                        <Dropdown
-                          id="waitTimeFilter"
-                          items={[{ id: '', label: t('any', 'Any') }, ...waitTimeRangeOptions]}
-                          selectedItem={
-                            waitTimeRangeOptions.find((range) => range.id === selectedWaitTimeRange) ?? null
-                          }
-                          itemToString={(item) => (item ? item.label : '')}
-                          label={
-                            selectedWaitTimeRange
-                              ? (waitTimeRangeOptions.find((r) => r.id === selectedWaitTimeRange)?.label ??
-                                t('all', 'All'))
-                              : t('all', 'All')
-                          }
-                          onChange={({ selectedItem }) => {
-                            setSelectedWaitTimeRange(selectedItem?.id || null);
-                            goTo(1);
-                          }}
-                          size={isDesktop(layout) ? 'sm' : 'lg'}
-                          titleText={t('filterByWaitTime', 'Tiempo de espera:')}
-                          type="inline"
-                        />
-                      </div>
-                      {hasActiveFilters && (
-                        <Button
-                          kind="ghost"
-                          size={isDesktop(layout) ? 'sm' : 'lg'}
-                          renderIcon={(props) => <Reset size={16} {...props} />}
-                          onClick={clearAllFilters}
-                        >
-                          {t('clearFilters', 'Limpiar filtros')}
-                        </Button>
-                      )}
-                      <TableToolbarSearch
-                        className={styles.search}
-                        expanded
-                        value={searchTerm}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          setSearchTerm(e.target.value);
+                    </div>
+                  </div>
+                  <div className={styles.filtersGrid}>
+                    <div className={styles.filterContainer}>
+                      <Dropdown
+                        id="statusFilter"
+                        items={[{ uuid: '', display: t('any', 'Any') }, ...availableStatuses]}
+                        selectedItem={selectedStatus}
+                        itemToString={(item) => (item ? item.display : '')}
+                        label={t('all', 'All')}
+                        onChange={({ selectedItem }) => {
+                          setSelectedStatus(selectedItem?.uuid ? selectedItem : null);
                           goTo(1);
                         }}
-                        placeholder={t('searchThisList', 'Paciente, HCE, documento, responsable...')}
-                        size={isDesktop(layout) ? 'md' : 'lg'}
-                        persistent
+                        size="md"
+                        titleText={t('status', 'Status')}
                       />
-                    </TableToolbarContent>
-                  </TableToolbar>
+                    </div>
+                    <div className={styles.filterContainer}>
+                      <Dropdown
+                        id="priorityFilter"
+                        items={[{ uuid: '', display: t('any', 'Any') }, ...availablePriorities]}
+                        selectedItem={selectedPriority}
+                        itemToString={(item) => (item ? item.display : '')}
+                        label={t('all', 'All')}
+                        onChange={({ selectedItem }) => {
+                          setSelectedPriority(selectedItem?.uuid ? selectedItem : null);
+                          goTo(1);
+                        }}
+                        size="md"
+                        titleText={t('priority', 'Priority')}
+                      />
+                    </div>
+                    {(availableProviders.length > 0 || selectedProvider) && (
+                      <div className={styles.filterContainer}>
+                        <Dropdown
+                          id="providerFilter"
+                          items={[{ uuid: '', display: t('any', 'Any') }, ...availableProviders]}
+                          selectedItem={selectedProvider}
+                          itemToString={(item) => (item ? item.display : '')}
+                          label={t('all', 'All')}
+                          onChange={({ selectedItem }) => {
+                            setSelectedProvider(selectedItem?.uuid ? selectedItem : null);
+                            goTo(1);
+                          }}
+                          size="md"
+                          titleText={t('provider', 'Provider')}
+                        />
+                      </div>
+                    )}
+                    <div className={styles.filterContainer}>
+                      <Dropdown
+                        id="identificationStatusFilter"
+                        items={[
+                          { id: '', label: t('any', 'Any') },
+                          ...availableIdentificationStatuses.map((status) => ({ id: status, label: status })),
+                        ]}
+                        itemToString={(item) => item?.label ?? ''}
+                        selectedItem={
+                          selectedIdentificationStatus
+                            ? { id: selectedIdentificationStatus, label: selectedIdentificationStatus }
+                            : null
+                        }
+                        label={selectedIdentificationStatus || t('all', 'All')}
+                        onChange={({ selectedItem }) => {
+                          setSelectedIdentificationStatus(selectedItem?.id || null);
+                          goTo(1);
+                        }}
+                        size="md"
+                        titleText={t('identification', 'Identification')}
+                      />
+                    </div>
+                    <div className={styles.filterContainer}>
+                      <Dropdown
+                        id="waitTimeFilter"
+                        items={[{ id: '', label: t('any', 'Any') }, ...waitTimeRangeOptions]}
+                        selectedItem={waitTimeRangeOptions.find((range) => range.id === selectedWaitTimeRange) ?? null}
+                        itemToString={(item) => (item ? item.label : '')}
+                        label={
+                          selectedWaitTimeRange
+                            ? (waitTimeRangeOptions.find((r) => r.id === selectedWaitTimeRange)?.label ??
+                              t('all', 'All'))
+                            : t('all', 'All')
+                        }
+                        onChange={({ selectedItem }) => {
+                          setSelectedWaitTimeRange(selectedItem?.id || null);
+                          goTo(1);
+                        }}
+                        size="md"
+                        titleText={t('waitTime', 'Wait time')}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <Table {...getTableProps()} className={styles.queueTable}>
-                  <TableHead>
-                    <TableRow>
-                      {headers.map((header) => (
-                        <TableHeader
-                          key={header.key}
-                          {...getHeaderProps({ header })}
-                          className={header.key === 'actions' ? 'cds--table-column-menu' : undefined}
-                        >
-                          {header.header}
-                        </TableHeader>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {rows.map((row) => (
-                      <TableRow {...getRowProps({ row })} key={row.id}>
-                        {row.cells.map((cell) => (
-                          <TableCell
-                            key={cell.id}
-                            className={cell.info?.header === 'actions' ? 'cds--table-column-menu' : undefined}
+                <div
+                  className={styles.tableScroll}
+                  role="region"
+                  aria-label={t('emergencyQueue', 'Emergency queue')}
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll all queue columns.
+                  tabIndex={0}
+                >
+                  <Table {...getTableProps()} className={styles.queueTable}>
+                    <TableHead>
+                      <TableRow>
+                        {headers.map((header) => (
+                          <TableHeader
+                            key={header.key}
+                            {...getHeaderProps({ header })}
+                            className={header.key === 'actions' ? 'cds--table-column-menu' : undefined}
                           >
-                            {cell.value}
-                          </TableCell>
+                            {header.header}
+                          </TableHeader>
                         ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow {...getRowProps({ row })} key={row.id}>
+                          {row.cells.map((cell) => (
+                            <TableCell
+                              key={cell.id}
+                              className={cell.info?.header === 'actions' ? 'cds--table-column-menu' : undefined}
+                            >
+                              {cell.value}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </TableContainer>
               {rows.length === 0 && (
-                <div className={styles.tileContainer}>
-                  <Tile className={styles.tile}>
-                    <div className={styles.tileContent}>
-                      <p className={styles.content}>{t('noPatientsToDisplay', 'No patients to display')}</p>
-                      <p className={styles.helper}>{t('checkFilters', 'Check the filters above')}</p>
-                    </div>
-                  </Tile>
+                <div className={styles.emptyState}>
+                  <p className={styles.content}>{t('noPatientsToDisplay', 'No patients to display')}</p>
+                  <p className={styles.helper}>
+                    {hasActiveFilters
+                      ? t('checkFilters', 'Change the filters or clear the search.')
+                      : t('emptyEmergencyQueueHint', 'Patients in this queue will appear here.')}
+                  </p>
                 </div>
               )}
               {paginated && (

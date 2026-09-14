@@ -157,6 +157,12 @@
     ]
   },
   "@sihsalus/esm-service-queues-app": {
+    "obstetricCare": {
+      "enabled": true,
+      "outpatientAppointmentServiceUuid": "a6d7f9b3-2c5e-48d1-93e4-7f8a6b5c2d02",
+      "outpatientQueueUuid": "d4e5f6a7-b8c9-40d1-e2f3-a4b5c6d7e8f9",
+      "inpatientQueueUuid": "c9d0e1f2-a3b4-45c6-d7e8-f9a0b1c2d3e4"
+    },
     "appointmentTriage": {
       "careRoutingContractVersion": "2026-07-18",
       "appointmentVisitAttributeTypeUuid": "193508ab-20c6-5291-9f23-0257335eaabd",

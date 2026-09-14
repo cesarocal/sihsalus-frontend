@@ -41,6 +41,12 @@ La actualización de datos conserva la página actual mientras siga existiendo;
 si desaparece, muestra la última página disponible. Estos controles afectan la
 vista, sin modificar la prioridad clínica ni guardar cambios en las entradas.
 
+La búsqueda y los filtros ocupan filas independientes de la tabla y se adaptan
+al ancho disponible. En pantallas estrechas, la tabla permite desplazamiento
+horizontal por teclado sin ocultar columnas clínicas. El registro rápido adapta
+sus campos al ancho del panel lateral; las acciones para registrar pacientes
+identificados o sin identificación usan los botones estándar de Carbon.
+
 Cuando se solicita una cola concreta, primero se valida contra el catálogo de
 colas de la ubicación. Un fallo de ese catálogo se muestra como error de carga,
 incluidos los errores de sesión o permisos; no se presenta como una cola vacía

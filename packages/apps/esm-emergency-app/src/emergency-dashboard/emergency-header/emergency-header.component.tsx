@@ -35,7 +35,7 @@ const EmergencyHeader: React.FC<EmergencyHeaderProps> = ({ queueFilter }) => {
 
   const handleNewPatientClick = () => {
     launchWorkspace(emergencyWorkflowWorkspace, {
-      workspaceTitle: t('newEmergencyPatient', 'New Emergency Patient'),
+      workspaceTitle: t('newEmergencyPatient', 'Add patient'),
     });
   };
 
@@ -55,7 +55,7 @@ const EmergencyHeader: React.FC<EmergencyHeaderProps> = ({ queueFilter }) => {
             size={responsiveSize}
             className={styles.newPatientButton}
           >
-            {t('newEmergencyPatient', 'New Emergency Patient')}
+            {t('newEmergencyPatient', 'Add patient')}
           </Button>
         )}
       </div>

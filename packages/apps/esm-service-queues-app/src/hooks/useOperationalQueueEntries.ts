@@ -1,24 +1,30 @@
+import { useConfig } from '@openmrs/esm-framework';
 import { useMemo } from 'react';
 
+import { type ConfigObject } from '../config-schema';
 import { type QueueEntry, type QueueEntrySearchCriteria } from '../types';
 import { useQueueEntries } from './useQueueEntries';
 
 type QueueLocationSelection = QueueEntrySearchCriteria['location'];
 
 /**
- * Queue 3 filters `location` by the queue's administrative location. The shared
- * triage queue belongs to the hospital, while its visits belong to the UPSS
- * that requested the triage. Prefer the visit location so the entry remains
- * visible under that UPSS, and fall back to the queue location for queue-only
- * workflows that have no clinical visit.
+ * Clinical queues belong to the receiving UPSS, which may differ from the
+ * visit's original location after a transfer. Only the configured shared triage
+ * queue uses the visit's UPSS instead of its administrative queue location.
  */
-export function getOperationalQueueLocationUuid(queueEntry: QueueEntry): string | undefined {
-  return queueEntry.visit?.location?.uuid ?? queueEntry.queue?.location?.uuid;
+export function getOperationalQueueLocationUuid(queueEntry: QueueEntry, triageQueueUuid?: string): string | undefined {
+  const visitLocationUuid = queueEntry.visit?.location?.uuid;
+  const queueLocationUuid = queueEntry.queue?.location?.uuid;
+
+  return triageQueueUuid && queueEntry.queue?.uuid === triageQueueUuid
+    ? visitLocationUuid || queueLocationUuid
+    : queueLocationUuid || visitLocationUuid;
 }
 
 export function matchesOperationalQueueLocation(
   queueEntry: QueueEntry,
   selectedLocation: QueueLocationSelection,
+  triageQueueUuid?: string,
 ): boolean {
   const selectedLocationUuids = Array.isArray(selectedLocation)
     ? selectedLocation.filter(Boolean)
@@ -30,7 +36,7 @@ export function matchesOperationalQueueLocation(
     return true;
   }
 
-  const operationalLocationUuid = getOperationalQueueLocationUuid(queueEntry);
+  const operationalLocationUuid = getOperationalQueueLocationUuid(queueEntry, triageQueueUuid);
   return Boolean(operationalLocationUuid && selectedLocationUuids.includes(operationalLocationUuid));
 }
 
@@ -41,6 +47,8 @@ export function matchesOperationalQueueLocation(
  * UPSS selector.
  */
 export function useOperationalQueueEntries(searchCriteria?: QueueEntrySearchCriteria) {
+  const { appointmentTriage } = useConfig<ConfigObject>();
+  const triageQueueUuid = appointmentTriage?.triageRouting?.queueUuid;
   const selectedLocation = searchCriteria?.location;
   const backendSearchCriteria = useMemo(
     () => (searchCriteria ? { ...searchCriteria, location: null } : undefined),
@@ -48,8 +56,8 @@ export function useOperationalQueueEntries(searchCriteria?: QueueEntrySearchCrit
   );
   const result = useQueueEntries(backendSearchCriteria);
   const queueEntries = useMemo(
-    () => result.queueEntries.filter((entry) => matchesOperationalQueueLocation(entry, selectedLocation)),
-    [result.queueEntries, selectedLocation],
+    () => result.queueEntries.filter((entry) => matchesOperationalQueueLocation(entry, selectedLocation, triageQueueUuid)),
+    [result.queueEntries, selectedLocation, triageQueueUuid],
   );
 
   return { ...result, queueEntries, totalCount: queueEntries.length };

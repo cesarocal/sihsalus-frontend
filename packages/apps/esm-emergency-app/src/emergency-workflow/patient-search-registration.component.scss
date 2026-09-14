@@ -4,12 +4,14 @@
 @use "@carbon/styles/scss/colors";
 
 .container {
+  min-width: 0;
+  max-width: 100%;
   padding: spacing.$spacing-05;
 }
 
 .header {
   h4 {
-    @include type.type-style("heading-04");
+    @include type.type-style("heading-03");
     margin-bottom: spacing.$spacing-03;
   }
 
@@ -20,33 +22,39 @@
 }
 
 .searchSection {
-  background: theme.$layer-01;
-  padding: spacing.$spacing-05;
-  border-radius: 4px;
+  min-width: 0;
+}
+
+.searchLabel {
+  @include type.type-style("label-01");
+  display: block;
+  color: theme.$text-secondary;
+  margin-bottom: spacing.$spacing-03;
 }
 
 .quickActions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: spacing.$spacing-03;
-  flex-wrap: wrap;
+  align-items: stretch;
   margin-top: spacing.$spacing-04;
+
+  :global(.cds--btn) {
+    width: 100%;
+  }
 }
 
-.unidentifiedPatientButton {
-  color: theme.$support-error;
-  border-color: theme.$support-error;
-
-  &:hover,
-  &:focus {
-    color: theme.$text-on-color;
-    background-color: theme.$support-error;
-    border-color: theme.$support-error;
-  }
+.quickActions :global(.cds--btn),
+.formActions :global(.cds--btn),
+.submitButton {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
 }
 
 // Search Results
 .resultsSection {
-  margin-top: spacing.$spacing-05;
+  min-width: 0;
 }
 
 .resultsCount {
@@ -57,13 +65,11 @@
 
 .patientResultTile {
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
   background: theme.$layer-01;
 
   &:hover {
     background: theme.$layer-hover-01;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -81,11 +87,13 @@
 
 .patientResultInfo {
   flex: 1;
+  min-width: 0;
 }
 
 .patientResultName {
   @include type.type-style("heading-compact-01");
   margin: 0 0 spacing.$spacing-02 0;
+  overflow-wrap: anywhere;
 }
 
 .patientResultMeta {
@@ -95,6 +103,7 @@
   align-items: center;
   gap: spacing.$spacing-03;
   flex-wrap: wrap;
+  overflow-wrap: anywhere;
 }
 
 .separator {
@@ -110,8 +119,7 @@
 // Selected/Registered Patient Card
 .patientFoundTile {
   background: theme.$layer-01;
-  border: 1px solid colors.$green-60;
-  border-radius: 4px;
+  border: 1px solid theme.$border-subtle-01;
   padding: spacing.$spacing-05;
 }
 
@@ -120,14 +128,23 @@
   align-items: center;
   justify-content: space-between;
   gap: spacing.$spacing-04;
+  flex-wrap: wrap;
 }
 
 .patientInfo {
   display: flex;
   align-items: center;
   gap: spacing.$spacing-04;
-  flex: 1;
+  flex: 1 1 12rem;
   min-width: 0;
+
+  > div {
+    min-width: 0;
+  }
+
+  > svg {
+    flex-shrink: 0;
+  }
 }
 
 .successIcon {
@@ -137,20 +154,19 @@
 
 // Registration Tile
 .registrationTile {
-  background: theme.$layer-01;
-  border: 1px solid theme.$border-subtle-01;
-  border-radius: 4px;
-  padding: spacing.$spacing-06;
+  min-width: 0;
+  background: transparent;
+  border-top: 1px solid theme.$border-subtle-01;
+  padding: spacing.$spacing-05 0 0;
 }
 
 .registrationHeader {
   display: flex;
   align-items: center;
   gap: spacing.$spacing-03;
-  margin-bottom: spacing.$spacing-04;
 
   h5 {
-    @include type.type-style("heading-03");
+    @include type.type-style("heading-compact-02");
     margin: 0;
   }
 
@@ -162,6 +178,7 @@
 .formActions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: spacing.$spacing-03;
   margin-top: spacing.$spacing-05;
   padding-top: spacing.$spacing-05;
@@ -182,9 +199,10 @@
 
 // Form sections with fieldset
 .formSection {
-  border: 1px solid theme.$border-subtle-01;
-  border-radius: 4px;
-  padding: spacing.$spacing-04 spacing.$spacing-05;
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid theme.$border-subtle-01;
+  padding: spacing.$spacing-05 0 0;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -195,31 +213,26 @@
   @include type.type-style("label-02");
   color: theme.$text-primary;
   font-weight: 600;
-  padding: 0 spacing.$spacing-02;
+  max-width: 100%;
+  padding: 0 spacing.$spacing-03 0 0;
+  overflow-wrap: anywhere;
 }
 
-.fieldRow {
+.fieldRow,
+.fieldRow3,
+.fieldRowDateGender {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: spacing.$spacing-04;
+  min-width: 0;
 
-  // Ensure Select dropdowns have minimum width to show value
-  :global(.cds--select) {
-    min-width: 5rem;
+  > * {
+    min-width: 0;
   }
 }
 
 .fieldRow3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: spacing.$spacing-04;
-}
-
-// Fecha nac (flexible) + Sexo (fixed width)
-.fieldRowDateGender {
-  display: grid;
-  grid-template-columns: 1fr 6rem;
-  gap: spacing.$spacing-04;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
 }
 
 .contentSwitcher {
@@ -235,54 +248,5 @@
 }
 
 .submitButton {
-  min-width: 240px;
-}
-
-// Responsive adjustments
-@media (max-width: 672px) {
-  .container {
-    padding: spacing.$spacing-03;
-  }
-
-  .selectedPatientRow {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .patientInfo {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .formActions {
-    flex-direction: column;
-
-    button {
-      width: 100%;
-    }
-  }
-
-  .fieldRow,
-  .fieldRow3,
-  .fieldRowDateGender {
-    grid-template-columns: 1fr;
-  }
-
-  .quickActions {
-    flex-direction: column;
-
-    button {
-      width: 100%;
-    }
-  }
-
-  .submitActions {
-    justify-content: stretch;
-  }
-
-  .submitButton {
-    width: 100%;
-    min-width: unset;
-  }
+  min-width: min(15rem, 100%);
 }

@@ -63,6 +63,8 @@ export type SisState = 'active' | 'inactive' | 'pending' | 'notConsulted' | 'mis
 export interface QueueWorkflowMetadata {
   appointmentStartDateTime?: string;
   appointmentUuid?: string;
+  /** Only a persisted appointment link with a matching patient can select a clinical workflow. */
+  appointmentServiceUuid?: string;
   destinationQueueUuid?: string;
   isTriageQueue: boolean;
   sisState: SisState;
@@ -378,6 +380,8 @@ export function useQueueWorkflowMetadata(queueEntries: Array<QueueEntry>) {
     const workflow: QueueWorkflowMetadata = {
       appointmentStartDateTime: normalizeAppointmentStartDateTime(appointment?.startDateTime),
       appointmentUuid: appointmentUuid ?? appointment?.uuid,
+      appointmentServiceUuid:
+        appointmentUuid && appointment?.patient?.uuid === entry.patient?.uuid ? appointment.service?.uuid : undefined,
       destinationQueueUuid: getDestinationQueueUuid(appointment, appointmentConfig.data),
       isTriageQueue: entry.queue?.uuid === appointmentConfig.data?.triageRouting?.queueUuid,
       // Never advertise an old visit snapshot as active while current patient

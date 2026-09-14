@@ -46,7 +46,7 @@ describe('CompactPatientSearchComponent', () => {
     expect(searchResultsContainer).toBeInTheDocument();
   });
 
-  it('renders a list of recently searched patients when a search term is not provided and the showRecentlySearchedPatients config property is set', async () => {
+  it('renders the recent patient preview without a search term when the legacy config flag is enabled', () => {
     mockUseConfig.mockReturnValue({
       ...getDefaultsFromConfigSchema(configSchema),
       search: {
@@ -59,13 +59,13 @@ describe('CompactPatientSearchComponent', () => {
 
     const searchResultsContainer = screen.getByTestId('floatingSearchResultsContainer');
     expect(searchResultsContainer).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Recently viewed patients' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Recently viewed patients' })).toBeInTheDocument();
   });
 
   it('hides recent charts when the user cannot open the chart', () => {
     vi.mocked(userHasAccess).mockReturnValue(false);
     renderWithRouter(CompactPatientSearchComponent, { isSearchPage: false, initialSearchTerm: '' });
-    expect(screen.queryByRole('heading', { name: 'Recently viewed patients' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Recently viewed patients' })).not.toBeInTheDocument();
   });
 
   it('navigates to the advanced search page with the correct query string when the Search button is clicked', async () => {

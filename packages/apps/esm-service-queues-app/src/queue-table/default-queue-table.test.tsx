@@ -32,6 +32,7 @@ const mockUpdateSelectedQueueStatus = vi.mocked(updateSelectedQueueStatus);
 const mockUpdateSelectedService = vi.mocked(updateSelectedService);
 const mockUseServiceQueuesStore = vi.mocked(useServiceQueuesStore);
 const mockUseQueueWorkflowMetadata = vi.mocked(useQueueWorkflowMetadata);
+const sharedTriageQueueUuid = 'shared-triage-queue';
 
 vi.mock('../create-queue-entry/hooks/useQueueLocations', async () => ({
   ...(await vi.importActual('../create-queue-entry/hooks/useQueueLocations')),
@@ -69,8 +70,13 @@ vi.mock('./queue-table.scss', () => ({
 describe('DefaultQueueTable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const config = getDefaultsFromConfigSchema<ConfigObject>(configSchema);
     mockUseConfig.mockReturnValue({
-      ...getDefaultsFromConfigSchema(configSchema),
+      ...config,
+      appointmentTriage: {
+        ...config.appointmentTriage,
+        triageRouting: { ...config.appointmentTriage.triageRouting, queueUuid: sharedTriageQueueUuid },
+      },
       customPatientChartUrl: 'someUrl',
       visitQueueNumberAttributeUuid: 'c61ce16f-272a-41e7-9924-4c555d0932c5',
     });
@@ -266,6 +272,7 @@ describe('DefaultQueueTable', () => {
           ...mockQueueEntries[0],
           queue: {
             ...mockQueueEntries[0].queue,
+            uuid: sharedTriageQueueUuid,
             location: { ...mockQueueEntries[0].queue.location, uuid: 'hospital' },
           },
           visit: {
@@ -277,6 +284,7 @@ describe('DefaultQueueTable', () => {
           ...mockQueueEntries[1],
           queue: {
             ...mockQueueEntries[1].queue,
+            uuid: sharedTriageQueueUuid,
             location: { ...mockQueueEntries[1].queue.location, uuid: 'hospital' },
           },
           visit: {
@@ -303,6 +311,66 @@ describe('DefaultQueueTable', () => {
       status: null,
     });
   });
+
+  it.each(['upss-hospitalizacion', 'upss-emergencia'])(
+    'shows a transfer from %s under Centro Obstetrico, using the receiving queue location',
+    async (originLocationUuid) => {
+      mockUseServiceQueuesStore.mockReturnValue({
+        queueLocationSelectionInitialized: true,
+        selectedServiceUuid: null,
+        selectedQueueLocationUuid: 'upss-centro-obstetrico',
+        selectedQueueStatusUuid: null,
+        selectedAppointmentStatus: '',
+        selectedQueueRoomTimestamp: new Date(),
+        isPermanentProviderQueueRoom: false,
+      });
+      mockQueueLocations.mockReturnValue({ queueLocations: [], isLoading: false, error: null });
+      mockUseQueueRooms.mockReturnValue({ rooms: [], isLoading: false, error: undefined });
+      mockUseQueueEntries.mockReturnValue({
+        queueEntries: [
+          {
+            ...mockQueueEntries[0],
+            queue: {
+              ...mockQueueEntries[0].queue,
+              uuid: 'centro-obstetrico-queue',
+              location: { ...mockQueueEntries[0].queue.location, uuid: 'upss-centro-obstetrico' },
+            },
+            visit: {
+              ...mockQueueEntries[0].visit,
+              location: { uuid: originLocationUuid },
+            },
+          },
+          {
+            ...mockQueueEntries[1],
+            queue: {
+              ...mockQueueEntries[1].queue,
+              location: { ...mockQueueEntries[1].queue.location, uuid: originLocationUuid },
+            },
+            visit: {
+              ...mockQueueEntries[1].visit,
+              location: { uuid: 'upss-centro-obstetrico' },
+            },
+          },
+        ],
+        isLoading: false,
+        error: undefined,
+        totalCount: 2,
+        isValidating: false,
+        mutate: vi.fn(),
+      });
+
+      rendeDefaultQueueTable();
+
+      expect(await screen.findByRole('link', { name: /Brian Johnson/i })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Alice Johnson/i })).not.toBeInTheDocument();
+      expect(mockUseQueueEntries).toHaveBeenCalledWith({
+        service: null,
+        location: null,
+        isEnded: false,
+        status: null,
+      });
+    },
+  );
 
   it('clears a persisted status only after the available statuses finish loading', async () => {
     mockUseServiceQueuesStore.mockReturnValue({

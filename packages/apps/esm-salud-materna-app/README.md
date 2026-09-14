@@ -22,6 +22,19 @@ Cobertura frontend actual:
 
 El historial de condiciones comparte lectura, creación, corrección y anulación REST, con paginación completa y estados clínicos precisos. Crear o editar una condición exige un proveedor clínico asociado a la sesión. La creación deriva el registrador de la sesión autenticada; la corrección parcial usa REST y conserva la versión original mediante el versionado de core. Cada versión tiene su autor y fecha de registro; la fecha clínica no cambia si no se edita. El UUID del proveedor no identifica al usuario registrador. Este contrato se ha revisado contra core 2.8.9 y REST 3.5.0; la validación con el backend instalado sigue pendiente. Los límites de persistencia, contenido y auditoría se documentan en el [contrato de antecedentes](../../../docs/clinical/antecedents-data-contract.md).
 
+El grupo Madre Gestante requiere sesión autenticada, acceso a la historia y permiso de lectura de al menos uno de
+sus paneles. Un rol de parto o puerperio no necesita permiso prenatal para ver el grupo; la condición existente de
+sexo e inscripción al programa sigue vigente. Cada panel conserva su privilegio propio.
+Los registros compartidos del grupo y selector exigen `app:hoja.clinica`; el componente aplica la alternativa de
+permisos, porque un arreglo en `routes.json` exigiría todos a la vez. El selector solo monta lectores y muestra
+formularios cuando el usuario tiene lectura y edición de la misma familia, además del acceso a la historia.
+Antes de abrir un formulario vuelve a comprobar la cuenta y sus permisos; no concede edición por tener acceso
+a otro panel. Las pruebas de regresión cubren roles prenatal, parto y puerperio, denegación y revocación.
+El selector resuelve el nombre exacto o UUID configurado con el mismo resolutor de los botones maternos antes
+de abrir el formulario. Solo abre una coincidencia publicada y no retirada; conserva el encuentro seleccionado
+y la actualización posterior al guardado. Los errores muestran un mensaje genérico y permiten reintentar;
+las aperturas pendientes se descartan al cerrar el selector o perder el acceso, y se evitan clics duplicados.
+
 Vacíos conocidos:
 
 - Falta convertir el placeholder de gestante adolescente en formulario real cuando content incorpore la ficha diferenciada.

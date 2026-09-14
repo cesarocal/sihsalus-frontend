@@ -139,6 +139,29 @@ it.each([
   ]);
 });
 
+it('loads all ten most recent charts without scrolling and never reads the discarded oldest chart', async () => {
+  const patientUuids = Array.from({ length: 11 }, (_, index) => `patient-${index}`);
+  const recorder = renderHook(() => useRecentlyViewedPatients(true));
+  act(() => {
+    for (const uuid of patientUuids) {
+      recorder.result.current.recordViewedPatient(uuid);
+    }
+  });
+  recorder.unmount();
+
+  renderPage();
+
+  const expectedPatientUuids = patientUuids.slice(1).reverse();
+  await waitFor(() => expect(screen.getAllByRole('link', { name: /^Synthetic/ })).toHaveLength(10));
+  expect(screen.getAllByRole('link', { name: /^Synthetic/ }).map((link) => link.getAttribute('href'))).toEqual(
+    expectedPatientUuids.map((uuid) => `/openmrs/spa/patient/${uuid}/chart/`),
+  );
+  expect(openmrsFetch).toHaveBeenCalledTimes(10);
+  expect(
+    vi.mocked(openmrsFetch).mock.calls.map(([url]) => new URL(String(url), 'http://localhost').pathname.split('/').at(-1)),
+  ).toEqual(expectedPatientUuids);
+});
+
 it.each([
   'app:opciones.busquedaPaciente',
   patientChartPrivilege,

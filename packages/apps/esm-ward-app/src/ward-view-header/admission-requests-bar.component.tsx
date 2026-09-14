@@ -17,18 +17,17 @@ const AdmissionRequestsBar: React.FC<AdmissionRequestsBarProps> = ({ wardPending
   const { t } = useTranslation();
   const layout = useLayoutType();
 
-  if (isLoading || !inpatientRequests) {
-    return null;
-  }
-
   if (error) {
-    console.error(error);
     return (
       <InlineNotification
         kind="error"
         title={t('errorLoadingPatientAdmissionRequests', 'Error loading patient admission requests')}
       />
     );
+  }
+
+  if (isLoading || !inpatientRequests) {
+    return null;
   }
 
   return (

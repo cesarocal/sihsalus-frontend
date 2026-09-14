@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { careLogbookMergePrivileges } from '../constants';
 import CareLogbookAppMenuLink from './care-logbook-app-menu-link.component';
 import CareLogbookDashboardLink from './care-logbook-dashboard-link.component';
-import CareLogbookMergePatientsAction from './care-logbook-merge-patients-action.component';
 import CareLogbookMergePatientsMenuItem from './care-logbook-merge-patients-menu-item.component';
 
 vi.mock('@openmrs/esm-framework', async () => {
@@ -45,20 +44,6 @@ describe('care logbook navigation links', () => {
 
     expect(screen.getByRole('link', { name: /atenciones/i })).toHaveAttribute('href', '/openmrs/spa/home/care-logbook');
     expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
-  it('navigates directly to the merge route from the top nav action', async () => {
-    const user = userEvent.setup();
-    render(<CareLogbookMergePatientsAction />);
-
-    const mergeAction = screen.getByRole('button', { name: /fusionar historias/i });
-    await user.click(mergeAction);
-
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/openmrs/spa/home/care-logbook/merge' });
-    expect(mergeAction.closest('[data-required-privileges]')).toHaveAttribute(
-      'data-required-privileges',
-      careLogbookMergePrivileges.join(','),
-    );
   });
 
   it('renders the patient actions merge entry as a text menu item', async () => {

@@ -1,3 +1,4 @@
+@use "@carbon/styles/scss/theme";
 @use "@carbon/colors";
 @use "@carbon/layout";
 @use "@carbon/type";
@@ -5,57 +6,35 @@
 
 .defaultQueueTable {
   margin: layout.$spacing-05;
+  min-width: 0;
 }
 
 .tableSection {
-  background: colors.$gray-10;
-  padding-bottom: layout.$spacing-05;
+  background: colors.$white-0;
+  border: 1px solid colors.$gray-20;
 }
 
 .headerContainer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: layout.$spacing-05;
   padding: layout.$spacing-05;
-  background-color: colors.$gray-10;
+  border-bottom: 1px solid colors.$gray-20;
+}
+
+.heading {
+  @include type.type-style("heading-compact-02");
+  color: $text-02;
 }
 
 .headerButtons {
   display: flex;
 }
 
-.desktopHeading {
-  h4 {
-    @include type.type-style("heading-compact-02");
-    color: $text-02;
-  }
-}
-
-.tabletHeading {
-  h4 {
-    @include type.type-style("heading-03");
-    color: $text-02;
-  }
-}
-
-.desktopHeading,
-.tabletHeading {
-  text-align: left;
-  text-transform: capitalize;
-  margin-bottom: layout.$spacing-05;
-
-  h4:after {
-    content: "";
-    display: block;
-    width: layout.$spacing-07;
-    padding-top: 3px;
-    border-bottom: 0.375rem solid var(--brand-03);
-  }
-}
-
 .tableContainer {
-  background-color: colors.$gray-10;
-  padding: 0 1rem;
+  padding: 0;
 
   a {
     text-decoration: none;
@@ -64,29 +43,55 @@
   th {
     color: $text-02;
   }
+}
 
-  :global(.cds--data-table) {
-    background-color: $ui-03;
+.controls {
+  display: grid;
+  gap: layout.$spacing-05;
+  padding: layout.$spacing-05;
+}
+
+.searchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: layout.$spacing-03 layout.$spacing-05;
+}
+
+.queueSearch {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.controlActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: layout.$spacing-03;
+
+  &:empty {
+    display: none;
   }
 
-  .toolbarContainer {
-    display: flex;
-    justify-content: space-between;
+  :global(.cds--inline-loading) {
+    width: auto;
   }
+}
 
-  .toolbarContent {
-    display: flex;
-    z-index: 1;
-    column-gap: layout.$spacing-03;
-    row-gap: layout.$spacing-03;
-    flex-wrap: wrap;
-    align-items: flex-end;
-  }
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  align-items: end;
+  gap: layout.$spacing-05;
+}
 
-  :global(.cds--table-toolbar) {
-    flex: 3;
-    position: static;
-    overflow: visible;
+.filterContainer {
+  min-width: 0;
+
+  :global(.cds--dropdown__wrapper),
+  :global(.cds--list-box) {
+    width: 100%;
+    max-width: none;
   }
 }
 
@@ -95,68 +100,43 @@
   color: $danger;
 }
 
-.filterContainer {
-  :global(.cds--dropdown__wrapper--inline) {
-    gap: 0;
+.tableScroll {
+  overflow-x: auto;
+
+  // Keep scrolling on the focusable region instead of Carbon's inner wrapper.
+  :global(.cds--data-table-content) {
+    overflow: visible;
   }
 
-  :global(.cds--list-box__menu-icon) {
-    height: layout.$spacing-05;
-  }
-}
-
-.search {
-  max-width: 16rem;
-  display: inline;
-
-  input {
-    background-color: $ui-02 !important;
-  }
-}
-
-.loaderContainer {
-  display: flex;
-  flex: 0.25;
-  justify-content: center;
-  align-items: center;
-  background-color: white;
-
-  :global(.cds--inline-loading) {
-    justify-content: end;
+  &:focus-visible {
+    outline: 2px solid theme.$focus;
+    outline-offset: -2px;
   }
 }
 
 .queueTable {
   width: 100%;
+  min-width: 64rem;
+
+  th,
+  td {
+    vertical-align: middle;
+    overflow-wrap: break-word;
+  }
 }
 
-.tileContainer {
-  border-top: 1px solid $ui-03;
-  padding: layout.$spacing-07 layout.$spacing-05;
-  background: white;
-  margin: 0 layout.$spacing-05;
-}
-
-.tile {
-  background-color: colors.$gray-10;
-  margin: auto;
-  width: fit-content;
-}
-
-.tileContent {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+.emptyState {
+  padding: layout.$spacing-09 layout.$spacing-05;
+  text-align: center;
 }
 
 .content {
-  @include type.type-style("heading-compact-02");
+  @include type.type-style("heading-compact-01");
   color: $text-02;
   margin-bottom: layout.$spacing-03;
 }
 
 .helper {
-  @include type.type-style("body-compact-01");
+  @include type.type-style("body-01");
   color: $text-02;
 }

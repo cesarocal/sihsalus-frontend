@@ -2,7 +2,7 @@ import { ConfigurableLink, useConfig } from '@openmrs/esm-framework';
 import { RequirePrivilege } from '@sihsalus/esm-rbac';
 import { useTranslation } from 'react-i18next';
 
-import { RecentPatientResults } from '../compact-patient-search/recently-searched-patients.component';
+import { RecentPatientResults } from '../compact-patient-search/recent-patients-preview.component';
 import type { PatientSearchConfig } from '../config-schema';
 import { patientChartPrivilege } from '../patient-chart-access';
 import { PatientSearchContext } from '../patient-search-context';

@@ -120,6 +120,28 @@ export const defaultQueueTable: TableDefinitions = {
 };
 
 export const configSchema = {
+  obstetricCare: {
+    enabled: {
+      _type: Type.Boolean,
+      _description: 'Enable obstetric care actions in the configured outpatient and inpatient queues.',
+      _default: false,
+    },
+    outpatientAppointmentServiceUuid: {
+      _type: Type.UUID,
+      _description: 'Appointment service identifying obstetric care within the shared outpatient queue.',
+      _default: '',
+    },
+    outpatientQueueUuid: {
+      _type: Type.UUID,
+      _description: 'Clinical outpatient queue reached after confirmed appointment triage.',
+      _default: '',
+    },
+    inpatientQueueUuid: {
+      _type: Type.UUID,
+      _description: 'Centro Obstetrico queue for inpatient care, separate from outpatient appointments.',
+      _default: '',
+    },
+  },
   appointmentTriage: {
     _description:
       'Queue-owned copy of the appointment routing fields required to identify, capture and route outpatient triage without loading the Appointments microfrontend.',
@@ -518,6 +540,12 @@ function columnHasType(columnDef: ColumnDefinition, type: ColumnType): boolean {
 }
 
 export interface ConfigObject {
+  obstetricCare: {
+    enabled: boolean;
+    outpatientAppointmentServiceUuid: string;
+    outpatientQueueUuid: string;
+    inpatientQueueUuid: string;
+  };
   appointmentTriage: {
     careRoutingContractVersion: string;
     appointmentVisitAttributeTypeUuid: string;

@@ -68,11 +68,11 @@ it('finds a patient when a pasted search has surrounding whitespace', async () =
 });
 
 it.each([
-  ['Show patients with status:', 'Waiting'],
-  ['Prioridad:', 'Emergency'],
-  ['Prestador:', 'Synthetic provider'],
-  ['Identificación:', 'Confirmado'],
-  ['Tiempo de espera:', '10 - 60 min'],
+  ['Status', 'Waiting'],
+  ['Priority', 'Emergency'],
+  ['Provider', 'Synthetic provider'],
+  ['Identification', 'Confirmado'],
+  ['Wait time', '10 - 60 min'],
 ])('clears the selected value shown by %s', async (filterLabel, option) => {
   const user = userEvent.setup();
   render(<EmergencyQueueTable />);
@@ -93,14 +93,14 @@ it('clears both search text and dropdown filters', async () => {
   render(<EmergencyQueueTable />);
   const search = screen.getByRole('searchbox');
 
-  await user.click(screen.getByRole('combobox', { name: 'Show patients with status:' }));
+  await user.click(screen.getByRole('combobox', { name: 'Status' }));
   await user.click(screen.getByRole('option', { name: 'In service' }));
   await user.type(search, 'Synthetic patient 1');
   expect(screen.getByText('No patients to display')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
 
   expect(search).toHaveValue('');
-  expect(screen.getByRole('combobox', { name: 'Show patients with status:' })).toHaveTextContent('All');
+  expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent('All');
   expect(screen.getByText('Synthetic patient 1')).toBeInTheDocument();
   expect(screen.getByText('Synthetic patient 2')).toBeInTheDocument();
 });
@@ -108,13 +108,13 @@ it('clears both search text and dropdown filters', async () => {
 it('keeps an active provider filter visible when refreshed entries no longer have that provider', async () => {
   const user = userEvent.setup();
   const { rerender } = render(<EmergencyQueueTable />);
-  await user.click(screen.getByRole('combobox', { name: 'Prestador:' }));
+  await user.click(screen.getByRole('combobox', { name: 'Provider' }));
   await user.click(screen.getByRole('option', { name: 'Synthetic provider' }));
 
   setEntries([{ ...makeEntry(1), providerWaitingFor: null }]);
   rerender(<EmergencyQueueTable />);
 
-  expect(screen.getByRole('combobox', { name: 'Prestador:' })).toHaveTextContent('Synthetic provider');
+  expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveTextContent('Synthetic provider');
   expect(screen.getByText('No patients to display')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
   expect(screen.getByText('Synthetic patient 1')).toBeInTheDocument();
@@ -144,7 +144,7 @@ it('returns to page one when filtering keeps the same number of pages', async ()
   await user.click(screen.getByRole('button', { name: 'Next page' }));
   expect(screen.getByText('Synthetic patient 11')).toBeInTheDocument();
 
-  await user.click(screen.getByRole('combobox', { name: 'Show patients with status:' }));
+  await user.click(screen.getByRole('combobox', { name: 'Status' }));
   await user.click(screen.getByRole('option', { name: 'Waiting' }));
 
   expect(screen.getByText('Synthetic patient 1')).toBeInTheDocument();
