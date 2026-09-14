@@ -59,13 +59,13 @@ describe('CompactPatientSearchComponent', () => {
 
     const searchResultsContainer = screen.getByTestId('floatingSearchResultsContainer');
     expect(searchResultsContainer).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Recently viewed patients' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Recently viewed patients' })).toBeInTheDocument();
   });
 
   it('hides recent charts when the user cannot open the chart', () => {
     vi.mocked(userHasAccess).mockReturnValue(false);
     renderWithRouter(CompactPatientSearchComponent, { isSearchPage: false, initialSearchTerm: '' });
-    expect(screen.queryByRole('heading', { name: 'Recently viewed patients' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Recently viewed patients' })).not.toBeInTheDocument();
   });
 
   it('navigates to the advanced search page with the correct query string when the Search button is clicked', async () => {
