@@ -2,9 +2,88 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem;
+  padding: 1.5rem;
+  max-width: 100rem;
+  margin: auto;
 }
-
 .container h1 {
   margin: 0;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-block: 1rem;
+}
+.actions {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.filters {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+.chart {
+  margin: 0;
+  max-width: 65rem;
+}
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 10rem;
+}
+.chart text {
+  font-size: 12px;
+  fill: currentColor;
+}
+.tableWrapper {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.table th,
+.table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #c6c6c6;
+}
+.table caption {
+  text-align: left;
+  padding-block: 0.75rem;
+  font-weight: 600;
+}
+.zone {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #e0e0e0;
+  color: #161616;
+}
+.zone[data-zone="SUCCESS"] {
+  background: #defbe6;
+}
+.zone[data-zone="SAFETY"] {
+  background: #d0e2ff;
+}
+.zone[data-zone="ALERT"] {
+  background: #fff1c7;
+}
+.zone[data-zone="EPIDEMIC"] {
+  background: #ffd7d9;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .container {
+    padding: 0.75rem;
+  }
+  .table th,
+  .table td {
+    padding: 0.5rem;
+  }
 }

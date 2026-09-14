@@ -1,7 +1,7 @@
-import { AppErrorBoundary, RequirePrivilege } from '@sihsalus/esm-rbac';
-import React from 'react';
-import { epidemiologicalSurveillanceReadPrivilege } from './constants';
-import Dashboard from './dashboard.component';
+import { AppErrorBoundary, RequirePrivilege } from "@sihsalus/esm-rbac";
+import React from "react";
+import { epidemiologicalSurveillanceReadPrivilege } from "./constants";
+import Dashboard from "./dashboard.component";
 
 const Root: React.FC = () => {
   return (
