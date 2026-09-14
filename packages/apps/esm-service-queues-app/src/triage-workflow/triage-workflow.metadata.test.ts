@@ -16,7 +16,7 @@ it.each(['linked', 'wrong-patient', 'legacy'] as const)(
       location: { uuid: 'outpatient-location' },
       startDateTime: '2026-09-14T10:00:00-05:00',
     };
-    const entry = {
+    const entry: QueueEntry = {
       ...mockQueueEntryAlice,
       uuid: 'queue-entry',
       patient: { ...mockQueueEntryAlice.patient, uuid: 'patient' },
@@ -25,13 +25,16 @@ it.each(['linked', 'wrong-patient', 'legacy'] as const)(
       visit: {
         ...mockQueueEntryAlice.visit,
         uuid: 'visit',
+        visitType: { uuid: 'outpatient-visit-type', display: 'Outpatient' },
+        startDatetime: appointment.startDateTime,
+        stopDatetime: null,
         location: { uuid: 'outpatient-location' },
         attributes:
           context === 'legacy'
             ? []
-            : [{ attributeType: { uuid: 'appointment-link' }, value: 'appointment' }],
+            : [{ uuid: 'visit-appointment-link', attributeType: { uuid: 'appointment-link' }, value: 'appointment' }],
       },
-    } as QueueEntry;
+    };
     const config = {
       appointmentVisitAttributeTypeUuid: 'appointment-link',
       appointmentArrivalRules: [],
