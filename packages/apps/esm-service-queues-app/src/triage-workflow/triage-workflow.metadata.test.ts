@@ -1,5 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import useSWR from 'swr';
+import { mockQueueEntryAlice } from 'test-utils';
 import { type QueueEntry } from '../types';
 import { useQueueWorkflowMetadata } from './triage-workflow.resource';
 
@@ -16,11 +17,13 @@ it.each(['linked', 'wrong-patient', 'legacy'] as const)(
       startDateTime: '2026-09-14T10:00:00-05:00',
     };
     const entry = {
+      ...mockQueueEntryAlice,
       uuid: 'queue-entry',
-      patient: { uuid: 'patient' },
-      queue: { uuid: 'outpatient-queue' },
+      patient: { ...mockQueueEntryAlice.patient, uuid: 'patient' },
+      queue: { ...mockQueueEntryAlice.queue, uuid: 'outpatient-queue' },
       startedAt: appointment.startDateTime,
       visit: {
+        ...mockQueueEntryAlice.visit,
         uuid: 'visit',
         location: { uuid: 'outpatient-location' },
         attributes:
@@ -43,7 +46,7 @@ it.each(['linked', 'wrong-patient', 'legacy'] as const)(
             : Array.isArray(key) && key[0] === 'sihsalus-queue-appointment-fallback'
               ? new Map([['2026-09-14', [appointment]]])
               : undefined;
-      return { data, isLoading: false, mutate: vi.fn() } as ReturnType<typeof useSWR>;
+      return { data, error: undefined, isLoading: false, isValidating: false, mutate: vi.fn() } as ReturnType<typeof useSWR>;
     });
 
     const { result } = renderHook(() => useQueueWorkflowMetadata([entry]));

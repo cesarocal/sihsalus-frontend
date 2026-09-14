@@ -59,7 +59,11 @@ beforeEach(() => {
   currentSession = mockSession.data;
   vi.mocked(getSessionStore).mockReturnValue({
     getState: () => ({ loaded: true, session: currentSession }),
-  } as ReturnType<typeof getSessionStore>);
+    getInitialState: () => ({ loaded: true, session: currentSession }),
+    setState: vi.fn(),
+    subscribe: vi.fn(),
+    destroy: vi.fn(),
+  });
   vi.mocked(useConfig).mockReturnValue(config);
   vi.mocked(useConnectivity).mockReturnValue(true);
   vi.mocked(userHasAccess).mockReturnValue(true);

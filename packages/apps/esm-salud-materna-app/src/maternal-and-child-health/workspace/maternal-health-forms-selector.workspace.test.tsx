@@ -246,7 +246,7 @@ describe('MaternalHealthFormsSelectorWorkspace', () => {
     expect(mockLaunchWorkspace2).toHaveBeenCalledOnce();
   });
 
-  it.each(['permission revocation', 'account change', 'workspace closure'])(
+  it.each(['permission revocation', 'account change', 'patient change', 'workspace closure'])(
     'discards a pending lookup after %s',
     async (change) => {
       const user = userEvent.setup();
@@ -256,7 +256,7 @@ describe('MaternalHealthFormsSelectorWorkspace', () => {
           finishLookup = resolve;
         }),
       );
-      const { unmount } = render(<MaternalHealthFormsSelectorWorkspace {...defaultWorkspaceProps} />);
+      const { rerender, unmount } = render(<MaternalHealthFormsSelectorWorkspace {...defaultWorkspaceProps} />);
 
       await user.click(screen.getByRole('button', { name: /embarazo actual/i }));
       expect(mockOpenmrsFetch).toHaveBeenCalledOnce();
@@ -267,6 +267,14 @@ describe('MaternalHealthFormsSelectorWorkspace', () => {
           loaded: true,
           session: { ...mockSession.data, user: { ...mockSession.data.user, uuid: 'different-synthetic-user' } },
         });
+      } else if (change === 'patient change') {
+        mockOpenmrsFetch.mockResolvedValue({ data: { results: [] } } as Awaited<ReturnType<typeof openmrsFetch>>);
+        rerender(
+          <MaternalHealthFormsSelectorWorkspace
+            {...defaultWorkspaceProps}
+            patientUuid="different-synthetic-patient"
+          />,
+        );
       } else {
         unmount();
       }
