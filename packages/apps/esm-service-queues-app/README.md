@@ -74,6 +74,7 @@ Excepción actual: la extensión `visit-form-queue-fields` declara únicamente p
 
 ## Contratos de UI
 
+- La tabla de pacientes en cola consulta cambios cada 15 segundos mientras la pestaña está visible y hay conexión, y vuelve a consultar al recuperar el foco o la conexión. Conserva los filtros y la última lista completa durante la actualización; solo reemplaza las filas cuando terminaron de cargar todas las páginas. Si falla una página, mantiene la lista anterior y muestra el error mediante el manejo existente. Es actualización periódica, no una suscripción push del backend.
 - El resumen de consulta se identifica por la combinación exacta de Encounter Type y Form configurados. Colas muestra primero los diagnósticos nativos activos y usa las observaciones históricas solo como fallback sin duplicarlas.
 - El guardado de triaje que queda pendiente en el equipo no mueve al paciente. La transición automática solo se ejecuta después de una respuesta confirmada del encounter; después de sincronizar un triaje offline, refrescar la cola y usar `Enviar a atención`. No borrar la acción offline para forzar el cambio de cola.
 - La entrada y la acción de triaje aceptan SIS vigente con bundle completo o un financiador no-SIS registrado explícitamente. Mientras la cobertura está cargando o no pudo leerse, la acción permanece verificando y no afirma que corresponda Caja. Un financiador ausente, o un SIS incompleto, inactivo, pendiente o no consultado, mantiene el bloqueo y la derivación a Caja.

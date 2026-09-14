@@ -70,7 +70,7 @@ export function useMutateQueueEntries() {
           (key.includes(`${restBaseUrl}/queue-entry`) || key.includes(`${restBaseUrl}/visit-queue-entry`))
         );
       });
-      globalThis.dispatchEvent(new CustomEvent('queue-entry-updated'));
+      globalThis.dispatchEvent(new CustomEvent('queue-entry-updated', { detail: { queueEntriesRevalidated: true } }));
     } catch (error) {
       showSnackbar({
         title: t('errorLoadingQueueEntries', 'Error loading queue entries'),
@@ -123,10 +123,17 @@ export function useQueueEntries(searchCriteria?: QueueEntrySearchCriteria, rep: 
   const { data, error, isLoading, isValidating, mutate } = useSWR<
     Awaited<ReturnType<typeof fetchAllQueueEntries>>,
     Error
-  >(getInitialUrl(rep, searchCriteria), fetchAllQueueEntries);
+  >(getInitialUrl(rep, searchCriteria), fetchAllQueueEntries, {
+    refreshInterval: 15_000,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
 
   useEffect(() => {
-    const queueUpdateListener = () => {
+    const queueUpdateListener = (event: Event) => {
+      if ((event as CustomEvent<{ queueEntriesRevalidated?: boolean }>).detail?.queueEntriesRevalidated) return;
       // The hook's error state reports a failed refresh to its consumers.
       void mutate().catch(() => undefined);
     };
