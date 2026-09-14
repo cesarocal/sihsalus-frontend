@@ -1,0 +1,472 @@
+{
+  "package": "sihsalus-frontend",
+  "cutoff": "2026-08-15T22:04:45.808559+00:00",
+  "versions": [
+    {
+      "id": 980901147,
+      "name": "sha256:091a26888536427fcb776a651fd45a5fd69c8d9a91a1ffc90409501efc74155f",
+      "created_at": "2026-06-27T18:45:02Z",
+      "updated_at": "2026-06-27T18:45:02Z",
+      "tags": [],
+      "references": [
+        "sha256:615dadde2afd95219397fe63843ad41a75fb989007576cbbcfb7c43fc6c2d8b9",
+        "sha256:a9ea05832533245c420ff865a639b177d3a69e87f124f1f393ce9ebafa4e00fe"
+      ]
+    },
+    {
+      "id": 1034591727,
+      "name": "sha256:35189238467333d3998a5bb6b3786f70833ece9d3a8d12e9ac2eeca6270ee0c3",
+      "created_at": "2026-07-15T22:43:34Z",
+      "updated_at": "2026-07-15T22:43:34Z",
+      "tags": [],
+      "references": [
+        "sha256:252c3c5f44105befb407d752c2c1a15539fcd655f8e95fa52de5a4e95656318d",
+        "sha256:ae10cc329b6812adc73f4d3564ed9237abce3b8dd0b5508d458959cc750b6a4a"
+      ]
+    },
+    {
+      "id": 1039512845,
+      "name": "sha256:3edfa0d6dfa374b7d7a7b9e05f1b9e83e3827c07477501d2037bb7ebb7b1375b",
+      "created_at": "2026-07-17T05:43:08Z",
+      "updated_at": "2026-07-17T05:43:08Z",
+      "tags": [],
+      "references": [
+        "sha256:5ca6cee1f0cc951fbecb79472900da59ff4f3a902691392b0d007301146da674",
+        "sha256:7eae70fac0fb3ba7db91efa073808812ddc79246a00bb1b3770a085532916bb8"
+      ]
+    },
+    {
+      "id": 853382680,
+      "name": "sha256:438596a412ca5535e5e8dbdd2ca5e632d9b8733cf95927a90a74c3f330eb70f6",
+      "created_at": "2026-05-10T05:34:26Z",
+      "updated_at": "2026-05-10T05:34:26Z",
+      "tags": [],
+      "references": [
+        "sha256:12e43df672d997d2e867a4f9e09a606b9285419974c6485b1de26588e99e4333",
+        "sha256:c923f981df133d773ab1c4e4cde4f1b225e939e7aaf877dbffbb9746b84591aa"
+      ]
+    },
+    {
+      "id": 999779494,
+      "name": "sha256:440087adb9e797e6c8e231d36041a4a1d4adb22de1c79eed409bd745e6338d08",
+      "created_at": "2026-07-04T05:58:37Z",
+      "updated_at": "2026-07-04T05:58:37Z",
+      "tags": [],
+      "references": [
+        "sha256:51aea15a91a37339004435302ecb0bd7593c370b337baaeae392a73277a36bb8",
+        "sha256:82fd73dbb9a203b03cd2d110ba56f899a685b73ac4abf73ba24585279385a451"
+      ]
+    },
+    {
+      "id": 1034556106,
+      "name": "sha256:56626026e7164aeed28843c85eb8352b0b423eb8b51d7467600e0f32415309fa",
+      "created_at": "2026-07-15T22:25:29Z",
+      "updated_at": "2026-07-15T22:25:29Z",
+      "tags": [],
+      "references": [
+        "sha256:1c3153fe71d442e9420170321b50a2a195d0ac1361243d85be298ce0e1c078aa",
+        "sha256:5a313eb55d995aff00c2d63e4682450e2f09a0884754c01c576c52c9d6369e4e"
+      ]
+    },
+    {
+      "id": 887255206,
+      "name": "sha256:6c5d848fa349198370e97e9445dbac91512600e9d334d93de5058358874c1ca4",
+      "created_at": "2026-05-23T19:42:44Z",
+      "updated_at": "2026-05-23T19:42:44Z",
+      "tags": [],
+      "references": [
+        "sha256:7d4fb1099a0ba11b6f84d308308bff2d355b3dcf52ce1903fe6f7b14817d2350",
+        "sha256:de676382f657969a6ed542f49fe14165662bf0821a1e9b3e9c5b8af93a26c352"
+      ]
+    },
+    {
+      "id": 922396222,
+      "name": "sha256:6fa435e4616c010273410639c71faae56baad142602c6562741d54d525fbf11c",
+      "created_at": "2026-06-06T16:55:17Z",
+      "updated_at": "2026-06-06T16:55:17Z",
+      "tags": [],
+      "references": [
+        "sha256:0ce0580bae988f041c8f2ddf37b81cc37acaa36a7ce53b31fea3158035a3159c",
+        "sha256:18b9126d967c915875c344ded88c62dba336b6d1428f12cc55de6e75984cb5c3"
+      ]
+    },
+    {
+      "id": 860038930,
+      "name": "sha256:88ab5c20e189669ea09ccbdb3d63742baa4b4119a88fa3f93a3361ee502c097d",
+      "created_at": "2026-05-12T19:38:52Z",
+      "updated_at": "2026-05-12T19:38:52Z",
+      "tags": [],
+      "references": [
+        "sha256:259500e97653a138c201d295138fd34c4a4a89768d9fc313eb5c31b3740087da",
+        "sha256:e81c4e2e7decedd6c65381f25b5bc358d7a7b45c192592490e17a8c6326d9719"
+      ]
+    },
+    {
+      "id": 1043524846,
+      "name": "sha256:92f07f516876e81f246ceaf73a6475c943989132de6862810b590e3c0873e6bc",
+      "created_at": "2026-07-18T15:42:41Z",
+      "updated_at": "2026-07-18T15:42:41Z",
+      "tags": [],
+      "references": [
+        "sha256:8fae438fd42b3d438291621ecef6fcec67fac02655550e0dd3bedf006c652d31",
+        "sha256:91452245aba1f9ebba72b6e2e94aed3c36ea032b7ff34d5223231365e5121ae7"
+      ]
+    },
+    {
+      "id": 1031483828,
+      "name": "sha256:97628f92112f544c751d67eba9e79ca41623b1b485a70e17c963a9bc93525a2c",
+      "created_at": "2026-07-15T04:13:08Z",
+      "updated_at": "2026-07-15T04:13:08Z",
+      "tags": [],
+      "references": [
+        "sha256:3fb5ab47d334dc95e08ee317584d1b5a38cc01ae9c9965190b1a0a621fb9bdbc",
+        "sha256:dbb8c77aa43a4c8686c6fda0f0a613722ea0307861155f1d3bd9778bfffc7bc2"
+      ]
+    },
+    {
+      "id": 961072523,
+      "name": "sha256:aca1803f37bb87eabf903e0b8f518341f91733bf01f5b877dfc8d6dfec2f2bba",
+      "created_at": "2026-06-20T16:55:50Z",
+      "updated_at": "2026-06-20T16:55:50Z",
+      "tags": [],
+      "references": [
+        "sha256:7bbd682fe7c8f4144da5c3738231203860af44fe032680f31e48b72e2fe1fd6c",
+        "sha256:ba1e0dc27e8839342dadede6dc940342f6c2e3a46d837f9d87f62d5b91b50e37"
+      ]
+    },
+    {
+      "id": 1064956024,
+      "name": "sha256:b6d7a2d13ea2c1c10b1ae0ded28810a66c66a764709bba6c7d0817279bc63e59",
+      "created_at": "2026-07-24T23:55:16Z",
+      "updated_at": "2026-07-24T23:55:16Z",
+      "tags": [],
+      "references": [
+        "sha256:08c3ef83ca91073238c7d7a45f64f1719420559895158bec93b2e13e70481563",
+        "sha256:1d57b82de506362318cacaa5b707c4d919d5a8dc0fc5b0f189a7c92837df7866"
+      ]
+    },
+    {
+      "id": 941248575,
+      "name": "sha256:c94f940bbdcb76ecfda3f0d9c7bfae9a27398c26b606e9ca943362355b6deb67",
+      "created_at": "2026-06-13T06:50:43Z",
+      "updated_at": "2026-06-13T06:50:43Z",
+      "tags": [],
+      "references": [
+        "sha256:4dc624291be03195197a0053f409cc517bc421458ab0d5c5882c12600df14785",
+        "sha256:7903c7b06ec2abef8170ea499ee41b58e90ea9249c536ac4aee85ca7c705041b"
+      ]
+    },
+    {
+      "id": 1018837521,
+      "name": "sha256:d377cfdf8f72be18e3477e0491614df293b827e0b676f0260a99cdd841c5a150",
+      "created_at": "2026-07-10T15:11:51Z",
+      "updated_at": "2026-07-10T15:11:51Z",
+      "tags": [],
+      "references": [
+        "sha256:708175d788a1a62704aa2a9fcc1b80b706f90a7fbcaf7dd3f617179872bcbbfc",
+        "sha256:72e303958e133477f8d05e0500b0878f22e8a30d7a4407d45b3626beab9f646a"
+      ]
+    },
+    {
+      "id": 904703623,
+      "name": "sha256:d395da436adc26f3e05480aea4122378619036722a51ae49b219fcfaca4bda9b",
+      "created_at": "2026-05-31T06:08:48Z",
+      "updated_at": "2026-05-31T06:08:48Z",
+      "tags": [],
+      "references": [
+        "sha256:2e4eda7711ebd29735b8d0a4fcae47065ad197407e7249916152c24527b3a039",
+        "sha256:7c07b7cc7efabb6dc324adc8bc0b0e6eee9ec565d46a84bbd9e15a2f817389d7"
+      ]
+    },
+    {
+      "id": 883370277,
+      "name": "sha256:f324c249f6a23e68a0f29c0310f7a929db6d79d7eb1543e34a12f2c1aa7eff34",
+      "created_at": "2026-05-21T23:47:07Z",
+      "updated_at": "2026-05-21T23:47:07Z",
+      "tags": [],
+      "references": [
+        "sha256:72e774418a52206c70c1a32ea79406da6f8dcd4a1a3d47deabbca46fabef815c",
+        "sha256:aba7ddb50bf1e58850fcc893d34c82dfa9ba64d9e9a791daec46908050c3af9c"
+      ]
+    },
+    {
+      "id": 980901124,
+      "name": "sha256:a9ea05832533245c420ff865a639b177d3a69e87f124f1f393ce9ebafa4e00fe",
+      "created_at": "2026-06-27T18:45:01Z",
+      "updated_at": "2026-06-27T18:45:01Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 980901137,
+      "name": "sha256:615dadde2afd95219397fe63843ad41a75fb989007576cbbcfb7c43fc6c2d8b9",
+      "created_at": "2026-06-27T18:45:02Z",
+      "updated_at": "2026-06-27T18:45:02Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1034591712,
+      "name": "sha256:252c3c5f44105befb407d752c2c1a15539fcd655f8e95fa52de5a4e95656318d",
+      "created_at": "2026-07-15T22:43:34Z",
+      "updated_at": "2026-07-15T22:43:34Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1034591693,
+      "name": "sha256:ae10cc329b6812adc73f4d3564ed9237abce3b8dd0b5508d458959cc750b6a4a",
+      "created_at": "2026-07-15T22:43:33Z",
+      "updated_at": "2026-07-15T22:43:33Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1039512827,
+      "name": "sha256:7eae70fac0fb3ba7db91efa073808812ddc79246a00bb1b3770a085532916bb8",
+      "created_at": "2026-07-17T05:43:07Z",
+      "updated_at": "2026-07-17T05:43:07Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1039512837,
+      "name": "sha256:5ca6cee1f0cc951fbecb79472900da59ff4f3a902691392b0d007301146da674",
+      "created_at": "2026-07-17T05:43:07Z",
+      "updated_at": "2026-07-17T05:43:07Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 853382665,
+      "name": "sha256:12e43df672d997d2e867a4f9e09a606b9285419974c6485b1de26588e99e4333",
+      "created_at": "2026-05-10T05:34:25Z",
+      "updated_at": "2026-05-10T05:34:25Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 853382673,
+      "name": "sha256:c923f981df133d773ab1c4e4cde4f1b225e939e7aaf877dbffbb9746b84591aa",
+      "created_at": "2026-05-10T05:34:26Z",
+      "updated_at": "2026-05-10T05:34:26Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 999779488,
+      "name": "sha256:82fd73dbb9a203b03cd2d110ba56f899a685b73ac4abf73ba24585279385a451",
+      "created_at": "2026-07-04T05:58:37Z",
+      "updated_at": "2026-07-04T05:58:37Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 999779484,
+      "name": "sha256:51aea15a91a37339004435302ecb0bd7593c370b337baaeae392a73277a36bb8",
+      "created_at": "2026-07-04T05:58:37Z",
+      "updated_at": "2026-07-04T05:58:37Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1034556070,
+      "name": "sha256:5a313eb55d995aff00c2d63e4682450e2f09a0884754c01c576c52c9d6369e4e",
+      "created_at": "2026-07-15T22:25:28Z",
+      "updated_at": "2026-07-15T22:25:28Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1034556088,
+      "name": "sha256:1c3153fe71d442e9420170321b50a2a195d0ac1361243d85be298ce0e1c078aa",
+      "created_at": "2026-07-15T22:25:28Z",
+      "updated_at": "2026-07-15T22:25:28Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 887255197,
+      "name": "sha256:7d4fb1099a0ba11b6f84d308308bff2d355b3dcf52ce1903fe6f7b14817d2350",
+      "created_at": "2026-05-23T19:42:44Z",
+      "updated_at": "2026-05-23T19:42:44Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 887255194,
+      "name": "sha256:de676382f657969a6ed542f49fe14165662bf0821a1e9b3e9c5b8af93a26c352",
+      "created_at": "2026-05-23T19:42:44Z",
+      "updated_at": "2026-05-23T19:42:44Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 922396202,
+      "name": "sha256:18b9126d967c915875c344ded88c62dba336b6d1428f12cc55de6e75984cb5c3",
+      "created_at": "2026-06-06T16:55:16Z",
+      "updated_at": "2026-06-06T16:55:16Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 922396212,
+      "name": "sha256:0ce0580bae988f041c8f2ddf37b81cc37acaa36a7ce53b31fea3158035a3159c",
+      "created_at": "2026-06-06T16:55:17Z",
+      "updated_at": "2026-06-06T16:55:17Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 860038918,
+      "name": "sha256:e81c4e2e7decedd6c65381f25b5bc358d7a7b45c192592490e17a8c6326d9719",
+      "created_at": "2026-05-12T19:38:51Z",
+      "updated_at": "2026-05-12T19:38:51Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 860038906,
+      "name": "sha256:259500e97653a138c201d295138fd34c4a4a89768d9fc313eb5c31b3740087da",
+      "created_at": "2026-05-12T19:38:51Z",
+      "updated_at": "2026-05-12T19:38:51Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1043524830,
+      "name": "sha256:91452245aba1f9ebba72b6e2e94aed3c36ea032b7ff34d5223231365e5121ae7",
+      "created_at": "2026-07-18T15:42:41Z",
+      "updated_at": "2026-07-18T15:42:41Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1043524838,
+      "name": "sha256:8fae438fd42b3d438291621ecef6fcec67fac02655550e0dd3bedf006c652d31",
+      "created_at": "2026-07-18T15:42:41Z",
+      "updated_at": "2026-07-18T15:42:41Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1031483814,
+      "name": "sha256:3fb5ab47d334dc95e08ee317584d1b5a38cc01ae9c9965190b1a0a621fb9bdbc",
+      "created_at": "2026-07-15T04:13:08Z",
+      "updated_at": "2026-07-15T04:13:08Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1031483808,
+      "name": "sha256:dbb8c77aa43a4c8686c6fda0f0a613722ea0307861155f1d3bd9778bfffc7bc2",
+      "created_at": "2026-07-15T04:13:07Z",
+      "updated_at": "2026-07-15T04:13:07Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 961072499,
+      "name": "sha256:ba1e0dc27e8839342dadede6dc940342f6c2e3a46d837f9d87f62d5b91b50e37",
+      "created_at": "2026-06-20T16:55:50Z",
+      "updated_at": "2026-06-20T16:55:50Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 961072511,
+      "name": "sha256:7bbd682fe7c8f4144da5c3738231203860af44fe032680f31e48b72e2fe1fd6c",
+      "created_at": "2026-06-20T16:55:50Z",
+      "updated_at": "2026-06-20T16:55:50Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1064956014,
+      "name": "sha256:08c3ef83ca91073238c7d7a45f64f1719420559895158bec93b2e13e70481563",
+      "created_at": "2026-07-24T23:55:15Z",
+      "updated_at": "2026-07-24T23:55:15Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1064955993,
+      "name": "sha256:1d57b82de506362318cacaa5b707c4d919d5a8dc0fc5b0f189a7c92837df7866",
+      "created_at": "2026-07-24T23:55:15Z",
+      "updated_at": "2026-07-24T23:55:15Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 941248562,
+      "name": "sha256:4dc624291be03195197a0053f409cc517bc421458ab0d5c5882c12600df14785",
+      "created_at": "2026-06-13T06:50:43Z",
+      "updated_at": "2026-06-13T06:50:43Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 941248569,
+      "name": "sha256:7903c7b06ec2abef8170ea499ee41b58e90ea9249c536ac4aee85ca7c705041b",
+      "created_at": "2026-06-13T06:50:43Z",
+      "updated_at": "2026-06-13T06:50:43Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1018837510,
+      "name": "sha256:72e303958e133477f8d05e0500b0878f22e8a30d7a4407d45b3626beab9f646a",
+      "created_at": "2026-07-10T15:11:51Z",
+      "updated_at": "2026-07-10T15:11:51Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 1018837494,
+      "name": "sha256:708175d788a1a62704aa2a9fcc1b80b706f90a7fbcaf7dd3f617179872bcbbfc",
+      "created_at": "2026-07-10T15:11:50Z",
+      "updated_at": "2026-07-10T15:11:50Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 904703617,
+      "name": "sha256:7c07b7cc7efabb6dc324adc8bc0b0e6eee9ec565d46a84bbd9e15a2f817389d7",
+      "created_at": "2026-05-31T06:08:48Z",
+      "updated_at": "2026-05-31T06:08:48Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 904703612,
+      "name": "sha256:2e4eda7711ebd29735b8d0a4fcae47065ad197407e7249916152c24527b3a039",
+      "created_at": "2026-05-31T06:08:47Z",
+      "updated_at": "2026-05-31T06:08:47Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 883370263,
+      "name": "sha256:aba7ddb50bf1e58850fcc893d34c82dfa9ba64d9e9a791daec46908050c3af9c",
+      "created_at": "2026-05-21T23:47:07Z",
+      "updated_at": "2026-05-21T23:47:07Z",
+      "tags": [],
+      "references": []
+    },
+    {
+      "id": 883370269,
+      "name": "sha256:72e774418a52206c70c1a32ea79406da6f8dcd4a1a3d47deabbca46fabef815c",
+      "created_at": "2026-05-21T23:47:07Z",
+      "updated_at": "2026-05-21T23:47:07Z",
+      "tags": [],
+      "references": []
+    }
+  ],
+  "criteria": "Only untagged old OCI indexes and their exclusively orphaned manifests; every tagged image, deployment, pin and rollback excluded",
+  "protected_pins": [
+    "sha256:47ab01bf9e658762aa5a700e0e5370193db619960b97fcc7b3e808be856790eb",
+    "sha256:ada19c77f8d27ea50e89db4fdae7287bbdf3a51c9fab8ac95dd82eba36d9a28c",
+    "sha256:e308e80b61583635d42e326a4dbb8199a42f054dd33760db2c1168526ec5435f"
+  ],
+  "approximate_exclusive_blob_bytes": 995669768
+}

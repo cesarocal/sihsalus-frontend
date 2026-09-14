@@ -12,10 +12,16 @@ on:
       - 'package.json'
       - 'yarn.lock'
   workflow_dispatch:
+    inputs:
+      cleanup_orphans:
+        description: 'Delete only the 51 reviewed, untagged orphan versions from the frozen plan'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.cleanup_orphans && 'ghcr-orphans' || github.ref }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.cleanup_orphans) }}
 
 env:
   IBM_TELEMETRY_DISABLED: 'true'
@@ -24,6 +30,7 @@ env:
 
 jobs:
   build-spa-image:
+    if: github.event_name != 'workflow_dispatch' || !inputs.cleanup_orphans
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -59,3 +66,42 @@ jobs:
           cache-from: type=gha,scope=release-amd64
           # Cache export is an optimization; keep the image build itself strict.
           cache-to: type=gha,scope=release-amd64,mode=max,ignore-error=true
+
+  cleanup-reviewed-orphans:
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.cleanup_orphans &&
+      github.repository == 'sihsalus/sihsalus-frontend' &&
+      github.ref == 'refs/heads/chore/ghcr-orphans-20260914'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate maintenance source and safeguards
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          python3 -B -m unittest discover -s .github/maintenance -p 'test_*.py' -v
+
+      # GitHub permits package deletion with GITHUB_TOKEN only when this
+      # repository already has package admin access. No permission grants or
+      # personal credentials are used; a rejected deletion stops the job.
+      - name: Revalidate OCI references and delete the frozen orphan set
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -B .github/maintenance/ghcr_orphans.py --delete
+
+      - name: Preserve cleanup journal
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ghcr-orphan-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ghcr-orphan-cleanup-journal.json
+          if-no-files-found: warn
+          retention-days: 30
