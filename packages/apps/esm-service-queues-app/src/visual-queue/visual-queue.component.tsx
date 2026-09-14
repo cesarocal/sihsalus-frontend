@@ -1,5 +1,5 @@
 import { Button, InlineLoading, InlineNotification, Layer, Tag } from '@carbon/react';
-import { ArrowLeft, Time } from '@carbon/react/icons';
+import { ArrowLeft, Maximize, Minimize, Time } from '@carbon/react/icons';
 import {
   ConfigurableLink,
   EmptyCardIllustration,
@@ -11,7 +11,7 @@ import {
 } from '@openmrs/esm-framework';
 import { formatPersonName } from '@openmrs/esm-utils';
 import dayjs from 'dayjs';
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type ConfigObject } from '../config-schema';
@@ -24,6 +24,7 @@ import { StatusSwitcher } from '../queue-table/default-queue-table.component';
 import { useServiceQueuesStore } from '../store/store';
 import { type Concept, type QueueEntry } from '../types';
 
+import { useVisualQueueFullscreen } from './use-visual-queue-fullscreen';
 import styles from './visual-queue.scss';
 
 export interface QueueBoardColumn {
@@ -93,9 +94,25 @@ function getPriorityTagType(priorityDisplay: string) {
 const VisualQueue = () => {
   const { t } = useTranslation();
   const layout = useLayoutType();
-  const { selectedQueueLocationUuid, selectedQueueStatusDisplay, selectedQueueStatusUuid, selectedServiceUuid } =
-    useServiceQueuesStore();
-  const { statuses, isLoadingQueueStatuses } = useQueueStatuses();
+  const boardId = useId();
+  const {
+    selectedQueueLocationName,
+    selectedQueueLocationUuid,
+    selectedQueueStatusDisplay,
+    selectedQueueStatusUuid,
+    selectedServiceDisplay,
+    selectedServiceUuid,
+  } = useServiceQueuesStore();
+  const { statuses, isLoadingQueueStatuses, queueStatusesError } = useQueueStatuses();
+  const {
+    boardRef,
+    fullscreenButtonRef,
+    isFullscreen,
+    isFullscreenSupported,
+    isFullscreenPending,
+    fullscreenError,
+    toggleFullscreen,
+  } = useVisualQueueFullscreen();
   const searchCriteria = useMemo(
     () => ({
       service: selectedServiceUuid,
@@ -110,54 +127,108 @@ const VisualQueue = () => {
     () => buildQueueBoardColumns(queueEntries ?? [], statuses, selectedQueueStatusUuid, selectedQueueStatusDisplay),
     [queueEntries, selectedQueueStatusDisplay, selectedQueueStatusUuid, statuses],
   );
+  const queueError = error || queueStatusesError;
+  const isQueueLoading = Boolean(isLoading || isLoadingQueueStatuses);
 
   return (
     <>
-      <PatientQueueHeader
-        showFilters
-        title={t('visualQueue', 'Visual queue')}
-        actions={
-          <Button
-            kind="ghost"
-            renderIcon={ArrowLeft}
-            size={isDesktop(layout) ? 'sm' : 'md'}
-            onClick={() => navigate({ to: serviceQueuesBasePath })}
-          >
-            {t('backToQueueTable', 'Back to queue table')}
-          </Button>
-        }
-      />
+      <PatientQueueHeader showFilters title={t('visualQueue', 'Visual queue')} />
       <main className={styles.page}>
         <StatusSwitcher />
-        <Layer className={styles.boardSection}>
+        <Layer className={styles.boardSection} ref={boardRef} role="region" aria-labelledby={`${boardId}-title`}>
           <div className={styles.boardHeader}>
-            <div>
-              <h2>{t('careFlow', 'Care flow')}</h2>
+            <div className={styles.boardHeading}>
+              <h2 id={`${boardId}-title`}>{t('careFlow', 'Care flow')}</h2>
               <p>
                 {t(
                   'visualQueueDescription',
                   'Patients are ordered by queue priority and arrival time within each status.',
                 )}
               </p>
+              {isFullscreen ? (
+                <p className={styles.filterSummary}>
+                  {t('visualQueueScope', 'UPSS: {{location}} · Service: {{service}} · Status: {{status}}', {
+                    location: selectedQueueLocationUuid
+                      ? (selectedQueueLocationName ?? t('unknown', 'Unknown'))
+                      : t('all', 'All'),
+                    service: selectedServiceUuid
+                      ? (selectedServiceDisplay ?? t('unknown', 'Unknown'))
+                      : t('all', 'All'),
+                    status: selectedQueueStatusUuid
+                      ? (selectedQueueStatusDisplay ?? t('unknown', 'Unknown'))
+                      : t('all', 'All'),
+                  })}
+                </p>
+              ) : null}
             </div>
-            <div className={styles.patientTotal}>
-              <span>{t('patients', 'Patients')}</span>
-              <strong>{queueEntries?.length ?? 0}</strong>
+            <div className={styles.boardControls}>
+              <div className={styles.patientTotal}>
+                <span>{t('patients', 'Patients')}</span>
+                <strong>
+                  <output
+                    aria-label={
+                      queueError || isQueueLoading
+                        ? t('queueCountUnavailable', 'Patient count unavailable')
+                        : t('patients', 'Patients')
+                    }
+                  >
+                    {queueError || isQueueLoading ? '—' : (queueEntries?.length ?? 0)}
+                  </output>
+                </strong>
+              </div>
+              <Button
+                kind="tertiary"
+                renderIcon={isFullscreen ? Minimize : Maximize}
+                size={isDesktop(layout) ? 'sm' : 'md'}
+                ref={fullscreenButtonRef}
+                disabled={!isFullscreenSupported}
+                aria-disabled={isFullscreenPending || !isFullscreenSupported}
+                aria-pressed={isFullscreen}
+                aria-describedby={!isFullscreenSupported ? `${boardId}-fullscreen-unavailable` : undefined}
+                onClick={toggleFullscreen}
+              >
+                {isFullscreen ? t('exitQueueFullscreen', 'Exit fullscreen') : t('enterQueueFullscreen', 'Fullscreen')}
+              </Button>
+              {isValidating && !isQueueLoading && !queueError ? (
+                <div className={styles.refreshing}>
+                  <InlineLoading description={t('updatingQueue', 'Updating queue')} />
+                </div>
+              ) : null}
             </div>
           </div>
 
-          {error ? (
+          {!isFullscreenSupported ? (
+            <p className={styles.fullscreenHint} id={`${boardId}-fullscreen-unavailable`}>
+              {t('queueFullscreenUnavailable', 'Fullscreen is not available in this browser.')}
+            </p>
+          ) : null}
+          {fullscreenError ? (
             <InlineNotification
+              className={styles.notification}
               hideCloseButton
               kind="error"
-              title={t('errorLoadingQueueEntries', 'Error loading queue entries')}
+              title={t('queueFullscreenError', 'Could not change fullscreen mode')}
+              subtitle={t('queueFullscreenErrorMessage', 'Try again or use Esc to exit fullscreen.')}
+            />
+          ) : null}
+
+          {queueError ? (
+            <InlineNotification
+              className={styles.notification}
+              hideCloseButton
+              kind="error"
+              title={
+                error
+                  ? t('errorLoadingQueueEntries', 'Error loading queue entries')
+                  : t('errorLoadingQueueStatuses', 'Error loading queue statuses')
+              }
               subtitle={getUserFacingErrorMessage(
-                error,
+                queueError,
                 t('queueDataLoadErrorMessage', 'Queue information could not be loaded. Please try again.'),
                 { logContext: 'Load visual queue' },
               )}
             />
-          ) : isLoading || isLoadingQueueStatuses ? (
+          ) : isQueueLoading ? (
             <div className={styles.loading}>
               <InlineLoading description={t('loadingVisualQueue', 'Loading visual queue')} />
             </div>
@@ -166,12 +237,12 @@ const VisualQueue = () => {
           ) : (
             <div className={styles.board} role="region" aria-label={t('visualQueue', 'Visual queue')}>
               {columns.map(({ status, entries }) => (
-                <section className={styles.lane} key={status.uuid} aria-labelledby={`queue-status-${status.uuid}`}>
+                <section className={styles.lane} key={status.uuid}>
                   <header className={styles.laneHeader}>
-                    <h3 id={`queue-status-${status.uuid}`}>{status.display || t('unknown', 'Unknown')}</h3>
+                    <h3 id={`${boardId}-${status.uuid}`}>{status.display || t('unknown', 'Unknown')}</h3>
                     <Tag type={entries.length ? 'blue' : 'gray'}>{entries.length}</Tag>
                   </header>
-                  <div className={styles.laneBody}>
+                  <div className={styles.laneBody} role="region" aria-labelledby={`${boardId}-${status.uuid}`}>
                     {entries.length ? (
                       entries.map((queueEntry, index) => (
                         <QueuePatientCard key={queueEntry.uuid} position={index + 1} queueEntry={queueEntry} />
@@ -184,13 +255,17 @@ const VisualQueue = () => {
               ))}
             </div>
           )}
-
-          {isValidating && !isLoading ? (
-            <div className={styles.refreshing}>
-              <InlineLoading description={t('updatingQueue', 'Updating queue')} />
-            </div>
-          ) : null}
         </Layer>
+        <div className={styles.pageFooter}>
+          <Button
+            kind="ghost"
+            renderIcon={ArrowLeft}
+            size={isDesktop(layout) ? 'sm' : 'md'}
+            onClick={() => navigate({ to: serviceQueuesBasePath })}
+          >
+            {t('backToQueueTable', 'Back to queue table')}
+          </Button>
+        </div>
       </main>
     </>
   );
