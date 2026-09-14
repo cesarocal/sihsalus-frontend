@@ -64,6 +64,8 @@ Los guards de UI controlan visibilidad y acceso a rutas, modales y workspaces. N
 
 ## Configuración operativa
 
+- La llegada con un financiador no SIS exige que Admisión confirme manualmente haber revisado el comprobante de Caja. La confirmación no acredita SIS ni ejecuta un cobro. El atributo `arrivalPaymentVisitAttributeTypeUuid` guarda JSON versión 1 con `confirmed`, `financingUuid`, `appointmentUuid`, `confirmedBy` y `confirmedAt`. En visitas nuevas se incluye en el mismo payload; en consultas activas se guarda y relee antes de autorizar el ingreso a cola o la llegada directa. Si cambia el financiador o falla el guardado, se bloquea la continuación. SIS conserva la verificación de cobertura existente.
+- Antes de habilitar ese flujo, el paquete de contenido debe instalar el atributo de visita FreeText `090eb9b3-a306-450f-8623-9fc00b8d82fa` (máximo una ocurrencia), definido en `configuration/backend_configuration/attributetypes/arrival_payment.csv` del repositorio de contenido. El modal verifica la configuración antes de abrir el formulario de consulta. El backend conserva su auditoría de creación/actualización; el registro representa una declaración del operador, no una verificación automática contra Caja.
 - `appointmentVisitAttributeTypeUuid` vincula la consulta activa con la cita y permite detectar cierres o llegadas que necesitan regularización.
 - `appointmentArrivalRules` y `careRoutingContractVersion` determinan el enrutamiento de la llegada.
 - `checkInButton` y `checkOutButton` habilitan las acciones o permiten delegarlas a una URL configurada.
