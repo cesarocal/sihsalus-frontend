@@ -1,6 +1,6 @@
-import { InlineLoading, Layer, Loading, Tile } from '@carbon/react';
+import { InlineLoading, Layer, Tile } from '@carbon/react';
 import classNames from 'classnames';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PatientSearchResponse } from '../types';
@@ -10,50 +10,17 @@ import CompactPatientBanner from './compact-patient-banner.component';
 import Loader from './loader.component';
 import styles from './patient-search.scss';
 
-interface RecentPatientSearchProps extends PatientSearchResponse {
+interface RecentPatientResultsProps
+  extends Pick<PatientSearchResponse, 'data' | 'fetchError' | 'isLoading' | 'isValidating'> {
   standalone?: boolean;
 }
 
-export const RecentPatientResults = React.forwardRef<HTMLDivElement, RecentPatientSearchProps>(
-  ({ data: searchResults, fetchError, hasMore, isLoading, isValidating, setPage, standalone = false }, ref) => {
+export const RecentPatientResults = React.forwardRef<HTMLDivElement, RecentPatientResultsProps>(
+  ({ data: patients, fetchError, isLoading, isValidating, standalone = false }, ref) => {
     const { t } = useTranslation();
-    const observer = useRef(null);
     const resultsClassName = classNames(styles.searchResults, { [styles.standaloneResults]: standalone });
 
-    const loadingIconRef = useCallback(
-      (node: HTMLDivElement | null) => {
-        if (isValidating) {
-          return;
-        }
-        if (observer.current) {
-          observer.current.disconnect();
-        }
-        observer.current = new IntersectionObserver(
-          (entries) => {
-            if (entries[0].isIntersecting && hasMore) {
-              setPage((page) => page + 1);
-            }
-          },
-          {
-            threshold: 0.75,
-          },
-        );
-        if (node) {
-          observer.current.observe(node);
-        }
-      },
-      [isValidating, hasMore, setPage],
-    );
-
-    useEffect(() => {
-      return () => {
-        if (observer.current) {
-          observer.current.disconnect();
-        }
-      };
-    }, []);
-
-    if (!searchResults && isLoading) {
+    if (!patients && isLoading) {
       return (
         <div className={styles.searchResultsContainer} role="progressbar">
           {[...Array(5)].map((_, index) => (
@@ -81,14 +48,14 @@ export const RecentPatientResults = React.forwardRef<HTMLDivElement, RecentPatie
       );
     }
 
-    if (searchResults?.length) {
+    if (patients?.length) {
       return (
         <div className={styles.searchResultsContainer}>
           <div className={resultsClassName}>
             <div className={styles.resultsText}>
               <span className={styles.resultsTextCount}>
                 {t('recentlyViewedPatientsCount', '{{count}} recently viewed patient', {
-                  count: searchResults.length,
+                  count: patients.length,
                 })}
               </span>
               {isValidating && (
@@ -97,18 +64,13 @@ export const RecentPatientResults = React.forwardRef<HTMLDivElement, RecentPatie
                 </span>
               )}
             </div>
-            <CompactPatientBanner patients={searchResults} ref={ref} />
-            {hasMore && (
-              <div className={styles.loadingIcon} ref={loadingIconRef}>
-                <Loading withOverlay={false} small />
-              </div>
-            )}
+            <CompactPatientBanner patients={patients} ref={ref} />
           </div>
         </div>
       );
     }
 
-    if (!searchResults?.length) {
+    if (!patients?.length) {
       return (
         <div className={styles.searchResultsContainer}>
           <div className={resultsClassName}>
@@ -135,7 +97,7 @@ export const RecentPatientResults = React.forwardRef<HTMLDivElement, RecentPatie
   },
 );
 
-const RecentlySearchedPatients = React.forwardRef<HTMLDivElement, RecentPatientSearchProps>((props, ref) => {
+const RecentPatientsPreview = React.forwardRef<HTMLDivElement, RecentPatientResultsProps>((props, ref) => {
   const { t } = useTranslation();
   return (
     <section aria-label={t('recentlyViewedPatients', 'Recently viewed patients')}>
@@ -144,4 +106,4 @@ const RecentlySearchedPatients = React.forwardRef<HTMLDivElement, RecentPatientS
   );
 });
 
-export default RecentlySearchedPatients;
+export default RecentPatientsPreview;

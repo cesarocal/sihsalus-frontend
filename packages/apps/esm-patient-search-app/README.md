@@ -48,6 +48,8 @@ no necesita una consulta y ofrece un enlace explícito a «Buscar paciente». La
 conserva su vista previa de recientes como acceso complementario.
 Muestra las últimas 10 historias abiertas en esta pestaña desde cualquier entrada, sin duplicados
 y con la apertura más reciente primero; no es una lista de pacientes buscados.
+`RecentPatientsPreview` y la página independiente reciben hasta diez historias en la carga inicial;
+la vista de recientes no pagina ni requiere desplazarse para solicitar más historias.
 El médico puede reabrir una historia mientras espera resultados; la lista no indica que haya resultados
 pendientes ni sustituye el seguimiento clínico.
 
