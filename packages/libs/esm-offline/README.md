@@ -21,6 +21,13 @@ the authenticated user's UUID even when a caller knows another row's numeric ID.
   queue-operation error after the started handlers settle; consumers must handle that rejection and refresh the queue.
   Registered handlers must pass `options.abort.signal` to every network request; the queue checks ownership before and
   after a handler but cannot preempt arbitrary handler code that ignores its abort controller.
+- Synchronization also requires an exclusive Web Lock for the origin. A second tab, an unavailable Web Locks API,
+  or a browser lock failure rejects before processing rows. There is no in-memory-only fallback. The lock lasts until
+  all started handlers settle and is released by the browser when the tab closes.
+- An item with an explicit dependency cannot run while a matching row for that user, type, and descriptor ID remains
+  queued. Failed parents retain their children; unrelated successful parents can still release their own children.
+  A parent removed by an earlier completed run need not return a result again. Consumers must continue to tolerate
+  an absent dependency result on retry, including handlers that deliberately return no value.
 - A handler may use its item-scoped `options.updateContent(updater)` capability to persist a durable partial-progress
   checkpoint. The update runs atomically against the latest stored content, so concurrent suboperations merge instead
   of overwriting one another. The capability can modify only the row currently owned by that synchronization and
@@ -37,13 +44,18 @@ the authenticated user's UUID even when a caller knows another row's numeric ID.
   bodies, names, or exception causes. Close or restart older open tabs during rollout so they cannot write a legacy raw
   error after the new client's opening scrub.
 
-This contract does not partition CacheStorage, service-worker routes, the app shell, or other origin-wide browser data.
-It therefore does not make account switching in one browser profile safe and does not remove the operational
-requirement for one managed browser/OS profile per clinical user while broader offline storage isolation remains open.
+The queue and downloaded responses have separate ownership checks, described below. Continue using one managed
+browser/OS profile per clinical user: this is logical application isolation, not encryption or protection against
+local browser administration, older clients, or arbitrary same-origin scripts.
+
+Roll out the queue and service worker together and close all older tabs before resuming synchronization. Older clients
+do not acquire the origin lock or understand new consumer checkpoints. Preserve pending queues during upgrades and
+rollback; uncertain writes made by an older client require backend reconciliation before retrying with either version.
 
 ## Consumer compatibility
 
-Existing arguments remain compatible; `SyncProcessOptions.updateContent` is additive and optional. Consumers already
+Existing arguments remain compatible; `SyncProcessOptions.updateContent` is additive and optional. Synchronization
+requires a secure context and a managed browser with Web Locks (the coordinated offline acceptance gate targets Chrome and Edge). Consumers already
 using the current-user helpers require no database migration. Code using `getFullSynchronizationItemsFor` or the internal
 `queueSynchronizationItemFor` helper must request only the authenticated user. Callers of `runSynchronization` must
 handle its fixed rejection and refresh the current-user list. UIs should also refresh after a generic edit/delete
@@ -67,3 +79,52 @@ handler; original handler exceptions never cross the public synchronization boun
 writes the response under the stable offline URL only after receiving a successful network response. A failed,
 non-successful, or canceled request rejects with a fixed non-sensitive error and leaves any existing cached response
 untouched. Callers remain responsible for registering the stable URL as a dynamic offline route.
+
+The repository worker handles responses outside the SPA before upstream fallback routing. Compiled SPA assets and
+navigation retain the upstream lifecycle. Protected fetches bypass the HTTP cache; a failed fresh read (`no-store`,
+explicit credentials, or a mutation) cannot fall back to downloaded data. Only successful network responses selected
+by the existing dynamic routes or network-first header are downloaded automatically. External origins cannot establish
+the clinical owner or use clinical fallback; deployments requiring external offline assets need separate acceptance.
+
+## Download ownership and verified cleanup
+
+`EsmOfflineProfile` stores one assigned owner, the last observed authenticated user, a monotonic generation, and a
+cleanup phase. The separate metadata database leaves the existing `EsmOffline` v4 queue format unchanged. A confirmed
+same-origin OpenMRS session assigns the initial owner. Logout or a credentialed request invalidates the active user;
+a later different user cannot read or refresh that owner's downloads. Online responses remain available. No owner
+transfer or automatic queue deletion occurs. Same-profile account switching remains outside the supported clinical
+operating procedure.
+
+Clinical responses use `omrs-clinical-cache-v1`. Legacy clinical entries in `omrs-spa-cache-v1` never establish
+readiness or supply clinical fallback. An initial profile with legacy downloads requires verified cleanup before new
+preparation. `areOfflineResourcesCached` checks successful responses under the current ownership boundary. Explicit
+refreshes capture the generation before HTTP and recheck it before storing; a late response after logout/login cannot
+replace a stable download. Shared browser storage locks serialize writes with identity changes and purge.
+
+The Offline Tools **Clear downloaded copies** action requires confirmation, connectivity, a fresh session matching
+the assigned owner, an exclusive storage lock, an idle synchronization lock, and an empty queue across all owners.
+It preserves selected patient/form membership, clears synchronization evidence, deletes clinical and legacy data
+responses, and verifies removal while retaining SPA shell files. It never deletes queued content. A failed or partial
+purge stays in the `clearing` phase and blocks cache use and new enqueue operations until an explicit cleanup retry
+succeeds. It does not reassign the profile to another user. A profile reassignment still requires operational
+reconciliation and authorized reprovisioning, including storage outside this library.
+
+Ship the worker and consumers together, close older tabs before upgrading, and confirm the new worker controls the
+page. Old workers/clients do not enforce these ownership rules. Preserve the managed profile and pending queues on
+rollback; an older client may read the legacy cache again and cannot be treated as equivalent protection.
+
+## Preparation evidence
+
+`getOfflineReadiness` checks a secure controlled worker, Web Locks, the current owner, valid storage estimates, selected
+patients/forms, the recorded synchronization owner/time/handlers, and current handler cache checks. Missing downloads,
+failed or absent handlers, invalid/future dates, unknown storage, or a check exceeding ten seconds cannot report ready.
+It reports the oldest verified download, incomplete selections and persistence grant separately. The 10 MiB free-space
+reserve is an operational minimum, not a prediction of the next photo/form size. There is no invented clinical expiry
+period. The interface says **Selected downloads verified**, not that all clinical workflows have been accepted.
+
+Storage persistence is requested only by an explicit button. A grant is not a backup and does not prevent an operator
+from clearing site data; see the [Storage Standard](https://storage.spec.whatwg.org/). Keep the contingency and
+reconciliation procedures even when all preparation checks succeed.
+
+Local regressions use `yarn workspace @openmrs/esm-offline test`. The real-worker browser harness and deployed
+acceptance boundaries are documented in [the offline laptop runbook](../../../docs/runbooks/offline-laptop-acceptance.md).

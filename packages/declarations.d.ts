@@ -1,5 +1,13 @@
 /// <reference types="vitest/globals" />
 
+import type { TestingLibraryMatchers } from "@testing-library/jest-dom/matchers";
+
+// Vitest 5 no longer inherits DOM matchers from the global Jest namespace.
+declare module "vitest" {
+  interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown>
+    extends TestingLibraryMatchers<unknown, R> {}
+}
+
 declare module "*.scss" {
   const styles: { [className: string]: string };
   export default styles;
@@ -34,18 +42,9 @@ declare namespace NodeJS {
   }
 }
 
-declare var spaBase: string;
-declare function getOpenmrsSpaBase(): string;
-
-// Minimal ambient declarations for Vitest globals used across tests.
 declare global {
-  const vi: {
-    // vi.Mock is used in a few places for casting; provide a permissive alias.
-    Mock: any;
-    fn(...args: any[]): any;
-    mocked<T>(t: T): T;
-    importActual<T = any>(path: string): Promise<T>;
-  };
+  var spaBase: string;
+  function getOpenmrsSpaBase(): string;
 }
 
 export {};

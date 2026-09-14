@@ -56,7 +56,31 @@ function getAppShellPackageRoot() {
 
 function getAppShellWebpackConfig(appShellRoot = getAppShellPackageRoot()) {
   const configFactory = require(path.join(appShellRoot, 'webpack.config.js'));
-  return configFactory({}, { mode: 'production' });
+  const config = configFactory({}, { mode: 'production' });
+  // Workspace SWC output uses explicit .js imports while this build consumes TypeScript sources.
+  // Match the monorepo's existing Rspack resolution contract.
+  config.resolve.extensionAlias = { '.js': ['.js', '.ts', '.tsx'] };
+  const cssLoaderPath = require.resolve('css-loader', {
+    paths: [appShellRoot],
+  });
+  for (const rule of config.module.rules) {
+    for (const loader of rule.use ?? []) {
+      if (loader.loader === cssLoaderPath) {
+        // Workspace components import a default class map. Keep non-module
+        // CSS/SCSS global while matching the styleguide's css-loader contract.
+        loader.options = {
+          ...loader.options,
+          modules: {
+            auto: true,
+            ...loader.options?.modules,
+            namedExport: false,
+            exportLocalsConvention: 'camel-case',
+          },
+        };
+      }
+    }
+  }
+  return config;
 }
 
 function getRepoOwnedServiceWorkerSource(repositoryRoot = REPOSITORY_ROOT) {

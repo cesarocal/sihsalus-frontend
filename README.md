@@ -48,6 +48,15 @@ usar HTTP(S), sin credenciales, query ni fragmento. Las rutas de contexto
 personalizadas se conservan. Esta normalización no cambia el backend elegido ni
 la política TLS.
 
+`yarn start` también reenvía el heartbeat de actividad clínica al endpoint
+`/_sihsalus/clinical-activity` del gateway configurado, con la misma política TLS
+y un límite de tres segundos. Solo admite POST a esa ruta exacta, sin query,
+cuerpo, cookies, autorización ni referer; no reenvía cabeceras del navegador.
+Devuelve 204 únicamente si el gateway confirma 204. Conserva sus errores 4xx/5xx
+sin cuerpos ni cabeceras, devuelve 502 ante redirecciones u otros fallos y 504
+ante timeout. Así la señal real de presencia sigue llegando a la política de
+apagado seguro sin incluir contexto clínico.
+
 ## Repository Structure
 
 ```
@@ -116,13 +125,40 @@ enlazada por `index.html`, incluso si supera el límite de tamaño predeterminad
 de Workbox. `validate-spa-artifact` verifica ese contrato para que una
 reconexión no pueda recuperar el shell sin sus estilos globales.
 
+El service worker conserva el ciclo de vida y las rutas de OpenMRS. La entrada local
+`packages/tooling/app-shell/service-worker.ts` agrega una ruta Workbox `NetworkOnly`
+para lecturas GET que solicitan conjuntamente `cache: 'no-store'` y
+`x-omrs-offline-caching-strategy: network-only-or-cache-only`. Esa combinación exige
+red fresca; las demás estrategias offline mantienen su comportamiento. El cambio
+requiere activar el worker actualizado y cerrar las pestañas de la versión anterior.
+
 ### Testing
 
 ```bash
 yarn test                                   # Run all unit tests
 yarn turbo run test --filter='@sihsalus/*' # Test SIH Salus packages only
 yarn test:e2e                               # Run Playwright E2E tests
+yarn test:styles                            # Check compiled CSS/SCSS in Chromium, without a backend
 ```
+
+Run `yarn playwright install chromium` before the first local `yarn test:styles`.
+This command builds the shared Rspack configuration and checks its CSS/SCSS rules
+through Imágenes, Stock and Onboarding, plus the styleguide's CSS extraction
+and the source-built app shell's Webpack rules.
+It verifies default imports, scoped classes and computed styles using temporary
+fixtures in an offline browser context. CI runs it for every PR and push to
+`main`; it is independent of the clinical E2E suites and their credentials.
+
+Apps using `openmrs/default-rspack-config` obtain `css-loader` from
+`@openmrs/rspack-config`. Keep that dependency in the shared configuration;
+the styleguide declares its own because it has a separate build configuration.
+The app shell also preserves default CSS Module imports with
+`modules.namedExport: false` and automatic module detection. Ordinary CSS/SCSS,
+including the framework stylesheet, must remain global.
+All three build configurations use `exportLocalsConvention: 'camel-case'` to
+preserve original class names and camelCase aliases. Consumers such as numeric
+observations must retain bracket imports like `styles['critical-value']` as
+well as dot imports. The five browser variants check both forms in CSS and SCSS.
 
 ### Quality
 

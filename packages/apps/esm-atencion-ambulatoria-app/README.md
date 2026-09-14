@@ -6,16 +6,17 @@ Microfrontend de atención ambulatoria y consulta externa para SIH Salus, una di
 
 Los permisos de lectura protegen los puntos de entrada y mantienen visibles los datos clínicos. Los permisos de edición ocultan las acciones de registro o modificación cuando el usuario solo puede consultar.
 
-| Superficie                                | Lectura / entrada                                                  | Modificación                                                                          |
-| ----------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Consulta externa e historia médica        | `app:hoja.clinica.consultaExterna`                                 | `app:hoja.clinica.consultaExterna.editar`                                             |
-| Formularios AMPATH de Consulta Externa    | `app:hoja.clinica.consultaExterna`                                 | `app:hoja.clinica.consultaExterna.editar` + `app:hoja.clinica.formulariosClinicos`    |
-| Hoja de Referencia Institucional nativa   | `app:hoja.clinica.consultaExterna`                                 | `app:hoja.clinica.consultaExterna.editar`                                             |
-| Diagnóstico/plan desde Consulta Externa   | `app:hoja.clinica.consultaExterna`                                 | `app:hoja.clinica.consultaExterna.editar` + `app:hoja.clinica.resumenConsulta.editar` |
-| Pruebas complementarias                   | `app:hoja.clinica.consultaExterna` + `app:hoja.clinica.resultados` | Solo lectura; las órdenes conservan sus propios permisos                              |
-| Historia social                           | `app:hoja.clinica.historiaSocial`                                  | `app:hoja.clinica.historiaSocial.editar`                                              |
-| Consultas previas desde Consulta Externa  | `app:hoja.clinica.visitas`                                         | Las acciones históricas conservan sus propios permisos                                |
-| Prescripción desde el plan de tratamiento | Entrada por Consulta Externa                                       | `app:hoja.clinica.canastaOrdenes` + `app:hoja.clinica.ordenes.editar`                 |
+| Superficie                                   | Lectura / entrada                                                   | Modificación                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Consulta externa e historia médica           | `app:hoja.clinica.consultaExterna`                                  | `app:hoja.clinica.consultaExterna.editar`                                             |
+| Formularios AMPATH de Consulta Externa       | `app:hoja.clinica.consultaExterna`                                  | `app:hoja.clinica.consultaExterna.editar` + `app:hoja.clinica.formulariosClinicos`    |
+| Hoja de Referencia Institucional nativa      | `app:hoja.clinica.consultaExterna`                                  | `app:hoja.clinica.consultaExterna.editar`                                             |
+| Diagnóstico/plan desde Consulta Externa      | `app:hoja.clinica.consultaExterna`                                  | `app:hoja.clinica.consultaExterna.editar` + `app:hoja.clinica.resumenConsulta.editar` |
+| Pruebas complementarias                      | `app:hoja.clinica.consultaExterna` + `app:hoja.clinica.resultados`  | Solo lectura; las órdenes conservan sus propios permisos                              |
+| Antecedentes y problemas en Consulta Externa | `app:hoja.clinica.consultaExterna` + `app:hoja.clinica.condiciones` | `app:hoja.clinica.condiciones.editar`                                                 |
+| Historia social                              | `app:hoja.clinica.historiaSocial`                                   | `app:hoja.clinica.historiaSocial.editar`                                              |
+| Consultas previas desde Consulta Externa     | `app:hoja.clinica.visitas`                                          | Las acciones históricas conservan sus propios permisos                                |
+| Prescripción desde el plan de tratamiento    | Entrada por Consulta Externa                                        | `app:hoja.clinica.canastaOrdenes` + `app:hoja.clinica.ordenes.editar`                 |
 
 En la navegación normal, los guards se acumulan: primero se entra al dashboard con lectura y después se habilita la acción con edición. Los workspaces y modales registrados declaran directamente el privilegio de edición, sin inferir el permiso base; OpenMRS no implementa herencia padre/hijo por el nombre del privilegio.
 
@@ -33,15 +34,17 @@ Con `showSisFinancingWarning: true` (apagada por defecto), el dashboard de consu
 
 La pestaña **Referencia / Contrarreferencia** lee exclusivamente encounters de `encounterTypes.referralCounterReferral` y contiene dos vistas independientes: **Referencias emitidas** y **Contrarreferencias recibidas**. El filtro de cada flujo se aplica antes de la paginación; una respuesta de contrarreferencia permanece asociada al encounter de su referencia y no se crea como un registro suelto. Las interconsultas basadas en órdenes no pertenecen a ese historial; se solicitan y consultan desde `esm-interconsultas-app`.
 
-La pestaña **Antecedentes**, situada antes de **Anamnesis**, reutiliza las vistas existentes de antecedentes médicos y sociales. La lectura está protegida por `app:hoja.clinica.historiaSocial`; las acciones de registro conservan los permisos de edición originales. La cabecera incluye **Consultas previas** solo para usuarios con `app:hoja.clinica.visitas` y abre el dashboard histórico canónico, sin duplicar ni cambiar la visita activa.
+La pestaña **Antecedentes**, situada antes de **Anamnesis**, monta en **Antecedentes y problemas** la misma extensión `conditions-details-widget` que la página independiente. `consulta-externa-antecedents-slot` pertenece a este módulo y recibe el recurso FHIR `patient` verificado junto con `patientUuid`; no se monta si la identidad no coincide o falla la carga. La lectura requiere `app:hoja.clinica.condiciones` y las acciones canónicas conservan `app:hoja.clinica.condiciones.editar`, sin exigir el permiso de historia social. El formulario, la lectura REST Condition, la edición y la actualización de la lista pertenecen a `esm-patient-conditions-app`, declarado como dependencia de este consumidor. Requiere su módulo instalado, la API REST de condiciones de OpenMRS y su configuración de conceptos. Si la sección no está disponible, se muestra un aviso seguro y no se ofrece el formulario antiguo como sustituto.
+
+**Registros médicos anteriores** conserva debajo la tabla histórica de encounters, únicamente de lectura dentro de Consulta Externa y protegida por `app:hoja.clinica.historiaSocial`. No se migran ni se reinterpretan observaciones o diagnósticos como Condition. **Historia social** mantiene su formulario y sus permisos originales. La cabecera incluye **Consultas previas** solo para usuarios con `app:hoja.clinica.visitas` y abre el dashboard histórico canónico, sin duplicar ni cambiar la visita activa.
 
 La tabla de antecedentes médicos conserva el resto del historial cuando un diagnóstico antiguo no trae su representación codificada: muestra `--` en esa celda en lugar de bloquear la pantalla. No infiere un diagnóstico ni modifica el registro histórico.
 
-Los formularios de antecedentes médicos y sociales reciben una función que actualiza la consulta del historial al completar el cierre desde el formulario. Abrir el formulario no dispara esa actualización. La X del workspace mantiene su contrato de cierre y no ejecuta ese callback.
+Fuera del registro canónico de Consulta Externa, los formularios históricos de antecedentes médicos y sociales reciben una función que actualiza la consulta del historial al completar el cierre desde el formulario. Abrir el formulario no dispara esa actualización. La X del workspace mantiene su contrato de cierre y no ejecuta ese callback.
 
-Los antecedentes personales cargan todas las páginas del historial FHIR. Para crear o editar exigen que la sesión tenga un proveedor clínico; el backend deriva el registrador desde la sesión autenticada y la edición conserva `recordedDate`. Al abrir un antecedente social nuevo se envía `encounterUuid` vacío: el UUID configurado identifica el tipo de encounter y no debe tratarse como un encounter existente.
+Los antecedentes personales comparten con Conditions, CRED y Salud Materna el lector y los payloads de `esm-patient-common-lib`: cargan todas las páginas REST, incluyendo los estados inactivos, antes de publicar el historial. Para crear o editar exigen que la sesión tenga un proveedor clínico; el backend deriva el autor desde la sesión autenticada. Las correcciones conservan la versión anterior con su autor y fecha, y generan una nueva versión atribuida al editor; sólo se envían los campos clínicos modificados. El uso de REST evita la pérdida de estados del traductor FHIR2 y su consulta privilegiada del registrador. Un fallo de recarga posterior no se trata como un fallo de escritura ni permite repetirla. Al abrir un antecedente social nuevo se envía `encounterUuid` vacío: el UUID configurado identifica el tipo de encounter y no debe tratarse como un encounter existente.
 
-El lector de antecedentes personales tolera que falten los arrays `coding`: conserva `code.text` cuando existe y usa `--` si no hay descripción, sin inventar concepto ni estado clínico. Las vistas por conjunto de conceptos mantienen su filtro: un registro sin código no impide mostrar los miembros válidos del conjunto.
+El lector de antecedentes personales tolera que falten los arrays `coding`: conserva la narración nativa de OpenMRS, `code.text` cuando existe o `--` si no hay descripción, sin inventar concepto ni estado clínico. Las vistas por conjunto de conceptos mantienen su filtro. Los nuevos registros «Otro» utilizan texto no codificado nativo; el antiguo concepto de pregunta de texto se conserva sólo para leer registros históricos. No se migran observaciones obstétricas ni se convierten todos los antecedentes en diagnósticos CIE-10. Véase el [contrato de antecedentes](../../../docs/clinical/antecedents-data-contract.md).
 
 La pestaña **Pruebas complementarias** monta `consulta-externa-pruebas-complementarias-slot` con el `patientUuid` activo. `@sihsalus/esm-patient-tests-app` aporta en ese slot la misma tarjeta de resultados recientes que usa la historia clínica, protegida por `app:hoja.clinica.resultados`; Consulta Externa no duplica su consulta FHIR ni su lógica de navegación. La tarjeta es de solo lectura y **Ver todos los resultados** abre el dashboard completo de resultados.
 
@@ -80,6 +83,8 @@ resultados corregidos, revisión clínica y auditoría de recepción. Los proyec
 de [interoperabilidad NOTI-CDC/NETLAB-INS](https://www.gob.pe/institucion/fsnvs/noticias/1309652-pmas-snvsp-impulsa-la-modernizacion-de-la-vigilancia-en-salud-publica-con-avances-clave-en-interoperabilidad-entre-noti-cdc-y-netlab-ins)
 no acreditan por sí mismos una interfaz disponible para SIH Salus.
 
+QA de antecedentes: con datos sintéticos en QLTY, agregar desde Consulta Externa y verificar el mismo registro tras recargar y desde la página Antecedentes; repetir con permisos de solo lectura y al cambiar de paciente. Confirmar que los registros anteriores siguen visibles sin acción de registro y que Historia social conserva su flujo. Las pruebas de integración locales montan el componente canónico real con lectores simulados; no validan persistencia contra el backend.
+
 QA mínimo de estos accesos: orden de pestañas/paneles; permisos concedidos y
 denegados; navegación tras cambiar de paciente; enlaces externos sin datos ni
 referrer; ausencia de escrituras clínicas. Antes de integrar, verificar también
@@ -89,7 +94,7 @@ para los roles previstos. Las pruebas locales con mocks no sustituyen esa revisi
 ## TODO content/backend
 
 - Validar en QLTY que `encounterTypes.externalConsultation`, `triage`, `referralCounterReferral` y `consultation` existan y sean los usados por los formularios reales.
-- Revisar que `conditionConceptClassUuid`, `conditionConceptSets` y `conditionFreeTextFallbackConceptUuid` resuelvan conceptos válidos para antecedentes y diagnósticos.
+- Revisar que `conditionConceptClassUuid` identifique una clase de conceptos y `conditionConceptSets` contenga conjuntos clínicos adecuados; `conditionFreeTextFallbackConceptUuid` se conserva para lectura histórica, sin reutilizarlo para nuevas narraciones.
 - Validar conceptos de anamnesis compartidos desde `ANAMNESIS_DEFAULT_CONCEPT_UUIDS` y los conceptos locales de diagnóstico, tratamiento, financiador, pertenencia étnica y referencia/contrarreferencia.
 - Confirmar que los datos de triaje provengan del encounter type correcto y no se mezclen con vitales de otros flujos.
 - Documentar qué formularios de consulta externa crean encounter nuevo y cuáles deben editar el encounter clínico actual.
@@ -137,6 +142,14 @@ La lectura de órdenes usa la representación polimórfica `FULL` de REST para r
 La Epicrisis pertenece al egreso de hospitalización según la NTS 139. Consulta Externa no abre ni reutiliza `Formulario Epicrisis Médica` ni `(Página 16) Epicrisis`; su documento es únicamente el resumen de la atención ambulatoria.
 
 El formulario identificado históricamente como `CE-SOAP-001-NOTA SOAP` registra el examen general y el examen regional por sistemas mediante campos diferenciados por `formFieldPath`. Ningún campo se completa como “normal” automáticamente. Consulta Externa muestra únicamente esos hallazgos de examen físico; de los registros SOAP históricos solo reutiliza el hallazgo objetivo como compatibilidad de lectura y no presenta Subjetivo, Apreciación ni Plan como secciones ambulatorias.
+
+El historial se implementa en `usePhysicalExam` y `examen-fisico.component.tsx`.
+El hook devuelve `physicalExamEntries` y filtra los encuentros sin hallazgos de
+examen físico antes de paginar, para que las notas que solo contienen relato,
+apreciación o plan no generen páginas vacías. El texto objetivo histórico se
+expone como `legacyObjective`. `formsList.soapNoteForm`, `concepts.soapObjectiveUuid`
+y el `formFieldPath` histórico se conservan como contratos con el contenido
+instalado; no definen un formato SOAP para Consulta Externa.
 
 La generación de ambos documentos falla cerrada si no se puede verificar que la visita, su tipo ambulatorio y el paciente coincidan. La primera versión se limita intencionalmente a la visita activa: los documentos deben generarse antes de finalizarla. Una futura generación histórica necesitará un selector explícito de visita; nunca debe elegir silenciosamente “la última” del paciente.
 

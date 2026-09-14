@@ -1,6 +1,8 @@
 # Recoverable synthetic fixture foundation
 
-Status: **draft, not wired into global setup, teardown, or browser CI**.
+Status: **draft; supervised adapters exist, browser CI remains blocked**.
+The [laboratory adapter](laboratory/README.md) reuses this foundation for one
+patient/visit pair per local test attempt, with private retained journals.
 The separate [supervised O3 Forms adapter](scripts/O3FORMS_SUPERVISED.md) provides
 an explicit opt-in CLI and retains the requirements below; it has not passed
 remote clinical acceptance. Importing these utilities does not run a remote
@@ -45,8 +47,13 @@ The REST session endpoint returns reference representations and ignores `v`;
 absence of `retired` there is not proof that an account or provider is active.
 Before creation and cleanup, the foundation validates the authenticated session's
 user/provider UUIDs, then reads only `user/{current-test-user-uuid}` and
-`provider/{current-test-provider-uuid}` with `custom:(uuid,retired)`. Both exact
-identities must match and explicitly return `retired: false`. No global user or
+`provider/{current-test-provider-uuid}` with `custom:(uuid,retired)`; the user
+representation also includes `roles:(name,retired)`. Both exact
+identities must match and explicitly return `retired: false`. An active core
+`System Developer` role on that freshly read user satisfies configured privileges
+according to OpenMRS `User.hasPrivilege`, even when the session lists only
+explicit grants. Other role names, display labels, retired roles or incomplete
+metadata do not qualify. No global user or
 provider list is queried. Review permission to read these two technical records
 as part of the environment's complete privilege configuration. Missing,
 mismatched or retired metadata blocks writes; HTTP 401/403 stops subsequent
@@ -57,14 +64,15 @@ At most one patient/visit pair exists for each label, `outpatient` and
 an inline synthetic person, without DNI, addresses, or separate person creation.
 The alphabetic run marker stays within the existing name-length boundary.
 This foundation does not choose drugs/concepts, create users or roles, sign
-orders, or alter existing laboratory fixture commands.
+orders. The laboratory adapter retains its own encounter/order commands and
+uses the foundation for patient/visit provisioning and dependent cleanup.
 
 ## Recovery guarantees and limits
 
 `PrivateFixtureJournal` requires a canonical private directory, uses an exclusive
 writer lock, writes state with mode 0600, and atomically replaces/fsyncs the state
 file. Its directory is mode 0700. Keep it under the ignored
-`e2e/.synthetic-fixtures/` directory when a future coordinated adapter is added.
+`e2e/.synthetic-fixtures/` directory, as the laboratory adapter does.
 The journal is sensitive recovery material: do not upload it as a CI artifact,
 commit it, paste it into a PR, or expose it in logs. It contains only binding,
 run marker, generated identifiers, synthetic UUIDs and progress flags, not
@@ -115,7 +123,9 @@ metadata deliberately blocks cleanup for review rather than guessing a new one.
   not cover temporary users, roles, or concurrent runtime notification captures.
 
 No current-SHA DEV/QLTY clinical validation is claimed by this foundation.
-The supervised O3 Forms adapter does not activate global setup/teardown or a
-browser CI suite, and does not waive CONTRIBUTING or durable recovery requirements.
+The laboratory adapter requires explicit local supervision and rejects CI before
+requests because a runner's destruction would lose its local journal. The
+supervised O3 Forms adapter does not activate global setup/teardown or a browser
+CI suite. Neither adapter waives CONTRIBUTING or durable recovery requirements.
 Keep any activation or adapter PR in draft until an accountable owner has reviewed
 the activation contract above and the required environment-specific evidence.

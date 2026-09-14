@@ -192,7 +192,7 @@ export async function findSingleEncounterForVisit(
   return matchingEncounterUuids[0];
 }
 
-/** Anamnesis/SOAP edit one verified encounter; referrals always create a new, visit-attached encounter. */
+/** Anamnesis and physical examination edit one verified encounter; referrals create a new, visit-attached encounter. */
 export function useConsultaExternaFormLauncher({
   patientUuid,
   formIdentifier,
@@ -252,11 +252,14 @@ export function useConsultaExternaFormLauncher({
         // that an earlier form remains open. Restore through the public API.
         const canRestore =
           previous?.identity === identity &&
-          workspace2Store.getState().openedWindows.some((window) =>
-            window.openedWorkspaces.some(
-              (workspace) => workspace.workspaceName === patientFormEntryWorkspace && workspace.props === previous.args[1],
-            ),
-          );
+          workspace2Store
+            .getState()
+            .openedWindows.some((window) =>
+              window.openedWorkspaces.some(
+                (workspace) =>
+                  workspace.workspaceName === patientFormEntryWorkspace && workspace.props === previous.args[1],
+              ),
+            );
         if (canRestore) {
           if ((await launchWorkspace2(...previous.args)) !== true) {
             throw new ConsultaExternaLaunchError('verification-failed');

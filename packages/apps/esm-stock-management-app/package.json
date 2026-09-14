@@ -72,7 +72,6 @@
     "@types/file-saver": "^2.0.5",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.0",
-    "css-loader": "^6.8.1",
     "dayjs": "^1.11.9",
     "i18next": "^26.3.6",
     "i18next-parser": "^9.3.0",
@@ -86,7 +85,8 @@
     "swr": "^2.2.4",
     "turbo": "^2.9.14",
     "typescript": "6.0.3",
-    "vitest": "^4.1.7",
+    "vite": "8.0.16",
+    "vitest": "^5.0.0",
     "yup": "^1.2.0"
   }
 }

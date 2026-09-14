@@ -42,7 +42,8 @@
     "@openmrs/esm-patient-common-lib": "workspace:*",
     "@openmrs/esm-utils": "workspace:*",
     "d3": "^7.6.1",
-    "lodash-es": "^4.17.23"
+    "lodash-es": "^4.17.23",
+    "react-to-print": "^3.1.1"
   },
   "peerDependencies": {
     "@openmrs/esm-framework": "*",
@@ -59,6 +60,7 @@
     "@rspack/cli": "1.7.11",
     "openmrs": "workspace:*",
     "typescript": "6.0.3",
-    "vitest": "^4.1.7"
+    "vite": "8.0.16",
+    "vitest": "^5.0.0"
   }
 }

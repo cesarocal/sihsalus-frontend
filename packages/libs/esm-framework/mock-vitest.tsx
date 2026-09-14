@@ -57,6 +57,10 @@ export const clearHistory = vi.fn();
 export const goBackInHistory = vi.fn();
 
 /* esm-offline */
+export const areOfflineResourcesCached = vi.fn();
+export const getOfflineReadiness = vi.fn();
+export const getOfflineProfileStatus = vi.fn();
+export const clearOfflineDownloads = vi.fn();
 export const useConnectivity = vi.fn().mockReturnValue(true);
 export const subscribeConnectivity = vi.fn();
 
@@ -157,6 +161,7 @@ export const useWorkspaces = vi.fn();
 export const useWorkspace2Context = vi.fn();
 
 interface OpenmrsDatePickerMockProps extends InputHTMLAttributes<HTMLInputElement> {
+  isDisabled?: boolean;
   invalid?: boolean;
   invalidText?: ReactNode;
   isInvalid?: boolean;
@@ -180,6 +185,7 @@ export const OpenmrsDatePicker = forwardRef<HTMLInputElement, OpenmrsDatePickerM
       isInvalid,
       invalidText,
       isReadOnly,
+      isDisabled,
       isRequired,
       maxDate: _maxDate,
       minDate: _minDate,
@@ -198,6 +204,7 @@ export const OpenmrsDatePicker = forwardRef<HTMLInputElement, OpenmrsDatePickerM
           id={id}
           ref={ref}
           readOnly={isReadOnly}
+          disabled={isDisabled ?? props.disabled}
           required={required ?? isRequired}
           type="text"
           value={value ? dayjs(value).format('DD/MM/YYYY') : ''}
