@@ -10,6 +10,15 @@
       "slot": "app-menu-slot"
     },
     {
+      "component": "careLogbookMergeAppMenuItem",
+      "name": "care-logbook-merge-app-menu-item",
+      "slot": "app-menu-item-slot",
+      "privileges": ["app:home.libroAtenciones", "app:home.libroAtenciones.editar", "app:opciones.fusionarPacientes"],
+      "online": true,
+      "offline": false,
+      "order": 100
+    },
+    {
       "component": "careLogbookHomeDashboardLink",
       "name": "care-logbook-home-dashboard-link",
       "slot": "homepage-dashboard-slot",

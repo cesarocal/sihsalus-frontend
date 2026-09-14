@@ -27,6 +27,15 @@ describe('routes.json', () => {
           slot: 'app-menu-slot',
         }),
         expect.objectContaining({
+          component: 'careLogbookMergeAppMenuItem',
+          name: 'care-logbook-merge-app-menu-item',
+          slot: 'app-menu-item-slot',
+          privileges: ['app:home.libroAtenciones', 'app:home.libroAtenciones.editar', 'app:opciones.fusionarPacientes'],
+          online: true,
+          offline: false,
+          order: 100,
+        }),
+        expect.objectContaining({
           component: 'careLogbookHomeDashboardLink',
           name: 'care-logbook-home-dashboard-link',
           slot: 'homepage-dashboard-slot',
