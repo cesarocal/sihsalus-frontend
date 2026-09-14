@@ -170,7 +170,6 @@ export async function startObstetricCare(
     queueEntryToTransition: freshEntry.uuid,
     newQueue: freshEntry.queue.uuid,
     newStatus: inServiceStatus,
-    newPriority: freshEntry.priority.uuid,
   });
   if (
     !attendingEntry?.uuid ||

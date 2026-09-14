@@ -171,7 +171,6 @@ describe('startObstetricCare', () => {
       queueEntryToTransition: entry.uuid,
       newQueue: entry.queue.uuid,
       newStatus: 'in-service',
-      newPriority: 'urgent-priority',
     });
     expect(openmrsFetch).toHaveBeenCalledWith(expect.stringContaining(`${restBaseUrl}/visit/visit?v=full&_=`), {
       cache: 'no-store',
@@ -189,6 +188,19 @@ describe('startObstetricCare', () => {
     await expect(startObstetricCare(entry, 'outpatient', config)).resolves.toMatchObject({ uuid: entry.uuid });
     expect(assertFreshPatientIsAlive).toHaveBeenCalledExactlyOnceWith('patient');
     expect(transitionQueueEntry).not.toHaveBeenCalled();
+  });
+
+  it('preserves a priority corrected while the visit is being verified', async () => {
+    const read = vi.mocked(openmrsFetch).getMockImplementation();
+    vi.mocked(openmrsFetch).mockImplementation(async (...args) => {
+      freshEntry = { ...freshEntry, priority: { ...freshEntry.priority, uuid: 'corrected-priority' } };
+      return read(...args);
+    });
+
+    await expect(startObstetricCare(entry, 'outpatient', config)).resolves.toMatchObject({
+      priority: { uuid: 'corrected-priority' },
+    });
+    expect(vi.mocked(transitionQueueEntry).mock.calls[0][0]).not.toHaveProperty('newPriority');
   });
 
   it('still blocks a deceased patient when reopening care already in service', async () => {

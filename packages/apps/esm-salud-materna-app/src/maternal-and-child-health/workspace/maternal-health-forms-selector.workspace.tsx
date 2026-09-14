@@ -144,7 +144,7 @@ const MaternalHealthFormsSelector: React.FC<DefaultPatientWorkspaceProps> = (pro
     () => () => {
       pendingLaunch.current = null;
     },
-    [patientUuid],
+    [],
   );
   const { pregnancyStartDate } = useCurrentPregnancy(patientUuid);
   const encounterUrl = patientUuid
@@ -304,7 +304,7 @@ const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProp
   const canEdit = maternalHealthPrivileges.some(({ edit }) => canEditMaternalForm(session, edit));
 
   return canEdit ? (
-    <MaternalHealthFormsSelector {...props} />
+    <MaternalHealthFormsSelector key={String(props.patientUuid ?? props.workspaceProps?.patientUuid ?? '')} {...props} />
   ) : (
     <UnauthorizedState privilege={maternalPatientChartPrivilege} />
   );
