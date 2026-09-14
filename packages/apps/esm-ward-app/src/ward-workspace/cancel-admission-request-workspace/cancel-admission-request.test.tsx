@@ -46,6 +46,8 @@ mockedUseWardLocation.mockReturnValue({
   location: mockLocationInpatientWard,
   invalidLocation: false,
   isLoadingLocation: false,
+  isValidatingLocation: false,
+  mutateLocation: vi.fn(),
   errorFetchingLocation: null,
 });
 

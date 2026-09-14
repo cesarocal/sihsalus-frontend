@@ -1,21 +1,21 @@
-@use '@carbon/layout';
-@use '@carbon/type';
-@use '@openmrs/esm-styleguide/src/vars' as *;
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
 
 .metric {
-  margin-left: layout.$spacing-05;
   display: flex;
-  align-items: end;
-  gap: 5px;
+  align-items: baseline;
+  gap: layout.$spacing-02;
+  min-width: 0;
 }
 
 .metricName {
-  @include type.type-style('helper-text-01');
+  @include type.type-style("helper-text-01");
   color: $color-gray-70;
 }
 
 .metricValue {
-  @include type.type-style('heading-03');
+  @include type.type-style("heading-03");
   line-height: revert;
 }
 

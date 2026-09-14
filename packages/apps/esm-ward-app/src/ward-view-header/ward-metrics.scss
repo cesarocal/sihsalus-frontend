@@ -1,7 +1,19 @@
-@use '@openmrs/esm-styleguide/src/vars' as *;
+@use "@carbon/layout";
+@use "@openmrs/esm-styleguide/src/vars" as *;
 
 .metricsContainer {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
+  gap: layout.$spacing-03 layout.$spacing-05;
+  min-width: 0;
+  max-width: 100%;
   margin-left: auto;
+}
+
+@media (max-width: $breakpoint-tablet-max) {
+  .metricsContainer {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
 }

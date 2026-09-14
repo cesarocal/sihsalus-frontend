@@ -1,4 +1,4 @@
-import { InlineLoading, InlineNotification, Tile } from '@carbon/react';
+import { Button, InlineLoading, InlineNotification, Tile } from '@carbon/react';
 import {
   ExtensionSlot,
   InPatientPictogram,
@@ -15,7 +15,8 @@ import { useWardConfig } from './ward-view.resource';
 import styles from './ward-view.scss';
 
 const WardView: React.FC<{}> = () => {
-  const { isLoadingLocation, invalidLocation, location } = useWardLocation();
+  const { isLoadingLocation, isValidatingLocation, errorFetchingLocation, invalidLocation, location, mutateLocation } =
+    useWardLocation();
   const { t } = useTranslation();
 
   return (
@@ -26,7 +27,25 @@ const WardView: React.FC<{}> = () => {
           <WardLocationSelector selectedLocation={location} />
         </div>
       </PageHeader>
-      {isLoadingLocation ? (
+      {errorFetchingLocation ? (
+        <div className={styles.pageState}>
+          <InlineNotification
+            id="ward-location-status"
+            kind="error"
+            hideCloseButton
+            title={t('errorLoadingWardLocation', 'Error loading ward location')}
+          />
+          <Button
+            aria-describedby="ward-location-status"
+            kind="ghost"
+            size="sm"
+            disabled={isValidatingLocation}
+            onClick={() => void mutateLocation(undefined, { throwOnError: false })}
+          >
+            {t('retry', 'Retry')}
+          </Button>
+        </div>
+      ) : isLoadingLocation ? (
         <div className={styles.pageState}>
           <InlineLoading description={t('loadingWardLocations', 'Loading ward locations...')} />
         </div>

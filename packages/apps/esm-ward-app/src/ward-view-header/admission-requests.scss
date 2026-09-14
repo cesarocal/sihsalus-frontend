@@ -3,12 +3,14 @@
 @use "@openmrs/esm-styleguide/src/vars" as *;
 
 .admissionRequestsContainer {
-  background-color: $color-gray-70;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: layout.$spacing-03;
+  min-width: 0;
+  max-width: 100%;
   padding: layout.$spacing-02 0 layout.$spacing-02 layout.$spacing-04;
   background-color: #393939;
-  margin-left: layout.$spacing-03;
   & > button {
     color: #78a9ff;
 
@@ -23,11 +25,11 @@
 }
 
 .movementIcon {
+  flex-shrink: 0;
   padding: layout.$spacing-02;
   border-radius: 50%;
   fill: $ui-03;
   background-color: $color-blue-60-2;
-  margin-right: layout.$spacing-03;
 }
 
 .blackBackground {
@@ -43,8 +45,18 @@
 
 .content {
   @include type.type-style("heading-compact-01");
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .manageButton {
+  flex-shrink: 0;
   margin: 0 layout.$spacing-03;
+}
+
+@media (max-width: $breakpoint-tablet-max) {
+  .admissionRequestsContainer {
+    flex: 1 1 100%;
+  }
 }
