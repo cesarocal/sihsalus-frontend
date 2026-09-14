@@ -72,6 +72,11 @@ jobs:
       github.event_name == 'workflow_dispatch' && inputs.cleanup_orphans &&
       github.repository == 'sihsalus/sihsalus-frontend' &&
       github.ref == 'refs/heads/chore/ghcr-orphans-20260914'
+    # Release uses this same repository-wide group for workflow_run on the
+    # default branch. Queue maintenance and publication without canceling either.
+    concurrency:
+      group: Release-refs/heads/main
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

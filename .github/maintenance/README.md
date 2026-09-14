@@ -20,8 +20,10 @@ Each version's digest, tags and timestamps are checked again immediately before
 its DELETE request. Parents precede their exclusively referenced children;
 the first failure stops all remaining writes.
 
-GHCR does not offer an atomic graph-check-and-delete transaction. Coordinate
-this short operation with package publishers. Any partial failure requires
+GHCR does not offer an atomic graph-check-and-delete transaction. The cleanup
+job shares `Release-refs/heads/main` with the existing Release workflow and uses
+`cancel-in-progress: false`, so those jobs wait for each other. Coordinate this
+short operation with any tag or manual candidate publishers as well. Any partial failure requires
 reviewing the uploaded journal before another run; missing planned versions
 stop a retry. A successful run verifies deleted API state, retained metadata
 and the readability of every tagged image's manifest tree and protected pin.
