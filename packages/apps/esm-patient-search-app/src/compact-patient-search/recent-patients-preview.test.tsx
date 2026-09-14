@@ -8,17 +8,13 @@ import { patientChartPrivilege } from '../patient-chart-access';
 import { PatientSearchContext } from '../patient-search-context';
 import { type SearchedPatient } from '../types';
 
-import RecentlySearchedPatients from './recently-searched-patients.component';
+import RecentPatientsPreview from './recent-patients-preview.component';
 
 const defaultProps = {
-  currentPage: 0,
   data: [],
   fetchError: null,
-  hasMore: false,
   isLoading: false,
   isValidating: false,
-  setPage: vi.fn(),
-  totalResults: 0,
 };
 
 const mockUseConfig = vi.mocked(useConfig<PatientSearchConfig>);
@@ -29,10 +25,10 @@ const clinicalUser = {
   roles: [],
 };
 
-describe('RecentlySearchedPatients', () => {
+describe('RecentPatientsPreview', () => {
   const birthdate = '1990-01-01T00:00:00.000+0000';
   const age = dayjs().diff(birthdate, 'years');
-  const mockSearchResults: Array<SearchedPatient> = [
+  const mockRecentPatients: Array<SearchedPatient> = [
     {
       attributes: [],
       identifiers: [
@@ -83,18 +79,18 @@ describe('RecentlySearchedPatients', () => {
     mockUserHasAccess.mockImplementation((privilege) => privilege === patientChartPrivilege);
   });
 
-  it('renders a loading state when fetching recently searched patients on initial render', () => {
-    renderRecentlySearchedPatients({
+  it('renders a loading state when fetching recently viewed patients on initial render', () => {
+    renderRecentPatientsPreview({
       isLoading: true,
       data: undefined,
     });
 
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
-    expect(screen.queryByText(/recent search result/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('renders an empty state when there are no matching search results', () => {
-    renderRecentlySearchedPatients({
+  it('renders an empty state when there are no recent patient charts', () => {
+    renderRecentPatientsPreview({
       isLoading: false,
       data: [],
     });
@@ -104,10 +100,10 @@ describe('RecentlySearchedPatients', () => {
     expect(
       screen.getByText(/Open a patient chart from search, a queue, a visit or a direct link/i),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/recent search result/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('renders an error state when search results fail to fetch', () => {
+  it('renders an error state when recent patient charts fail to fetch', () => {
     const error = {
       message: 'You are not logged in',
       response: {
@@ -116,37 +112,31 @@ describe('RecentlySearchedPatients', () => {
       },
     };
 
-    renderRecentlySearchedPatients({
+    renderRecentPatientsPreview({
       fetchError: error,
       isLoading: false,
     });
 
     expect(screen.getByText(/sorry, there was an error. Please try again/i)).toBeInTheDocument();
-    expect(screen.queryByText(/recent search result/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('renders a list of recently searched patients', () => {
-    renderRecentlySearchedPatients({
-      currentPage: 0,
-      data: mockSearchResults,
-      hasMore: false,
-      totalResults: 1,
+  it('renders a list of recently viewed patients', () => {
+    renderRecentPatientsPreview({
+      data: mockRecentPatients,
     });
 
     const patientLink = screen.getByRole('link');
-    expect(patientLink).toHaveAttribute('href', `/openmrs/spa/patient/${mockSearchResults[0].uuid}/chart/`);
+    expect(patientLink).toHaveAttribute('href', `/openmrs/spa/patient/${mockRecentPatients[0].uuid}/chart/`);
     expect(within(patientLink).getByText(/Smith, John Doe/i)).toBeInTheDocument();
     expect(within(patientLink).getByText(/1000NLY/)).toBeInTheDocument();
     expect(screen.getByRole('img')).toBeInTheDocument();
     expect(screen.getByText(/1 recently viewed patient/i)).toBeInTheDocument();
   });
 
-  it('renders a loading spinner when revalidating recently searched patients', () => {
-    renderRecentlySearchedPatients({
-      currentPage: 0,
-      data: mockSearchResults,
-      hasMore: false,
-      totalResults: 1,
+  it('renders a loading spinner when revalidating recently viewed patients', () => {
+    renderRecentPatientsPreview({
+      data: mockRecentPatients,
       isValidating: true,
     });
 
@@ -158,7 +148,7 @@ describe('RecentlySearchedPatients', () => {
     const patientClickSideEffect = vi.fn();
     render(
       <PatientSearchContext.Provider value={{ patientClickSideEffect }}>
-        <RecentlySearchedPatients {...defaultProps} data={mockSearchResults} />
+        <RecentPatientsPreview {...defaultProps} data={mockRecentPatients} />
       </PatientSearchContext.Provider>,
     );
     const link = screen.getByRole('link', { name: 'Smith, John Doe' });
@@ -175,15 +165,15 @@ describe('RecentlySearchedPatients', () => {
 
   it('does not offer a chart link without chart access', () => {
     mockUserHasAccess.mockReturnValue(false);
-    renderRecentlySearchedPatients({ data: mockSearchResults });
+    renderRecentPatientsPreview({ data: mockRecentPatients });
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
 
-function renderRecentlySearchedPatients(props = {}) {
+function renderRecentPatientsPreview(props = {}) {
   render(
     <PatientSearchContext.Provider value={{}}>
-      <RecentlySearchedPatients {...defaultProps} {...props} />
+      <RecentPatientsPreview {...defaultProps} {...props} />
     </PatientSearchContext.Provider>,
   );
 }

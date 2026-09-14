@@ -20,7 +20,7 @@ import { PatientSearchContext } from '../patient-search-context';
 
 import styles from './compact-patient-search.scss';
 import PatientSearch from './patient-search.component';
-import RecentlySearchedPatients from './recently-searched-patients.component';
+import RecentPatientsPreview from './recent-patients-preview.component';
 
 interface CompactPatientSearchProps {
   isSearchPage: boolean;
@@ -57,8 +57,8 @@ const CompactPatientSearchComponent: React.FC<CompactPatientSearchProps> = ({
   const showRecentPatients = showRecentlySearchedPatients && canAccessPatientChart;
   const { recentlyViewedPatientUuids } = useRecentlyViewedPatients(showRecentPatients);
 
-  const recentPatientSearchResponse = useRestPatients(recentlyViewedPatientUuids, !hasCurrentSearchTerm);
-  const { data: recentPatients, fetchError } = recentPatientSearchResponse;
+  const recentPatientResponse = useRestPatients(recentlyViewedPatientUuids, !hasCurrentSearchTerm);
+  const { data: recentPatients, fetchError } = recentPatientResponse;
   const patientsForKeyboardNavigation = shouldSearch ? searchedPatients : !hasCurrentSearchTerm ? recentPatients : null;
 
   const handleFocusToInput = useCallback(() => {
@@ -191,7 +191,7 @@ const CompactPatientSearchComponent: React.FC<CompactPatientSearchProps> = ({
 
         {!isSearchPage && !hasCurrentSearchTerm && showRecentPatients && (
           <div className={styles.floatingSearchResultsContainer} data-testid="floatingSearchResultsContainer">
-            <RecentlySearchedPatients ref={bannerContainerRef} {...recentPatientSearchResponse} />
+            <RecentPatientsPreview ref={bannerContainerRef} {...recentPatientResponse} />
           </div>
         )}
       </div>

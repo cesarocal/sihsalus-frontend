@@ -46,7 +46,7 @@ describe('CompactPatientSearchComponent', () => {
     expect(searchResultsContainer).toBeInTheDocument();
   });
 
-  it('renders a list of recently searched patients when a search term is not provided and the showRecentlySearchedPatients config property is set', async () => {
+  it('renders the recent patient preview without a search term when the legacy config flag is enabled', () => {
     mockUseConfig.mockReturnValue({
       ...getDefaultsFromConfigSchema(configSchema),
       search: {
