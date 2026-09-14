@@ -17,7 +17,7 @@ import {
   TextInput,
   Tile,
 } from '@carbon/react';
-import { Download, Launch } from '@carbon/react/icons';
+import { Download } from '@carbon/react/icons';
 import {
   ConfigurableLink,
   EmptyCardIllustration,
@@ -31,7 +31,7 @@ import { AppErrorBoundary, RequirePrivilege } from '@sihsalus/esm-rbac';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { careLogbookBasePath, careLogbookMergePrivileges, careLogbookPrivilege, moduleName } from '../constants';
+import { careLogbookBasePath, careLogbookPrivilege, moduleName } from '../constants';
 import { useAdmissions } from '../resources/admissions.resource';
 import styles from './admission-home.scss';
 
@@ -266,13 +266,6 @@ export default function AdmissionHome() {
               title={t('admissionReportByUps', 'Libro de Atenciones')}
               illustration={<RegistrationPictogram />}
             />
-            <RequirePrivilege privilege={careLogbookMergePrivileges} hideUnauthorized>
-              <ConfigurableLink to={`${spaBasePath}${careLogbookBasePath}/merge`} className={styles.headerAction}>
-                <Button kind="secondary" renderIcon={Launch} as="span">
-                  {t('mergeDuplicatePatients', 'Fusionar historias duplicadas')}
-                </Button>
-              </ConfigurableLink>
-            </RequirePrivilege>
           </PageHeader>
 
           <div className={styles.content}>

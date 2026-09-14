@@ -3,7 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { type PropsWithChildren } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
-import { careLogbookMergePrivileges } from '../constants';
 import { type AdmissionRow, useAdmissions } from '../resources/admissions.resource';
 import AdmissionHome from './admission-home.component';
 
@@ -206,12 +205,7 @@ describe('AdmissionHome', () => {
     expect(getMetricValue('En curso')).toHaveTextContent('1');
     expect(getMetricValue('Finalizadas')).toHaveTextContent('1');
     expect(getMetricValue('Tipos de visita reportados')).toHaveTextContent('2');
-    const mergeLink = screen.getByRole('link', { name: /fusionar historias duplicadas/i });
-    expect(mergeLink).toHaveAttribute('href', '/openmrs/spa/home/care-logbook/merge');
-    expect(mergeLink.closest('[data-required-privileges]')).toHaveAttribute(
-      'data-required-privileges',
-      careLogbookMergePrivileges.join(','),
-    );
+    expect(screen.queryByRole('link', { name: /fusionar historias duplicadas/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ada Lovelace' })).toHaveAttribute(
       'href',
       '/openmrs/spa/home/care-logbook/patient/patient-1',
