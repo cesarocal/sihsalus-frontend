@@ -1,6 +1,12 @@
-import { getDefaultsFromConfigSchema, useAppContext, useConfig, useFeatureFlag } from '@openmrs/esm-framework';
+import {
+  getDefaultsFromConfigSchema,
+  useAppContext,
+  useConfig,
+  useFeatureFlag,
+  useLocations,
+} from '@openmrs/esm-framework';
 import { screen } from '@testing-library/react';
-import { useParams } from 'react-router-dom';
+import { MemoryRouter, useParams } from 'react-router-dom';
 import { renderWithSwr } from 'test-utils';
 import { mockWardPatientGroupDetails, mockWardViewContext } from '../../test-utils/mock';
 import { configSchema, type WardConfigObject } from '../config-schema';
@@ -51,10 +57,68 @@ window.IntersectionObserver = IntersectionObserverMock as unknown as typeof Inte
 beforeEach(() => {
   const config = getDefaultsFromConfigSchema<WardConfigObject>(configSchema);
   mockUseConfig.mockReturnValue(config);
+  vi.mocked(useLocations).mockReturnValue([{ uuid: 'abcd', display: 'mock location' }]);
 });
+
+function renderWardView() {
+  return renderWithSwr(
+    <MemoryRouter>
+      <WardView />
+    </MemoryRouter>,
+  );
+}
 
 describe('WardView', () => {
   let restoreBedLayouts: (() => void) | null = null;
+
+  it('shows the page header and selection instructions before a ward is selected', () => {
+    mockUseWardLocation.mockReturnValueOnce({
+      location: undefined,
+      isLoadingLocation: false,
+      errorFetchingLocation: undefined,
+      invalidLocation: false,
+    });
+
+    const { container } = renderWardView();
+
+    expect(screen.getByText('Hospitalization')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Ward location' })).toHaveTextContent('Select a ward');
+    expect(screen.getByText('Select a ward to view its beds and admitted patients.')).toBeInTheDocument();
+    expect(container.querySelector('[data-extension-slot-name]')).not.toBeInTheDocument();
+  });
+
+  it('keeps the page header and selector visible while the requested ward loads', () => {
+    mockUseWardLocation.mockReturnValueOnce({
+      location: undefined,
+      isLoadingLocation: true,
+      errorFetchingLocation: undefined,
+      invalidLocation: false,
+    });
+
+    const { container } = renderWardView();
+
+    expect(screen.getByText('Hospitalization')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Ward location' })).toBeInTheDocument();
+    expect(screen.getByText('Loading ward locations...')).toBeInTheDocument();
+    expect(container.querySelector('[data-extension-slot-name]')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    'default-ward',
+    'maternal-ward',
+  ])('preserves the configured %s content beneath the page header', (wardId) => {
+    mockUseConfig.mockReturnValue({
+      ...getDefaultsFromConfigSchema<WardConfigObject>(configSchema),
+      wards: [{ id: wardId }],
+    });
+
+    const { container } = renderWardView();
+
+    expect(screen.getByText('Hospitalization')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Ward location' })).toHaveTextContent('mock location');
+    expect(container.querySelector(`[data-extension-slot-name="${wardId}"]`)).toBeInTheDocument();
+    expect(screen.queryByText('Select a ward to view its beds and admitted patients.')).not.toBeInTheDocument();
+  });
 
   it('renders the session location when no location provided in URL', () => {
     renderWithSwr(<DefaultWardView />);
@@ -96,11 +160,14 @@ describe('WardView', () => {
       invalidLocation: true,
     });
 
-    renderWithSwr(<WardView />);
+    const { container } = renderWardView();
     const notification = screen.getByRole('status');
     expect(notification).toBeInTheDocument();
     const invalidText = screen.queryByText('Invalid location specified');
     expect(invalidText).toBeInTheDocument();
+    expect(screen.getByText('Hospitalization')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Ward location' })).toBeInTheDocument();
+    expect(container.querySelector('[data-extension-slot-name]')).not.toBeInTheDocument();
   });
 
   it('should render warning if backend module installed and no beds configured', () => {
@@ -129,7 +196,7 @@ describe('WardView', () => {
     wardPatientGroupDetails.bedLayouts = [];
     mockUseFeatureFlag.mockReturnValue(false);
 
-    renderWithSwr(<WardView />);
+    renderWardView();
     const noBedsConfiguredForThisLocation = screen.queryByText('No beds configured for this location');
     expect(noBedsConfiguredForThisLocation).not.toBeInTheDocument();
   });
