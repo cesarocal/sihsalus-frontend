@@ -143,6 +143,7 @@
   "selectABed": "Select a bed",
   "selectALocation": "Select a location",
   "selectWardLocation": "Select a ward",
+  "selectWardLocationHelp": "Select a ward to view its beds and admitted patients.",
   "showingLocations_one": "{{start}}-{{end}} of {{count}} locations",
   "showingLocations_other": "{{start}}-{{end}} of {{count}} locations",
   "somePartsOfTheFormDidntLoad": "Some parts of the form didn't load",

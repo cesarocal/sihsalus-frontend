@@ -1,9 +1,9 @@
-import { Dropdown, InlineLoading, Tile } from '@carbon/react';
-import { useLocations } from '@openmrs/esm-framework';
+import { Dropdown, InlineLoading } from '@carbon/react';
+import { type Location, useLocations } from '@openmrs/esm-framework';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-export default function WardLocationSelector() {
+export default function WardLocationSelector({ selectedLocation }: { selectedLocation?: Location }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const admissionLocations = useLocations('Admission Location');
@@ -13,19 +13,18 @@ export default function WardLocationSelector() {
   }
 
   return (
-    <Tile>
-      <Dropdown
-        id="ward-location-selector"
-        items={admissionLocations}
-        itemToString={(location) => location?.display ?? location?.name ?? ''}
-        label={t('selectWardLocation', 'Select a ward')}
-        titleText={t('wardLocation', 'Ward location')}
-        onChange={({ selectedItem }) => {
-          if (selectedItem?.uuid) {
-            navigate(selectedItem.uuid);
-          }
-        }}
-      />
-    </Tile>
+    <Dropdown
+      id="ward-location-selector"
+      items={admissionLocations}
+      itemToString={(location) => location?.display ?? location?.name ?? ''}
+      label={t('selectWardLocation', 'Select a ward')}
+      titleText={t('wardLocation', 'Ward location')}
+      selectedItem={admissionLocations.find((location) => location.uuid === selectedLocation?.uuid) ?? null}
+      onChange={({ selectedItem }) => {
+        if (selectedItem?.uuid) {
+          navigate(`/${selectedItem.uuid}`);
+        }
+      }}
+    />
   );
 }

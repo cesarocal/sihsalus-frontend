@@ -149,6 +149,7 @@
   "selectABed": "Seleccione una cama",
   "selectALocation": "Seleccione una ubicación",
   "selectWardLocation": "Seleccione una sala",
+  "selectWardLocationHelp": "Seleccione una sala de hospitalización para ver sus camas y pacientes hospitalizados.",
   "showingLocations_one": "{{start}}-{{end}} de {{count}} ubicaciones",
   "showingLocations_many": "{{start}}-{{end}} de {{count}} ubicaciones",
   "showingLocations_other": "{{start}}-{{end}} de {{count}} ubicaciones",

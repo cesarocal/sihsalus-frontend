@@ -120,6 +120,37 @@ que el content, los roles ni los formularios estén instalados en DEV/QLTY.
 Para deshabilitar las acciones nuevas, establecer `obstetricCare.enabled=false`;
 las entradas y acciones generales de cola se conservan.
 
+## Vista visual de colas
+
+- `Volver a la tabla de colas` está al pie del tablero, después del flujo de
+  atención. Conserva los filtros compartidos de UPSS, servicio y estado.
+- `Pantalla completa` amplía únicamente el tablero mediante la API de pantalla
+  completa del navegador. La cabecera conserva el contador, un resumen de los
+  filtros activos y el botón para salir. También se puede salir con `Esc`;
+  al cambiar de modo, el foco vuelve al control de pantalla completa.
+- La ampliación conserva las entradas y su orden, las actualizaciones, los
+  enlaces existentes y las autorizaciones de la ruta. Es una vista para el
+  personal autorizado; no convierte el tablero en una pantalla pública ni
+  anonimiza los datos que ya muestra.
+- Si el navegador no admite pantalla completa, el control queda deshabilitado
+  con una explicación. Si rechaza la solicitud, aparece un mensaje seguro dentro
+  del tablero y se conserva el modo actual.
+- Las columnas muestran completos los nombres de estado y conservan los enlaces
+  a pacientes accesibles con teclado. En pantalla completa, las listas usan el alto disponible
+  con desplazamiento independiente. El indicador de actualización ocupa su propio
+  espacio junto a los controles, sin superponerse al contador.
+- Durante la carga o ante un error de entradas o estados, el contador indica que
+  no está disponible. Una lectura fallida de estados no se presenta como una cola
+  vacía. No cambia la consulta al backend ni las reglas de transición de colas.
+- Validación mínima: pruebas de renderizado, filtros, carga/error, entrada/salida
+  de pantalla completa, rechazo del navegador y disponibilidad de la API; smoke
+  de navegador con datos sintéticos para dimensiones, desplazamiento, foco y
+  salida mediante botón/Escape. La validación contra DEV/QLTY se registra aparte.
+
+Capturas con datos sintéticos en un fixture local del componente:
+[vista normal](docs/images/visual-queue-normal.png) y
+[pantalla completa](docs/images/visual-queue-fullscreen.png).
+
 ## Riesgos conocidos
 
 - Configuracion incompleta de conceptos produce errores dificiles de diagnosticar.
