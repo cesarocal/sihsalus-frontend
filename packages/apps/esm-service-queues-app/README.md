@@ -83,6 +83,43 @@ Excepción actual: la extensión `visit-form-queue-fields` declara únicamente p
 - Las acciones de cambiar estado/prioridad deben fallar de forma visible si no hay conceptos configurados.
 - Los nombres de menu deben usar lenguaje final para usuarios clinicos, no nombres internos del paquete.
 
+## Flujo obstétrico
+
+`obstetricCare.enabled` habilita las acciones en `config/frontend.json`. Los UUIDs
+pertenecen al contrato de content; no se deduce la especialidad por nombres:
+
+- Consulta externa: la cita de atención ambulatoria por obstetra pasa por el
+  triaje existente y permanece en la cola compartida de Consulta Externa. La
+  acción `Atender Obstetricia` requiere el vínculo persistido con esa cita y el
+  triaje guardado en el servidor. Las coincidencias aproximadas por fecha no
+  habilitan esta acción. Una atención sin cita conserva las acciones generales.
+- Centro Obstétrico: usa su cola propia, incluso cuando la consulta proviene de
+  Hospitalización o Emergencia. El filtro UPSS usa la ubicación de la cola
+  receptora; solo el triaje compartido usa la UPSS de la consulta. No exige una
+  cita, el triaje ambulatorio ni su barrera de financiamiento.
+
+`Atender Obstetricia` verifica paciente, consulta activa única y estado antes de
+pasar a Atendiéndose y abrir el dashboard materno autorizado. Conserva la cola y
+prioridad, y reutiliza la reconciliación existente si se pierde una respuesta.
+`Continuar atención obstétrica` no crea otra transición. El acceso necesita
+sesión autenticada, lectura de historia y colas, permisos nativos de pacientes,
+consultas y edición de entradas, y lectura/edición del panel materno elegido.
+La rama ambulatoria también necesita `View Appointments`. Las acciones se
+deshabilitan sin conexión; un triaje pendiente de sincronización no las habilita.
+
+`Finalizar en cola` pide confirmación y cierra únicamente la entrada operativa.
+El guardado clínico, finalización de la cita, cierre de consulta y egreso materno
+conservan sus flujos existentes. El acceso requiere que `esm-salud-materna-app`
+esté incluido en el SPA; cada formulario mantiene sus permisos y requisitos.
+
+La validación remota debe cubrir ambos recorridos con pacientes sintéticos:
+llegada y triaje, traslado desde Hospitalización/Emergencia, guardar y recargar
+el formulario, continuar y finalizar en cola, falta de permisos, consulta
+cerrada o múltiple, fallo de red y reintento. La revisión de código no demuestra
+que el content, los roles ni los formularios estén instalados en DEV/QLTY.
+Para deshabilitar las acciones nuevas, establecer `obstetricCare.enabled=false`;
+las entradas y acciones generales de cola se conservan.
+
 ## Vista visual de colas
 
 - `Volver a la tabla de colas` está al pie del tablero, después del flujo de

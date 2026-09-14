@@ -7,6 +7,7 @@ import {
   showModal,
   showSnackbar,
   userHasAccess,
+  useConfig,
   useLayoutType,
   useSession,
 } from '@openmrs/esm-framework';
@@ -19,7 +20,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { serviceQueuesPatientVitalsWorkspace } from '../../constants';
+import type { ConfigObject } from '../../config-schema';
 import { useMutateQueueEntries } from '../../hooks/useQueueEntries';
+import ObstetricCareActions from '../../obstetric-care/obstetric-care-actions.component';
+import { getObstetricCareMode } from '../../obstetric-care/obstetric-care.resource';
 import { canTransitionServiceQueueEntries, canTriageQueuePatients } from '../../permissions';
 import {
   getAppointmentTriageConfig,
@@ -34,6 +38,8 @@ export function QueueTableActionCell({ queueEntry }: QueueTableCellComponentProp
   const { t } = useTranslation();
   const layout = useLayoutType();
   const session = useSession();
+  const config = useConfig<ConfigObject>();
+  const obstetricCareMode = getObstetricCareMode(queueEntry, config.obstetricCare);
   const canTransition = canTransitionServiceQueueEntries(session?.user);
   const canTriage = canTriageQueuePatients(session?.user);
   const isTriageConfigLoading = queueEntry.workflow?.triageState === 'loading';
@@ -151,7 +157,7 @@ export function QueueTableActionCell({ queueEntry }: QueueTableCellComponentProp
     }
   };
 
-  if (isTriageConfigLoading || (!canTransition && !canPerformTriage)) {
+  if (isTriageConfigLoading || (!canTransition && !canPerformTriage && !obstetricCareMode)) {
     return null;
   }
 
@@ -173,6 +179,8 @@ export function QueueTableActionCell({ queueEntry }: QueueTableCellComponentProp
             ? t('sendToCare', 'Enviar a atención')
             : t('performTriage', 'Realizar triaje')}
         </Button>
+      ) : obstetricCareMode && !isDeceasedPatient ? (
+        <ObstetricCareActions queueEntry={queueEntry} mode={obstetricCareMode} config={config} />
       ) : canTransition && !isDeceasedPatient ? (
         <Button
           kind="ghost"

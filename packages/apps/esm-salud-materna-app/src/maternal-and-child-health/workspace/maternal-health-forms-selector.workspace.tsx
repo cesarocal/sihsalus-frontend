@@ -1,14 +1,18 @@
 import {
+  getSessionStore,
   launchWorkspace2,
   openmrsFetch,
   restBaseUrl,
+  showSnackbar,
+  type Session,
   useConfig,
   userHasAccess,
   useSession,
 } from '@openmrs/esm-framework';
 import type { CompletedFormInfo, Form } from '@openmrs/esm-patient-common-lib';
 import { FormsSelectorWorkspace } from '@openmrs/esm-patient-common-lib';
-import React, { useCallback, useMemo } from 'react';
+import { UnauthorizedState } from '@sihsalus/esm-rbac';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
 import type { ConfigObject } from '../../config-schema';
@@ -16,10 +20,13 @@ import {
   cancerPreventionEditPrivilege,
   familyPlanningEditPrivilege,
   labourDeliveryEditPrivilege,
+  maternalHealthPrivileges,
+  maternalPatientChartPrivilege,
   postnatalCareEditPrivilege,
   prenatalCareEditPrivilege,
 } from '../../constants';
 import { useCurrentPregnancy } from '../../hooks/useCurrentPregnancy';
+import { resolveMaternalForm } from '../../hooks/useMaternalFormLauncher';
 import { type DefaultPatientWorkspaceProps, formEntryWorkspace } from '../../types';
 import {
   encounterMatchesForm,
@@ -114,12 +121,31 @@ const formEditPrivileges: Record<MaternalFormKey, string> = {
   breastCancerScreeningForm: cancerPreventionEditPrivilege,
 };
 
-const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProps> = (props) => {
+function canEditMaternalForm(session: Session | null | undefined, editPrivilege: string) {
+  const user = session?.user;
+  return Boolean(
+    session?.authenticated &&
+      user?.uuid &&
+      userHasAccess(maternalPatientChartPrivilege, user) &&
+      maternalHealthPrivileges.some(
+        ({ view, edit }) => edit === editPrivilege && userHasAccess(view, user) && userHasAccess(edit, user),
+      ),
+  );
+}
+
+const MaternalHealthFormsSelector: React.FC<DefaultPatientWorkspaceProps> = (props) => {
   const { t } = useTranslation();
   const config = useConfig<ConfigObject>();
   const session = useSession();
   const workspaceProps = props.workspaceProps ?? {};
   const patientUuid = (props.patientUuid ?? workspaceProps.patientUuid ?? '') as string;
+  const pendingLaunch = useRef<object | null>(null);
+  useEffect(
+    () => () => {
+      pendingLaunch.current = null;
+    },
+    [],
+  );
   const { pregnancyStartDate } = useCurrentPregnancy(patientUuid);
   const encounterUrl = patientUuid
     ? `${restBaseUrl}/encounter?patient=${patientUuid}&limit=100&v=custom:(uuid,encounterDatetime,form:(uuid,name,display))`
@@ -148,15 +174,15 @@ const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProp
 
   const availableForms = useMemo<Array<CompletedFormInfo>>(() => {
     return maternalFormKeys.reduce<Array<CompletedFormInfo>>((forms, formKey) => {
-      const formUuid = config.formsList[formKey];
-      if (!formUuid || !userHasAccess(formEditPrivileges[formKey], session?.user)) {
+      const formIdentifier = config.formsList[formKey]?.trim();
+      if (!formIdentifier || !canEditMaternalForm(session, formEditPrivileges[formKey])) {
         return forms;
       }
 
-      const label = formLabels[formKey] ?? formUuid;
+      const label = formLabels[formKey] ?? formIdentifier;
       forms.push({
         form: {
-          uuid: formUuid,
+          uuid: formIdentifier,
           name: label,
           display: label,
           version: '1',
@@ -169,7 +195,7 @@ const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProp
 
       return forms;
     }, []);
-  }, [config.formsList, session?.user]);
+  }, [config.formsList, session]);
   const formsWithHistory = useMemo<Array<CompletedFormInfo>>(
     () =>
       availableForms.map((formInfo) => {
@@ -200,17 +226,56 @@ const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProp
   );
 
   const launchForm = useCallback(
-    (form: Form, encounterUuid: string, onFormSubmitted: () => void) => {
-      launchWorkspace2(formEntryWorkspace, {
-        form: { uuid: form.uuid },
-        encounterUuid,
-        handlePostResponse: () => {
-          onFormSubmitted();
-          void mutateMaternalEncounters();
-        },
-      });
+    async (form: Form, encounterUuid: string, onFormSubmitted: () => void) => {
+      const formKey = maternalFormKeys.find((key) => config.formsList[key]?.trim() === form.uuid);
+      if (pendingLaunch.current || !formKey) {
+        return;
+      }
+      const canLaunch = () => {
+        const { loaded, session: currentSession } = getSessionStore().getState();
+        return (
+          loaded &&
+          currentSession?.user?.uuid === session?.user?.uuid &&
+          canEditMaternalForm(currentSession, formEditPrivileges[formKey])
+        );
+      };
+      if (!canLaunch()) {
+        return;
+      }
+
+      const request = {};
+      pendingLaunch.current = request;
+      try {
+        const resolvedForm = await resolveMaternalForm(form.uuid, form.display ?? form.name);
+        if (pendingLaunch.current !== request || !canLaunch()) {
+          return;
+        }
+        await launchWorkspace2(formEntryWorkspace, {
+          form: resolvedForm,
+          encounterUuid,
+          handlePostResponse: () => {
+            onFormSubmitted();
+            void mutateMaternalEncounters();
+          },
+        });
+      } catch {
+        if (pendingLaunch.current === request && canLaunch()) {
+          showSnackbar({
+            kind: 'error',
+            title: t('maternalFormNotAvailable', 'Formulario materno no disponible'),
+            subtitle: t(
+              'maternalFormNotAvailableSubtitle',
+              'Revise que el formulario esté publicado y que el UUID o nombre configurado sea exacto.',
+            ),
+          });
+        }
+      } finally {
+        if (pendingLaunch.current === request) {
+          pendingLaunch.current = null;
+        }
+      }
     },
-    [mutateMaternalEncounters],
+    [config.formsList, mutateMaternalEncounters, session?.user?.uuid, t],
   );
 
   return (
@@ -231,6 +296,17 @@ const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProp
       closeWorkspaceWithSavedChanges={closeWorkspaceWithSavedChanges}
       setTitle={setTitle}
     />
+  );
+};
+
+const MaternalHealthFormsSelectorWorkspace: React.FC<DefaultPatientWorkspaceProps> = (props) => {
+  const session = useSession();
+  const canEdit = maternalHealthPrivileges.some(({ edit }) => canEditMaternalForm(session, edit));
+
+  return canEdit ? (
+    <MaternalHealthFormsSelector key={String(props.patientUuid ?? props.workspaceProps?.patientUuid ?? '')} {...props} />
+  ) : (
+    <UnauthorizedState privilege={maternalPatientChartPrivilege} />
   );
 };
 

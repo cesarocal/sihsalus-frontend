@@ -1,8 +1,5 @@
 import { defineConfigSchema, getAsyncLifecycle, getSyncLifecycle } from '@openmrs/esm-framework';
-import {
-  createClinicalDashboardGroup as createDashboardGroup,
-  createDashboardLink,
-} from '@openmrs/esm-patient-common-lib';
+import { createDashboardLink } from '@openmrs/esm-patient-common-lib';
 import type React from 'react';
 
 import { configSchema } from './config-schema';
@@ -31,12 +28,12 @@ import {
   cancerPreventionDashboardMeta,
   familyPlanningDashboardMeta,
   labourAndDeliveryDashboardMeta,
-  maternalAndChildHealthNavGroup,
   postnatalDashboardMeta,
   prenatalDashboardMeta,
 } from './maternal-and-child-health/dashboard.meta';
 import { FamilyPlanning } from './maternal-and-child-health/family-planning.component';
 import { LabourDelivery } from './maternal-and-child-health/labour-delivery.component';
+import MaternalHealthNavGroup from './maternal-and-child-health/maternal-health-nav-group.component';
 import { PostnatalCare } from './maternal-and-child-health/postnatal-care.component';
 import { PrenatalCare } from './maternal-and-child-health/prenatal-care.component';
 import MaternalHealthFormsSelectorWorkspace from './maternal-and-child-health/workspace/maternal-health-forms-selector.workspace';
@@ -58,10 +55,7 @@ export function startupApp(): void {
 // ================================================================================
 // MATERNAL AND CHILD HEALTH EXPORTS
 // ================================================================================
-export const maternalAndChildHealthSideNavGroup = getSyncLifecycle(
-  createDashboardGroup(maternalAndChildHealthNavGroup),
-  options,
-);
+export const maternalAndChildHealthSideNavGroup = getSyncLifecycle(MaternalHealthNavGroup, options);
 
 // Navigation Links
 export const labourAndDeliveryLink = getSyncLifecycle(
