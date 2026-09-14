@@ -49,7 +49,7 @@
       "name": "maternal-and-child-health-dashboard-group-link",
       "component": "maternalAndChildHealthSideNavGroup",
       "slot": "patient-chart-dashboard-slot",
-      "privileges": "app:hoja.clinica.controlPrenatal",
+      "privileges": "app:hoja.clinica",
       "meta": {
         "slot": "maternal-and-child-health-slot",
         "isFolder": true
@@ -339,7 +339,7 @@
     {
       "name": "maternal-health-forms-selector-workspace",
       "component": "maternalHealthFormsSelectorWorkspace",
-      "privileges": "app:hoja.clinica.controlPrenatal.editar",
+      "privileges": "app:hoja.clinica",
       "title": "Formularios de Salud Materna",
       "type": "form"
     }
@@ -348,7 +348,7 @@
     {
       "name": "maternal-health-forms-selector-workspace",
       "component": "maternalHealthFormsSelectorWorkspace",
-      "privileges": "app:hoja.clinica.controlPrenatal.editar",
+      "privileges": "app:hoja.clinica",
       "window": "patient-chart-maternal-health-forms"
     },
     {

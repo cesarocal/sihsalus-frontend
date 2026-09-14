@@ -498,6 +498,7 @@ export interface QueueEntry {
   workflow?: {
     appointmentStartDateTime?: string;
     appointmentUuid?: string;
+    appointmentServiceUuid?: string;
     destinationQueueUuid?: string;
     isTriageQueue: boolean;
     sisState: 'active' | 'inactive' | 'pending' | 'notConsulted' | 'missing' | 'notApplicable';
