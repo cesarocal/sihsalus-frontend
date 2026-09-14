@@ -6,7 +6,7 @@ export default function useLocation(
   rep: string = 'custom:(display,uuid,tags:(uuid,display))',
 ) {
   return useSWRImmutable<FetchResponse<Location>>(
-    locationUuid ? `${restBaseUrl}/location/${locationUuid}?v=${rep}` : null,
+    locationUuid ? `${restBaseUrl}/location/${encodeURIComponent(locationUuid)}?v=${rep}` : null,
     openmrsFetch,
   );
 }
