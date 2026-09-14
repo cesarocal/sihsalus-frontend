@@ -1,6 +1,7 @@
 import type {
   DefinicionIndicadorForm,
   DiagnosticoOption,
+  EncounterTypeOption,
   GetResultadosParams,
   GetSeriesParams,
   Indicador,
@@ -33,6 +34,13 @@ const mockOrdenes: Array<OrdenOption> = [
   { uuid: 'ord-hemograma', display: 'Hemograma' },
   { uuid: 'ord-ferritina', display: 'Ferritina sérica' },
   { uuid: 'ord-fluor', display: 'Aplicación de flúor' },
+];
+
+const mockEncounterTypes: Array<EncounterTypeOption> = [
+  { uuid: 'enc-cred-neonato', display: 'CRED Neonato' },
+  { uuid: 'enc-cred-1-4', display: 'CRED 1-4 años' },
+  { uuid: 'enc-control-nino-sano', display: 'Control de niño sano' },
+  { uuid: 'enc-control-prenatal', display: 'Control prenatal' },
 ];
 
 const definicionPrenatal: DefinicionIndicadorForm = {
@@ -429,6 +437,11 @@ export function searchDiagnosticosMock(query: string): Array<DiagnosticoOption> 
 export function searchOrdenesMock(query: string): Array<OrdenOption> {
   const normalized = query.trim().toLowerCase();
   return mockOrdenes.filter((item) => item.display.toLowerCase().includes(normalized));
+}
+
+export function searchEncounterTypesMock(query: string): Array<EncounterTypeOption> {
+  const normalized = query.trim().toLowerCase();
+  return mockEncounterTypes.filter((item) => item.display.toLowerCase().includes(normalized));
 }
 
 export function resolveLocationsMock(uuids: Array<string>) {

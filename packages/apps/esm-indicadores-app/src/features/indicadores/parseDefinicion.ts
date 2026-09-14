@@ -14,6 +14,7 @@ export interface DefinicionResolvableNames {
   locations?: Map<string, string>;
   diagnosticos?: Map<string, DiagnosticoOption>;
   ordenes?: Map<string, string>;
+  encounterTypes?: Map<string, string>;
 }
 
 export function parseDefinicion(
@@ -27,6 +28,7 @@ export function parseDefinicion(
   const diagnosticos = definicion.evento?.diagnosticos?.[0];
   const ordenUuids = definicion.evento?.ordenes?.map((orden) => orden.concepto_uuid) ?? [];
   const locationUuids = definicion.evento?.location_uuids ?? [];
+  const encounterTypeUuids = definicion.evento?.encounter_type_uuids ?? [];
   const diagnosticoUuids = diagnosticos?.concepto_uuids ?? [];
 
   return {
@@ -45,6 +47,10 @@ export function parseDefinicion(
     selectedOrdenes: ordenUuids.map((uuid) => ({
       uuid,
       display: names?.ordenes?.get(uuid) ?? uuid,
+    })),
+    selectedEncounterTypes: encounterTypeUuids.map((uuid) => ({
+      uuid,
+      display: names?.encounterTypes?.get(uuid) ?? uuid,
     })),
     sexo: definicion.poblacion?.sexo ?? '',
     minAnios: toStringValue(definicion.poblacion?.min_anios),

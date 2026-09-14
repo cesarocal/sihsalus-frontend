@@ -6,6 +6,7 @@ import {
   resolveLocationsMock,
   resolveOrdenesMock,
   searchDiagnosticosMock,
+  searchEncounterTypesMock,
   searchLocationsMock,
   searchOrdenesMock,
 } from '../mocks/indicators-data';
@@ -15,6 +16,7 @@ import { assertShape, isIndicadorDetail, isPaginatedResponse, isSQLPreview } fro
 import type {
   DefinicionIndicadorForm,
   DiagnosticoOption,
+  EncounterTypeOption,
   Indicador,
   IndicadorCreatePayload,
   IndicadorDetail,
@@ -140,6 +142,20 @@ export async function searchOrdenes(query: string): Promise<Array<OrdenOption>> 
       return response.map(mapConceptToOrden);
     },
     () => searchOrdenesMock(query),
+  );
+}
+
+/**
+ * Returns every OpenMRS encounter type. The backend does not filter this
+ * endpoint; the client filters the full list by display name (e.g. "CRED").
+ */
+export async function getEncounterTypes(): Promise<Array<EncounterTypeOption>> {
+  return withMockFallback(
+    async () => {
+      const conceptosPath = await getReportesSqlResourcePath('conceptos');
+      return fetchJson<Array<EncounterTypeOption>>(`${conceptosPath}/encounter-types`);
+    },
+    () => searchEncounterTypesMock(''),
   );
 }
 

@@ -1,4 +1,4 @@
-type TipoIndicador = 'conteo_atenciones' | 'conteo_pacientes';
+type TipoIndicador = 'conteo_atenciones' | 'conteo_pacientes' | 'conteo_pacientes_ventana';
 export type TipoDiagnostico = 'definitivo' | 'presuntivo';
 export type Sexo = 'M' | 'F';
 
@@ -35,6 +35,7 @@ interface FiltroOrdenForm {
 interface FiltrosEventoForm {
   location_uuids?: Array<string>;
   minimo_ocurrencias?: number;
+  encounter_type_uuids?: Array<string>;
   diagnosticos?: Array<FiltroDiagnosticoForm>;
   ordenes?: Array<FiltroOrdenForm>;
 }
@@ -90,6 +91,11 @@ export interface DiagnosticoOption {
 }
 
 export interface OrdenOption {
+  uuid: string;
+  display: string;
+}
+
+export interface EncounterTypeOption {
   uuid: string;
   display: string;
 }
@@ -221,6 +227,7 @@ export interface IndicadorFormValues {
   selectedDiagnosticos: Array<DiagnosticoOption>;
   diagnosticoTipo: TipoDiagnostico | '';
   selectedOrdenes: Array<OrdenOption>;
+  selectedEncounterTypes: Array<EncounterTypeOption>;
   sexo: '' | Sexo;
   minAnios: string;
   minMeses: string;

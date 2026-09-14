@@ -7,13 +7,14 @@ import type { DefinicionIndicadorForm } from '../api/types';
 import DefinicionView from '../components/DefinicionView';
 import IndicadorForm from '../components/IndicadorForm';
 import SQLPreviewSection from '../components/SQLPreviewSection';
-import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
+import { getIndicadorSaveErrorMessage, indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
 import {
   notifyError,
   notifySuccess,
   useCreateVersion,
   useIndicador,
   useResolvedDiagnosticos,
+  useResolvedEncounterTypes,
   useResolvedLocations,
   useResolvedOrdenes,
 } from '../features/indicadores/hooks';
@@ -85,27 +86,42 @@ const IndicadorDetailPage: React.FC = () => {
       ),
     [data],
   );
+  const allEncounterTypeUuids = useMemo(
+    () =>
+      Array.from(
+        new Set(data?.versiones.flatMap((v) => v.definicion.evento?.encounter_type_uuids ?? []) ?? []),
+      ),
+    [data],
+  );
 
   const { displayMap: locationNames, isLoading: locationNamesLoading } = useResolvedLocations(allLocationUuids);
   const { resolveMap: diagnosticoNames, isLoading: diagnosticoNamesLoading } =
     useResolvedDiagnosticos(allDiagnosticoUuids);
   const { displayMap: ordenNames, isLoading: ordenNamesLoading } = useResolvedOrdenes(allOrdenUuids);
+  const { displayMap: encounterTypeNames, isLoading: encounterTypeNamesLoading } =
+    useResolvedEncounterTypes(allEncounterTypeUuids);
 
   const formNames: DefinicionResolvableNames = useMemo(
-    () => ({ locations: locationNames, diagnosticos: diagnosticoNames, ordenes: ordenNames }),
-    [locationNames, diagnosticoNames, ordenNames],
+    () => ({
+      locations: locationNames,
+      diagnosticos: diagnosticoNames,
+      ordenes: ordenNames,
+      encounterTypes: encounterTypeNames,
+    }),
+    [locationNames, diagnosticoNames, ordenNames, encounterTypeNames],
   );
 
   const resolved: ResolvedDefinitionNames = useMemo(
-    () => ({ locationNames, diagnosticoNames, ordenNames }),
-    [locationNames, diagnosticoNames, ordenNames],
+    () => ({ locationNames, diagnosticoNames, ordenNames, encounterTypeNames }),
+    [locationNames, diagnosticoNames, ordenNames, encounterTypeNames],
   );
 
   const ordenesReady = ordenUuids.length === 0 || (!ordenesLoading && Boolean(ordenesData));
   const formNamesReady =
     (latestLocationUuids.length === 0 || !locationNamesLoading) &&
     (latestDiagnosticoUuids.length === 0 || !diagnosticoNamesLoading) &&
-    (ordenUuids.length === 0 || !ordenNamesLoading);
+    (ordenUuids.length === 0 || !ordenNamesLoading) &&
+    (allEncounterTypeUuids.length === 0 || !encounterTypeNamesLoading);
 
   const handleCreateVersion = async ({
     definicion,
@@ -129,10 +145,10 @@ const IndicadorDetailPage: React.FC = () => {
       setShowVersionForm(false);
       notifySuccess(t('versionCreated', 'Versión creada'));
     } catch (createError) {
-      const message = getUserFacingErrorMessage(
+      const message = getIndicadorSaveErrorMessage(
         createError,
+        t,
         t('versionCreateFailed', 'No se pudo crear la versión.'),
-        indicatorsErrorMessageOptions(t),
       );
       setServerError(message);
       notifyError(message);

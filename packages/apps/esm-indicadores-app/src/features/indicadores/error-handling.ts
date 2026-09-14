@@ -1,3 +1,5 @@
+import { getUserFacingErrorMessage } from '@openmrs/esm-framework';
+
 type Translate = (key: string, defaultValue: string) => string;
 
 export function indicatorsErrorMessageOptions(t: Translate) {
@@ -16,4 +18,54 @@ export function indicatorsErrorMessageOptions(t: Translate) {
       504: t('indicatorsError504', 'El servicio de indicadores tardó demasiado en responder.'),
     },
   } as const;
+}
+
+interface UnknownEncounterTypesDetail {
+  field: 'encounter_type_uuids';
+  unknown_uuids: Array<string>;
+}
+
+function getUnknownEncounterTypesDetail(error: unknown): UnknownEncounterTypesDetail | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const responseBody = (error as { responseBody?: unknown }).responseBody;
+  if (!responseBody || typeof responseBody !== 'object') {
+    return undefined;
+  }
+
+  const detail = (responseBody as { detail?: unknown }).detail;
+  if (!detail || typeof detail !== 'object') {
+    return undefined;
+  }
+
+  const candidate = detail as { field?: unknown; unknown_uuids?: unknown };
+  if (
+    candidate.field !== 'encounter_type_uuids' ||
+    !Array.isArray(candidate.unknown_uuids) ||
+    candidate.unknown_uuids.length === 0
+  ) {
+    return undefined;
+  }
+
+  return { field: 'encounter_type_uuids', unknown_uuids: candidate.unknown_uuids as Array<string> };
+}
+
+/**
+ * Message for indicator create/version failures. Surfaces the 422 validation
+ * detail produced by reportes-sql when the submitted definition references
+ * encounter types the backend cannot resolve; every other failure (including
+ * the 502 gateway error) falls back to the standard status mapping.
+ */
+export function getIndicadorSaveErrorMessage(error: unknown, t: Translate, fallback: string): string {
+  const detail = getUnknownEncounterTypesDetail(error);
+  if (detail) {
+    return t(
+      'encounterTypesUnknownUuids',
+      `Hay tipos de encuentro que no existen: ${detail.unknown_uuids.join(', ')}.`,
+    );
+  }
+
+  return getUserFacingErrorMessage(error, fallback, indicatorsErrorMessageOptions(t));
 }

@@ -2,13 +2,19 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DefinicionIndicadorForm, DiagnosticoOption } from '../api/types';
-import { useResolvedDiagnosticos, useResolvedLocations, useResolvedOrdenes } from '../features/indicadores/hooks';
+import {
+  useResolvedDiagnosticos,
+  useResolvedEncounterTypes,
+  useResolvedLocations,
+  useResolvedOrdenes,
+} from '../features/indicadores/hooks';
 import styles from '../indicators-dashboard.module.scss';
 
 export interface ResolvedDefinitionNames {
   locationNames: Map<string, string>;
   diagnosticoNames: Map<string, DiagnosticoOption>;
   ordenNames: Map<string, string>;
+  encounterTypeNames: Map<string, string>;
 }
 
 interface DefinicionViewProps {
@@ -48,12 +54,17 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved })
     () => definicion.evento?.ordenes?.map((item) => item.concepto_uuid) ?? [],
     [definicion.evento?.ordenes],
   );
+  const encounterTypeUuids = useMemo(
+    () => definicion.evento?.encounter_type_uuids ?? [],
+    [definicion.evento?.encounter_type_uuids],
+  );
 
   // With pre-resolved maps the hooks receive an empty list, so their SWR
   // keys stay null and no requests are issued.
   const { displayMap } = useResolvedLocations(resolved ? [] : locationUuids);
   const { resolveMap } = useResolvedDiagnosticos(resolved ? [] : diagnosticoUuids);
   const { data: ordenesData } = useResolvedOrdenes(resolved ? [] : ordenUuids);
+  const { displayMap: encounterTypesData } = useResolvedEncounterTypes(resolved ? [] : encounterTypeUuids);
 
   const locationNames = resolved?.locationNames ?? displayMap;
   const diagnosticoNames = resolved?.diagnosticoNames ?? resolveMap;
@@ -63,14 +74,19 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved })
     () => resolved?.ordenNames ?? (ordenesData ? new Map(Object.entries(ordenesData)) : new Map<string, string>()),
     [resolved, ordenesData],
   );
+  const encounterTypeNames = resolved?.encounterTypeNames ?? encounterTypesData;
+
+  const tipoLabel =
+    definicion.tipo === 'conteo_atenciones'
+      ? t('countEncounters', 'Conteo de atenciones')
+      : definicion.tipo === 'conteo_pacientes_ventana'
+        ? t('countPatientsWindow', 'Conteo de pacientes en ventana etaria')
+        : t('countPatients', 'Conteo de pacientes');
 
   return (
     <div className={styles.definitionList}>
       <div>
-        <strong>{t('definitionType', 'Tipo:')}</strong>
-        {definicion.tipo === 'conteo_atenciones'
-          ? t('countEncounters', 'Conteo de atenciones')
-          : t('countPatients', 'Conteo de pacientes')}
+        <strong>{t('definitionType', 'Tipo:')}</strong> {tipoLabel}
       </div>
       <div>
         <strong>{t('definitionLocations', 'Servicios:')}</strong>{' '}
@@ -81,6 +97,12 @@ const DefinicionView: React.FC<DefinicionViewProps> = ({ definicion, resolved })
       <div>
         <strong>{t('definitionMinOccurrences', 'Mínimo de ocurrencias:')}</strong>{' '}
         {definicion.evento?.minimo_ocurrencias ?? 1}
+      </div>
+      <div>
+        <strong>{t('definitionEncounterTypes', 'Tipos de encuentro:')}</strong>{' '}
+        {encounterTypeUuids.length
+          ? encounterTypeUuids.map((uuid) => encounterTypeNames.get(uuid) ?? uuid).join(', ')
+          : t('noFilter', 'Sin filtro')}
       </div>
       <div>
         <strong>{t('definitionDiagnostics', 'Diagnósticos:')}</strong>{' '}

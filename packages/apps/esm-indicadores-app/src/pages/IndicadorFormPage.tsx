@@ -5,13 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { DefinicionIndicadorForm } from '../api/types';
 import IndicadorForm from '../components/IndicadorForm';
-import { indicatorsErrorMessageOptions } from '../features/indicadores/error-handling';
+import { indicatorsErrorMessageOptions, getIndicadorSaveErrorMessage } from '../features/indicadores/error-handling';
 import {
   notifyError,
   notifySuccess,
   useCreateIndicador,
   useIndicador,
   useResolvedDiagnosticos,
+  useResolvedEncounterTypes,
   useResolvedLocations,
   useResolvedOrdenes,
   useUpdateIndicador,
@@ -45,6 +46,7 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
     () => firstVersion?.evento?.diagnosticos?.flatMap((item) => item.concepto_uuids) ?? [],
     [firstVersion],
   );
+  const encounterTypeUuids = useMemo(() => firstVersion?.evento?.encounter_type_uuids ?? [], [firstVersion]);
 
   // Resolve every clinical-filter uuid to its display name BEFORE mounting the
   // form. The form state freezes at first mount (useState initializer), so the
@@ -55,6 +57,8 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
   const { resolveMap: diagnosticosMap, isLoading: diagnosticosLoading } = useResolvedDiagnosticos(diagnosticoUuids);
   const { data: ordenesData, isLoading: ordenesLoading } = useResolvedOrdenes(ordenUuids);
   const ordenesMap = useMemo(() => (ordenesData ? new Map(Object.entries(ordenesData)) : undefined), [ordenesData]);
+  const { displayMap: encounterTypesMap, isLoading: encounterTypesLoading } =
+    useResolvedEncounterTypes(encounterTypeUuids);
 
   // Mount the form only once every async name resolution it needs is available
   // (or there is nothing to resolve). parseDefinicion falls back to raw UUIDs
@@ -62,7 +66,8 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
   const locationsReady = locationUuids.length === 0 || !locationsLoading;
   const diagnosticosReady = diagnosticoUuids.length === 0 || !diagnosticosLoading;
   const ordenesReady = ordenUuids.length === 0 || !ordenesLoading;
-  const namesReady = locationsReady && diagnosticosReady && ordenesReady;
+  const encounterTypesReady = encounterTypeUuids.length === 0 || !encounterTypesLoading;
+  const namesReady = locationsReady && diagnosticosReady && ordenesReady && encounterTypesReady;
 
   const defaultValues = useMemo(() => {
     if (!indicador?.versiones.length) {
@@ -76,9 +81,10 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
         locations: locationsMap,
         diagnosticos: diagnosticosMap,
         ordenes: ordenesMap,
+        encounterTypes: encounterTypesMap,
       }),
     };
-  }, [indicador, locationsMap, diagnosticosMap, ordenesMap]);
+  }, [indicador, locationsMap, diagnosticosMap, ordenesMap, encounterTypesMap]);
 
   const handleSubmit = async ({
     metadata,
@@ -108,10 +114,10 @@ const IndicadorFormPage: React.FC<IndicadorFormPageProps> = ({ mode }) => {
         navigate(`/${id}`);
       }
     } catch (submitError) {
-      const message = getUserFacingErrorMessage(
+      const message = getIndicadorSaveErrorMessage(
         submitError,
+        t,
         t('indicatorSaveFailed', 'No se pudo guardar el indicador.'),
-        indicatorsErrorMessageOptions(t),
       );
       setServerError(message);
       notifyError(message);

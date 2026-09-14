@@ -11,6 +11,7 @@ import type {
 } from '../api/types';
 import styles from '../indicators-dashboard.module.scss';
 import DiagnosticoSearchSelector from './DiagnosticoSearchSelector';
+import EncounterTypeSearchSelector from './EncounterTypeSearchSelector';
 import LocationSearchSelector from './LocationSearchSelector';
 import OrdenSearchSelector from './OrdenSearchSelector';
 
@@ -38,6 +39,7 @@ const defaultValues: IndicadorFormValues = {
   selectedDiagnosticos: [],
   diagnosticoTipo: '',
   selectedOrdenes: [],
+  selectedEncounterTypes: [],
   sexo: '',
   minAnios: '',
   minMeses: '',
@@ -84,6 +86,7 @@ function buildDefinicion(values: IndicadorFormValues): DefinicionIndicadorForm {
   const locationUuids = values.selectedLocations.map((item) => item.uuid);
   const diagnosticoUuids = values.selectedDiagnosticos.map((item) => item.uuid);
   const ordenUuids = values.selectedOrdenes.map((item) => item.uuid);
+  const encounterTypeUuids = values.selectedEncounterTypes.map((item) => item.uuid);
   const minimoOcurrencias = parseNumber(values.minimoOcurrencias);
   const diagnosticos =
     values.filtroClinico === 'diagnosticos' && diagnosticoUuids.length
@@ -100,6 +103,7 @@ function buildDefinicion(values: IndicadorFormValues): DefinicionIndicadorForm {
       : undefined;
   const hasEvento =
     locationUuids.length > 0 ||
+    encounterTypeUuids.length > 0 ||
     Boolean(diagnosticos?.length) ||
     Boolean(ordenes?.length) ||
     (minimoOcurrencias !== undefined && minimoOcurrencias !== 1);
@@ -108,6 +112,7 @@ function buildDefinicion(values: IndicadorFormValues): DefinicionIndicadorForm {
     ? {
         location_uuids: locationUuids.length ? locationUuids : undefined,
         minimo_ocurrencias: minimoOcurrencias !== 1 ? minimoOcurrencias : undefined,
+        encounter_type_uuids: encounterTypeUuids.length ? encounterTypeUuids : undefined,
         diagnosticos,
         ordenes,
       }
@@ -186,6 +191,13 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
 
     if (values.filtroClinico === 'ordenes' && !values.selectedOrdenes.length) {
       setValidationError(t('orderFilterRequired', 'Ingrese al menos una orden para ese filtro clínico.'));
+      return;
+    }
+
+    if (values.tipo === 'conteo_pacientes_ventana' && !values.selectedEncounterTypes.length) {
+      setValidationError(
+        t('encounterTypesRequired', 'Ingrese al menos un tipo de encuentro para el conteo en ventana.'),
+      );
       return;
     }
 
@@ -287,6 +299,10 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
               >
                 <SelectItem value="conteo_atenciones" text={t('countEncounters', 'Conteo de atenciones')} />
                 <SelectItem value="conteo_pacientes" text={t('countPatients', 'Conteo de pacientes')} />
+                <SelectItem
+                  value="conteo_pacientes_ventana"
+                  text={t('countPatientsWindow', 'Conteo de pacientes en ventana etaria')}
+                />
               </Select>
             </div>
           </section>
@@ -364,6 +380,12 @@ const IndicadorForm: React.FC<IndicadorFormProps> = ({
               <OrdenSearchSelector
                 selectedItems={values.selectedOrdenes}
                 onChange={(items) => updateField('selectedOrdenes', items)}
+              />
+            ) : null}
+            {values.tipo === 'conteo_pacientes_ventana' ? (
+              <EncounterTypeSearchSelector
+                selectedItems={values.selectedEncounterTypes}
+                onChange={(items) => updateField('selectedEncounterTypes', items)}
               />
             ) : null}
           </section>

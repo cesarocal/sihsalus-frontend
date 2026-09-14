@@ -6,6 +6,7 @@ import {
   createIndicador,
   createVersion,
   deleteIndicador,
+  getEncounterTypes,
   getIndicador,
   getIndicadores,
   previewSql,
@@ -20,6 +21,7 @@ import {
 import type {
   DefinicionIndicadorForm,
   DiagnosticoOption,
+  EncounterTypeOption,
   Indicador,
   IndicadorCreatePayload,
   IndicadorDetail,
@@ -201,6 +203,42 @@ export function useOrdenSearch(query: string) {
     () => searchOrdenes(query),
   );
   return { data: data ?? [], error, isLoading };
+}
+
+const encounterTypesKey = () => ['encounter-types'] as const;
+
+/**
+ * Fetches the full encounter-type list once and keeps it cached. The backend
+ * endpoint returns everything; filtering happens client-side by display name.
+ */
+export function useEncounterTypes() {
+  const { data, error, isLoading } = useSWR<Array<EncounterTypeOption>, Error>(encounterTypesKey(), () =>
+    getEncounterTypes(),
+  );
+  return { data: data ?? [], error, isLoading };
+}
+
+export function useEncounterTypeSearch(query: string) {
+  const { data, error, isLoading } = useEncounterTypes();
+  const normalized = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () => (normalized ? data.filter((item) => item.display.toLowerCase().includes(normalized)) : data),
+    [data, normalized],
+  );
+  return { data: filtered, error, isLoading };
+}
+
+export function useResolvedEncounterTypes(uuids: Array<string>) {
+  const deduped = useMemo(() => Array.from(new Set(uuids.filter(Boolean))), [uuids]);
+  // Only fetch the full list when there is something to resolve. The key is
+  // shared with useEncounterTypes, so SWR dedupes the request when both hooks
+  // are mounted.
+  const { data, error, isLoading } = useSWR<Array<EncounterTypeOption>, Error>(
+    deduped.length ? encounterTypesKey() : null,
+    () => getEncounterTypes(),
+  );
+  const displayMap = useMemo(() => new Map((data ?? []).map((item) => [item.uuid, item.display])), [data]);
+  return { data: data ?? [], displayMap, error, isLoading };
 }
 
 export function useResolvedLocations(uuids: Array<string>) {
