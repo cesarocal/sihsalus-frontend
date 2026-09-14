@@ -3,7 +3,6 @@ import { configSchema } from './config-schema';
 import { careLogbookBasePath, moduleName } from './constants';
 import CareLogbookAppMenuLink from './links/care-logbook-app-menu-link.component';
 import CareLogbookDashboardLink from './links/care-logbook-dashboard-link.component';
-import CareLogbookMergePatientsAction from './links/care-logbook-merge-patients-action.component';
 import CareLogbookMergePatientsMenuItem from './links/care-logbook-merge-patients-menu-item.component';
 import Root from './root.component';
 
@@ -61,8 +60,6 @@ export const careLogbookHomeDashboard = root;
 export const careLogbookHomeDashboardLink = getSyncLifecycle(CareLogbookDashboardLink, options);
 
 export const careLogbookLegacyHomeDashboardAlias = getSyncLifecycle(LegacyCareLogbookDashboardAlias, options);
-
-export const careLogbookMergePatientsAction = getSyncLifecycle(CareLogbookMergePatientsAction, options);
 
 export const careLogbookMergePatientsMenuItem = getSyncLifecycle(CareLogbookMergePatientsMenuItem, options);
 

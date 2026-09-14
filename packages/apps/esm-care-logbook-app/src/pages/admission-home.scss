@@ -21,7 +21,7 @@
 
 .header {
   display: grid;
-  grid-template-columns: minmax(max-content, 1fr) auto;
+  grid-template-columns: minmax(max-content, 1fr);
   align-items: center;
   gap: layout.$spacing-05;
   margin-bottom: 1.5rem;
@@ -37,11 +37,6 @@
 
 .headerContent p:last-child {
   white-space: nowrap;
-}
-
-.headerAction {
-  justify-self: end;
-  text-decoration: none;
 }
 
 .content {
@@ -237,10 +232,6 @@
     gap: layout.$spacing-03;
     padding-right: layout.$spacing-04;
     padding-bottom: layout.$spacing-04;
-  }
-
-  .headerAction {
-    justify-self: start;
   }
 
   .content {

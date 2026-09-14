@@ -14,10 +14,10 @@ Tambien concentra evidencia funcional del perfil `N1.ADM` de la acreditacion SIH
 - Dependencias: REST `visit` con `includeInactive`, `fromStartDate`, `toStartDate`, `startIndex` y enlaces de paginación; privilegios de lectura de visitas, pacientes y relaciones. Una página fallida no se presenta como un informe completo.
 
 - Registro/listado de atenciones por tipo de visita y UPSS en `/home/care-logbook`.
-- Fusion de historias clinicas duplicadas en `/home/care-logbook/merge`, delegando al flujo legacy de OpenMRS `findDuplicatePatients.htm`, que luego abre `mergePatients.form` para comparar y fusionar los pacientes seleccionados.
+- Fusion de historias clinicas duplicadas en `/home/care-logbook/merge`, accesible desde el menu de acciones del paciente con los permisos de fusion. Delega al flujo legacy de OpenMRS `findDuplicatePatients.htm`, que luego abre `mergePatients.form` para comparar y fusionar los pacientes seleccionados. No se ofrece como boton en el encabezado del Libro de Atenciones ni en la barra superior.
 - Programacion de turnos desde `/home/care-logbook/patient/:uuid`, mostrando turnos proximos y abriendo el workspace real de Appointments para registrar citas con prestadores.
 - Resumen de identificacion minima del paciente para pantallas clinicas que consumen `patient-info-slot`.
-- Accesos desde menu de aplicaciones, dashboard de inicio y acciones superiores.
+- Accesos al Libro de Atenciones desde el menu de aplicaciones y el dashboard de inicio.
 - Ubicacion de pacientes sin DNI mediante fecha/hora, HCE o codigo temporal, estado de identificacion, responsable, tipo de visita, UPSS y estado de visita.
 
 ## Terminologia

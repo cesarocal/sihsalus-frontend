@@ -46,12 +46,6 @@ describe('routes.json', () => {
           }),
         }),
         expect.objectContaining({
-          component: 'careLogbookMergePatientsAction',
-          name: 'care-logbook-merge-patients-action',
-          slot: 'top-nav-actions-slot',
-          privileges: ['app:home.libroAtenciones.editar', 'app:opciones.fusionarPacientes'],
-        }),
-        expect.objectContaining({
           component: 'careLogbookMergePatientsMenuItem',
           name: 'care-logbook-merge-patients-menu-item',
           slot: 'patient-actions-slot',
@@ -67,6 +61,7 @@ describe('routes.json', () => {
         slot: 'care-logbook-dashboard-slot',
       }),
     );
+    expect(routes.extensions).not.toContainEqual(expect.objectContaining({ slot: 'top-nav-actions-slot' }));
   });
 
   it('does not register patient banner identity extensions from the care logbook', () => {
