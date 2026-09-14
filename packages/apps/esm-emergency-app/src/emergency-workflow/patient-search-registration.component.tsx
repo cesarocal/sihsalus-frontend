@@ -580,7 +580,7 @@ const PatientSearchRegistration: React.FC<PatientSearchRegistrationProps> = ({ o
 
   return (
     <div className={styles.container}>
-      <Stack gap={6}>
+      <Stack gap={5}>
         {/* Header */}
         <div className={styles.header}>
           <h4>{t('quickEmergencyRegistration', 'Registro rápido de emergencias')}</h4>
@@ -596,29 +596,32 @@ const PatientSearchRegistration: React.FC<PatientSearchRegistrationProps> = ({ o
         {!readyPatient && (
           <>
             <Layer className={styles.searchSection}>
+              <label className={styles.searchLabel} htmlFor="patient-search" id="patient-search-label">
+                {t('searchPatient', 'Buscar paciente')}
+              </label>
               <Search
                 id="patient-search"
+                aria-labelledby="patient-search-label"
                 labelText={t('searchPatient', 'Buscar paciente')}
-                placeholder={t('enterNameIdOrDni', 'Nombre, HCE o documento...')}
+                placeholder={t('enterNameIdOrDni', 'Nombre, HCE o documento')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                size="lg"
+                size="md"
                 closeButtonLabelText={t('clearSearch', 'Limpiar')}
                 onClear={handleClearSearch}
               />
               {isLoading && <InlineLoading description={t('searchingPatients', 'Buscando...')} />}
               <div className={styles.quickActions}>
-                <Button kind="tertiary" renderIcon={UserFollow} onClick={() => handleOpenRegistrationForm()} size="sm">
+                <Button kind="primary" renderIcon={UserFollow} onClick={() => handleOpenRegistrationForm()} size="md">
                   {t('registerNewPatient', 'Registrar nuevo paciente')}
                 </Button>
                 <Button
-                  className={styles.unidentifiedPatientButton}
-                  kind="tertiary"
+                  kind="secondary"
                   renderIcon={UserFollow}
                   onClick={() => handleOpenRegistrationForm(true)}
-                  size="sm"
+                  size="md"
                 >
-                  {t('registerUnidentifiedPatient', 'Registrar paciente no identificado / incapaz')}
+                  {t('registerUnidentifiedPatientShort', 'Sin identificar o sin poder comunicarse')}
                 </Button>
               </div>
             </Layer>
