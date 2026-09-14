@@ -139,13 +139,6 @@ const RecentlySearchedPatients = React.forwardRef<HTMLDivElement, RecentPatientS
   const { t } = useTranslation();
   return (
     <section aria-label={t('recentlyViewedPatients', 'Recently viewed patients')}>
-      <h2 className={styles.recentPatientsHeading}>{t('recentlyViewedPatients', 'Recently viewed patients')}</h2>
-      <p className={styles.recentPatientsHelp}>
-        {t(
-          'recentlyViewedPatientsHelp',
-          'The last 10 patient charts opened in this tab, from any entry point. Reopen a chart while waiting for results.',
-        )}
-      </p>
       <RecentPatientResults {...props} ref={ref} />
     </section>
   );
