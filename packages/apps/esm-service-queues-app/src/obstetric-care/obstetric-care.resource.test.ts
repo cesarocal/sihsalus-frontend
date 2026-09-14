@@ -111,13 +111,14 @@ beforeEach(() => {
   };
   vi.mocked(fetchQueueEntry).mockImplementation(async () => response(freshEntry));
   vi.mocked(openmrsFetch).mockImplementation(async (url) => {
-    if (String(url).includes('/visit?')) {
+    const { pathname } = new URL(String(url), 'https://example.test');
+    if (pathname === `${restBaseUrl}/visit`) {
       return response(activeVisits);
     }
-    if (String(url).includes('/visit/')) {
+    if (pathname === `${restBaseUrl}/visit/visit`) {
       return response(visit);
     }
-    if (String(url).includes('/appointments/')) {
+    if (pathname === `${restBaseUrl}/appointments/appointment`) {
       return response(appointment);
     }
     throw new Error('Unexpected clinical request');
@@ -215,7 +216,7 @@ describe('startObstetricCare', () => {
   it.each(['uuid', 'patient', 'visit', 'queue'] as const)('rejects a stale %s identity', async (field) => {
     freshEntry = { ...freshEntry, [field]: field === 'uuid' ? 'other-entry' : { uuid: 'other-subject' } };
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow('The obstetric queue entry changed');
     expect(openmrsFetch).not.toHaveBeenCalled();
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
@@ -230,14 +231,20 @@ describe('startObstetricCare', () => {
   ])('rejects a closed, voided or mismatched visit: %j', async (change) => {
     visit = { ...visit, ...change } as Visit;
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The active obstetric visit could not be verified.',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(1);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
   it.each(['uuid', 'patient', 'service', 'location'] as const)('revalidates the appointment %s', async (field) => {
     appointment = { ...appointment, [field]: field === 'uuid' ? 'other-appointment' : { uuid: 'other-context' } };
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The obstetric appointment route or saved triage could not be verified.',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(3);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -252,7 +259,10 @@ describe('startObstetricCare', () => {
       activeVisits.links = [{ rel: 'next' }];
     }
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'A unique active obstetric visit could not be verified.',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -261,6 +271,7 @@ describe('startObstetricCare', () => {
     vi.mocked(openmrsFetch).mockResolvedValueOnce(response(visit)).mockRejectedValueOnce(error);
 
     await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toBe(error);
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -269,7 +280,9 @@ describe('startObstetricCare', () => {
     visit.attributes =
       state === 'missing' ? [] : state === 'voided' ? [{ ...attribute, voided: true }] : [attribute, attribute];
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The linked obstetric appointment and triage could not be verified.',
+    );
     expect(openmrsFetch).toHaveBeenCalledTimes(2);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
@@ -286,7 +299,10 @@ describe('startObstetricCare', () => {
             },
           ];
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The obstetric appointment route or saved triage could not be verified.',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(3);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -299,14 +315,19 @@ describe('startObstetricCare', () => {
           ? [route, route]
           : [{ ...route, queueUuid: 'other-queue' }];
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The obstetric appointment route or saved triage could not be verified.',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(3);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
   it('rejects an absent transition concept before any request', async () => {
     config.concepts.defaultTransitionStatus = '';
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The obstetric queue configuration could not be verified.',
+    );
     expect(fetchQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -316,14 +337,18 @@ describe('startObstetricCare', () => {
       config.appointmentTriage.triageRouting.encounterTypeUuid = '';
     }
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The linked obstetric appointment and triage could not be verified.',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
   it('rejects an in-service status excluded by the queue configuration', async () => {
     freshEntry = { ...freshEntry, queue: { ...freshEntry.queue, allowedStatuses: [] } };
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow('The obstetric queue entry changed');
+    expect(openmrsFetch).not.toHaveBeenCalled();
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -336,14 +361,17 @@ describe('startObstetricCare', () => {
   it('does not reactivate an entry in an unknown or cancelled status', async () => {
     freshEntry = { ...freshEntry, status: { ...freshEntry.status, uuid: 'cancelled' } };
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow('The obstetric queue entry changed');
+    expect(openmrsFetch).not.toHaveBeenCalled();
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
   it('rejects ambiguous source and in-service concepts', async () => {
     config.concepts.defaultStatusConceptUuid = config.concepts.defaultTransitionStatus;
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The obstetric queue configuration could not be verified.',
+    );
     expect(fetchQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -361,7 +389,8 @@ describe('startObstetricCare', () => {
       status: { ...freshEntry.status, uuid: 'in-service' },
     };
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow('The obstetric queue entry changed');
+    expect(openmrsFetch).not.toHaveBeenCalled();
     expect(transitionQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -381,7 +410,10 @@ describe('startObstetricCare', () => {
       } as QueueEntry),
     );
 
-    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow();
+    await expect(startObstetricCare(entry, 'outpatient', config)).rejects.toThrow(
+      'The active obstetric queue transition could not be verified.',
+    );
+    expect(transitionQueueEntry).toHaveBeenCalledTimes(1);
   });
 
   it('propagates failed authoritative reads without transitioning', async () => {
