@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.openmrs.org/routes.schema.json",
+  "backendDependencies": {
+    "webservices.rest": ">=2.24.0"
+  },
+  "pages": [
+    {
+      "component": "root",
+      "route": "blood-bank",
+      "online": true,
+      "offline": true
+    }
+  ],
+  "extensions": [
+    {
+      "component": "bloodBankAppMenuLink",
+      "name": "blood-bank-app-menu-link",
+      "slot": "app-menu-slot",
+      "order": 35,
+      "online": true,
+      "offline": true
+    },
+    {
+      "component": "bloodBankGlobalNav",
+      "name": "blood-bank-global-nav",
+      "slot": "blood-bank-navigation-slot",
+      "order": 0,
+      "online": true,
+      "offline": true
+    }
+  ]
+}

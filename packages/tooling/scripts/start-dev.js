@@ -13,6 +13,7 @@ const chalk = require('chalk');
 const { createSpaStaticOptions, isSpaIndexRequestPath } = require('../openmrs/spa-static-options');
 const { formatSpaArtifactIssue, inspectSpaArtifacts } = require('./spa-artifact-manifest');
 const { normalizeDevBackendUrl } = require('./dev-backend-url');
+const { resolveDevMockSession } = require('./dev-mock-session');
 const logInfo = (msg) => console.log(`${chalk.green.bold('[start-dev]')} ${msg}`);
 const logWarn = (msg) => console.warn(`${chalk.yellow.bold('[start-dev]')} ${chalk.yellow(msg)}`);
 const logFail = (msg) => console.error(`${chalk.red.bold('[start-dev]')} ${chalk.red(msg)}`);
@@ -28,6 +29,7 @@ try {
 const backendSource = hadBackendBeforeDotenv ? 'shell' : dotenvResult.parsed?.SIHSALUS_BACKEND_URL ? '.env' : 'default';
 const requireBackendUrl = process.env.SIHSALUS_REQUIRE_BACKEND_URL === 'true';
 const authMode = process.env.SIHSALUS_AUTH_MODE || 'openmrs';
+const devMockLoginEnabled = process.env.SIHSALUS_DEV_MOCK_LOGIN === 'true';
 const fhirBase = process.env.SIHSALUS_FHIR_BASE || `${backend}/openmrs/ws/fhir2/R4`;
 const proxyPort = (() => {
   const portArgIdx = process.argv.indexOf('--port');
@@ -55,6 +57,7 @@ const defaultDevApps = [
   'esm-patient-search-app',
   'esm-patient-vitals-app',
   'esm-primary-navigation-app',
+  'esm-blood-bank-app',
 ];
 
 const devAppsEnv =
@@ -99,6 +102,9 @@ function logStartupSummary({ mode, apps = [] }) {
   logInfo(`${chalk.bold('Backend')} ${chalk.cyan.underline(backend)} ${chalk.dim(`(${backendSource})`)}`);
   logInfo(`${chalk.bold('FHIR R4')} ${chalk.cyan.underline(fhirBase)}`);
   logInfo(`${chalk.bold('Auth')} ${authMode}`);
+  if (devMockLoginEnabled) {
+    logWarn('LOCAL MOCK LOGIN ENABLED — synthetic session only; never use this mode for shared or deployed environments.');
+  }
   logInfo(`${chalk.bold('Mode')} ${mode}`);
   logInfo(`${chalk.bold('Local SPA')} ${chalk.cyan.underline(`http://localhost:${proxyPort}${spaPath}`)}`);
 
@@ -419,6 +425,16 @@ async function startWithProxy(cliArgs) {
   app.all(sessionPath, async (req, res) => {
     const authorization = req.get('authorization');
     const cookie = req.get('cookie') || '';
+
+    if (devMockLoginEnabled) {
+      const mockResponse = resolveDevMockSession({ authorization, cookie, method: req.method });
+      res.set('cache-control', 'no-store');
+      if (mockResponse.setCookie) {
+        res.setHeader('set-cookie', mockResponse.setCookie);
+      }
+      res.status(200).json(mockResponse.body);
+      return;
+    }
 
     if (req.method === 'GET' && !authorization && !cookie) {
       res.status(200).json({ authenticated: false, sessionId: '' });

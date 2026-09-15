@@ -7532,34 +7532,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rspack/dev-middleware@npm:^2.0.3":
-  version: 2.0.3
-  resolution: "@rspack/dev-middleware@npm:2.0.3"
-  peerDependencies:
-    "@rspack/core": ^2.0.0
-  peerDependenciesMeta:
-    "@rspack/core":
-      optional: true
-  checksum: 10c0/603d51113a793235a04cc344c4cc7d82c411f651b067e88024ce16870e61c09cfed59c9b7142506dde43f2168448460a2eb03eb519c15d6e408785e3db0ed41b
-  languageName: node
-  linkType: hard
-
-"@rspack/dev-server@npm:2.2.0":
-  version: 2.2.0
-  resolution: "@rspack/dev-server@npm:2.2.0"
-  dependencies:
-    "@rspack/dev-middleware": "npm:^2.0.3"
-  peerDependencies:
-    "@rspack/core": ^2.0.0
-    selfsigned: ^5.0.0
-  peerDependenciesMeta:
-    selfsigned:
-      optional: true
-  checksum: 10c0/c98856c67d1b4d541fcaa02028d504464dda95d775953e979eadb4380ad580d49184b570f7c98af921d8808e31b8afcd50267c170543dc2b1067b6e62274c50d
-  languageName: node
-  linkType: hard
-
-"@rspack/dev-server@npm:~1.1.5":
+"@rspack/dev-server@npm:1.1.5, @rspack/dev-server@npm:~1.1.5":
   version: 1.1.5
   resolution: "@rspack/dev-server@npm:1.1.5"
   dependencies:
@@ -7890,6 +7863,44 @@ __metadata:
     react-router-dom: ">=6.30.4 <8"
     rxjs: 6.x
     swr: 2.x
+  languageName: unknown
+  linkType: soft
+
+"@sihsalus/esm-blood-bank-app@workspace:packages/apps/esm-blood-bank-app":
+  version: 0.0.0-use.local
+  resolution: "@sihsalus/esm-blood-bank-app@workspace:packages/apps/esm-blood-bank-app"
+  dependencies:
+    "@carbon/react": "npm:^1.92.1"
+    "@carbon/styles": "npm:1.102.0"
+    "@openmrs/esm-framework": "workspace:*"
+    "@rspack/cli": "npm:1.7.11"
+    "@rspack/core": "npm:1.7.11"
+    "@sihsalus/esm-rbac": "workspace:*"
+    "@swc/core": "npm:1.15.21"
+    "@testing-library/react": "npm:^16.3.2"
+    "@testing-library/user-event": "npm:^14.6.1"
+    "@types/react": "npm:^18.3.21"
+    "@types/react-dom": "npm:^18.3.0"
+    css-loader: "npm:6.11.0"
+    i18next: "npm:^26.3.6"
+    openmrs: "workspace:*"
+    react: "npm:^18.3.1"
+    react-dom: "npm:^18.3.1"
+    react-i18next: "npm:^16.0.0"
+    react-router-dom: "npm:7.18.2"
+    rxjs: "npm:^6.6.7"
+    sass-embedded: "npm:1.89.0"
+    sass-loader: "npm:16.0.5"
+    style-loader: "npm:4.0.0"
+    swc-loader: "npm:0.2.7"
+    typescript: "npm:6.0.3"
+    vitest: "npm:^4.1.7"
+  peerDependencies:
+    "@openmrs/esm-framework": "*"
+    react: 18.x
+    react-i18next: 16.x
+    react-router-dom: ">=6.30.4 <8"
+    rxjs: 6.x
   languageName: unknown
   linkType: soft
 
@@ -13890,6 +13901,30 @@ __metadata:
   languageName: node
   linkType: hard
 
+"css-loader@npm:6.11.0, css-loader@npm:^6.8.1":
+  version: 6.11.0
+  resolution: "css-loader@npm:6.11.0"
+  dependencies:
+    icss-utils: "npm:^5.1.0"
+    postcss: "npm:^8.4.33"
+    postcss-modules-extract-imports: "npm:^3.1.0"
+    postcss-modules-local-by-default: "npm:^4.0.5"
+    postcss-modules-scope: "npm:^3.2.0"
+    postcss-modules-values: "npm:^4.0.0"
+    postcss-value-parser: "npm:^4.2.0"
+    semver: "npm:^7.5.4"
+  peerDependencies:
+    "@rspack/core": 0.x || 1.x
+    webpack: ^5.0.0
+  peerDependenciesMeta:
+    "@rspack/core":
+      optional: true
+    webpack:
+      optional: true
+  checksum: 10c0/bb52434138085fed06a33e2ffbdae9ee9014ad23bf60f59d6b7ee67f28f26c6b1764024d3030bd19fd884d6ee6ee2224eaed64ad19eb18fbbb23d148d353a965
+  languageName: node
+  linkType: hard
+
 "css-loader@npm:7.1.4":
   version: 7.1.4
   resolution: "css-loader@npm:7.1.4"
@@ -13911,30 +13946,6 @@ __metadata:
     webpack:
       optional: true
   checksum: 10c0/a3a3a6b564d4fcf978961be8bc6ca06fb3836fc8fbd729ddae4b0b94166a0f5ccf119fb3301a6fecbe90608a8edbfd418bdc644cf053615e6271aa65b3fdc00b
-  languageName: node
-  linkType: hard
-
-"css-loader@npm:^6.8.1":
-  version: 6.11.0
-  resolution: "css-loader@npm:6.11.0"
-  dependencies:
-    icss-utils: "npm:^5.1.0"
-    postcss: "npm:^8.4.33"
-    postcss-modules-extract-imports: "npm:^3.1.0"
-    postcss-modules-local-by-default: "npm:^4.0.5"
-    postcss-modules-scope: "npm:^3.2.0"
-    postcss-modules-values: "npm:^4.0.0"
-    postcss-value-parser: "npm:^4.2.0"
-    semver: "npm:^7.5.4"
-  peerDependencies:
-    "@rspack/core": 0.x || 1.x
-    webpack: ^5.0.0
-  peerDependenciesMeta:
-    "@rspack/core":
-      optional: true
-    webpack:
-      optional: true
-  checksum: 10c0/bb52434138085fed06a33e2ffbdae9ee9014ad23bf60f59d6b7ee67f28f26c6b1764024d3030bd19fd884d6ee6ee2224eaed64ad19eb18fbbb23d148d353a965
   languageName: node
   linkType: hard
 
@@ -20356,7 +20367,7 @@ __metadata:
     "@pnpm/npm-conf": "npm:^2.1.0"
     "@rspack/cli": "npm:1.7.11"
     "@rspack/core": "npm:1.7.11"
-    "@rspack/dev-server": "npm:2.2.0"
+    "@rspack/dev-server": "npm:1.1.5"
     "@swc/core": "npm:1.15.21"
     "@types/express": "npm:^4.11.1"
     "@types/glob": "npm:^7.1.1"
