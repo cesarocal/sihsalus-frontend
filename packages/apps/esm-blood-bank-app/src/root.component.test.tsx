@@ -37,7 +37,7 @@ vi.mock('./blood-bank-app.component', () => ({
 describe('Blood Bank root', () => {
   beforeEach(() => {
     mockUseLeftNav.mockClear();
-    mockUseConfig.mockReturnValue({ enabled: true, title: 'Banco de Sangre', useMockData: true });
+    mockUseConfig.mockReturnValue({ enabled: true, useMockData: true });
     mockRequirePrivilege.mockImplementation(({ children }) => <>{children}</>);
   });
 
@@ -63,7 +63,7 @@ describe('Blood Bank root', () => {
   });
 
   it('renders a safe disabled state', () => {
-    mockUseConfig.mockReturnValue({ enabled: false, title: 'Banco de Sangre', useMockData: true });
+    mockUseConfig.mockReturnValue({ enabled: false, useMockData: true });
 
     render(<Root />);
 

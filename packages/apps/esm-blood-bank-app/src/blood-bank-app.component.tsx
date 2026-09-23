@@ -1,4 +1,4 @@
-import { BrowserRouter, HashRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import type { BloodBankApi } from './api';
 import { bloodBankPrivileges, type BloodBankPrivilege } from './access/blood-bank-privileges';
@@ -19,21 +19,19 @@ import { TransfusionsPage } from './sections/transfusions/transfusions-page.comp
 
 interface BloodBankAppProps {
   api: BloodBankApi;
-  router?: 'browser' | 'hash' | 'memory';
+  router?: 'browser' | 'memory';
   initialPath?: string;
   basename?: string;
-  title?: string;
-  enforcePrivileges?: boolean;
 }
 
-function BloodBankRoutes({ api, title, enforcePrivileges }: { api: BloodBankApi; title: string; enforcePrivileges: boolean }) {
+function BloodBankRoutes({ api }: { api: BloodBankApi }) {
   const protectedPage = (privilege: BloodBankPrivilege, page: React.ReactNode) => (
-    <ProtectedSection privilege={privilege} enforcePrivileges={enforcePrivileges}>{page}</ProtectedSection>
+    <ProtectedSection privilege={privilege}>{page}</ProtectedSection>
   );
 
   return (
     <Routes>
-      <Route element={<BloodBankLayout title={title} enforcePrivileges={enforcePrivileges} />}>
+      <Route element={<BloodBankLayout />}>
         <Route index element={<DashboardPage api={api} />} />
         <Route path="donors" element={protectedPage(bloodBankPrivileges.donors, <DonorsPage api={api} />)} />
         <Route path="applicant-selection" element={protectedPage(bloodBankPrivileges.applicantSelection, <ApplicantSelectionPage />)} />
@@ -55,14 +53,10 @@ function BloodBankRoutes({ api, title, enforcePrivileges }: { api: BloodBankApi;
   );
 }
 
-export function BloodBankApp({ api, router = 'memory', initialPath = '/', basename, title = 'Banco de Sangre', enforcePrivileges = true }: BloodBankAppProps) {
+export function BloodBankApp({ api, router = 'memory', initialPath = '/', basename }: BloodBankAppProps) {
   if (router === 'browser') {
-    return <BrowserRouter basename={basename}><BloodBankRoutes api={api} title={title} enforcePrivileges={enforcePrivileges} /></BrowserRouter>;
+    return <BrowserRouter basename={basename}><BloodBankRoutes api={api} /></BrowserRouter>;
   }
 
-  if (router === 'hash') {
-    return <HashRouter><BloodBankRoutes api={api} title={title} enforcePrivileges={enforcePrivileges} /></HashRouter>;
-  }
-
-  return <MemoryRouter initialEntries={[initialPath]}><BloodBankRoutes api={api} title={title} enforcePrivileges={enforcePrivileges} /></MemoryRouter>;
+  return <MemoryRouter initialEntries={[initialPath]}><BloodBankRoutes api={api} /></MemoryRouter>;
 }

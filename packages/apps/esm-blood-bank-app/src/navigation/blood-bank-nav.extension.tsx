@@ -31,7 +31,6 @@ function BloodBankNavContent() {
           <RequireAnyPrivilege
             key={item.path}
             privileges={item.children.map((child) => child.privilege)}
-            enforcePrivileges
           >
             <SideNavMenu
               title={t(item.labelKey, item.defaultLabel)}
@@ -42,7 +41,7 @@ function BloodBankNavContent() {
                 const href = hrefFor(child.path);
                 const ChildIcon = child.icon;
                 return (
-                  <ProtectedSection key={child.path} privilege={child.privilege} enforcePrivileges hideUnauthorized>
+                  <ProtectedSection key={child.path} privilege={child.privilege} hideUnauthorized>
                     <SideNavMenuItem
                       href={href}
                       isActive={pathname === href}
@@ -59,7 +58,7 @@ function BloodBankNavContent() {
             </SideNavMenu>
           </RequireAnyPrivilege>
         ) : (
-          <ProtectedSection key={item.path} privilege={item.privilege} enforcePrivileges hideUnauthorized>
+          <ProtectedSection key={item.path} privilege={item.privilege} hideUnauthorized>
             <SideNavLink
               href={hrefFor(item.path)}
               renderIcon={item.icon ? decorativeIcon(item.icon) : undefined}

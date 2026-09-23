@@ -6,13 +6,9 @@ import type { BloodBankPrivilege } from './blood-bank-privileges';
 interface ProtectedSectionProps {
   children: ReactNode;
   privilege: BloodBankPrivilege;
-  enforcePrivileges: boolean;
   hideUnauthorized?: boolean;
 }
 
-/** Standalone previews have no OpenMRS session; integrated pages always enforce RBAC. */
-export function ProtectedSection({ children, privilege, enforcePrivileges, hideUnauthorized = false }: ProtectedSectionProps) {
-  if (!enforcePrivileges) return <>{children}</>;
-
+export function ProtectedSection({ children, privilege, hideUnauthorized = false }: ProtectedSectionProps) {
   return <RequirePrivilege privilege={privilege} hideUnauthorized={hideUnauthorized}>{children}</RequirePrivilege>;
 }

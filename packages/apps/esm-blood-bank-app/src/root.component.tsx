@@ -20,8 +20,6 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
       api={config.useMockData ? mockBloodBankApi : openmrsBloodBankApi}
       basename={modulePath}
       router="browser"
-      enforcePrivileges
-      title={config.title}
     />
   );
 }

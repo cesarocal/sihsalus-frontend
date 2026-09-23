@@ -17,17 +17,16 @@ vi.mock('@sihsalus/esm-rbac', () => ({
 describe('BloodBankApp', () => {
   beforeEach(() => allowedPrivileges.clear());
 
-  it('muestra las secciones principales', async () => {
-    render(<BloodBankApp api={mockBloodBankApi} enforcePrivileges={false} />);
+  it('muestra el inicio integrado con datos sintéticos', async () => {
+    render(<BloodBankApp api={mockBloodBankApi} />);
 
     expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Donantes' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Inventario' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Transfusiones' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Resumen operativo' })).toBeInTheDocument();
   });
 
   it('permite abrir una sección mediante ruta interna', async () => {
-    render(<BloodBankApp api={mockBloodBankApi} initialPath="/laboratory/compatibility" enforcePrivileges={false} />);
+    allowedPrivileges.add(bloodBankPrivileges.compatibility);
+    render(<BloodBankApp api={mockBloodBankApi} initialPath="/laboratory/compatibility" />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Compatibilidad' })).toBeInTheDocument();
   });
@@ -39,7 +38,7 @@ describe('BloodBankApp', () => {
       getInventory: () => Promise.resolve([]),
     };
 
-    render(<BloodBankApp api={failingApi} enforcePrivileges={false} />);
+    render(<BloodBankApp api={failingApi} />);
 
     expect(await screen.findByText('No se pudieron cargar los datos')).toBeInTheDocument();
     expect(screen.queryByText('technical backend detail')).not.toBeInTheDocument();

@@ -7,7 +7,7 @@ Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio,
 - Inicio, Donantes e Inventario consumen el contrato `BloodBankApi` con datos sintéticos.
 - Las demás rutas son bases visuales; todavía no guardan información clínica.
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
-- El modo standalone es solo para desarrollo visual: muestra todas las secciones con mocks y un menú local de vista previa. No reproduce la barra compartida, autenticación, RBAC, sesión, contenido clínico ni comportamiento del backend.
+- Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
 
 ## Contratos de integración
 
@@ -26,16 +26,6 @@ Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio,
 
 El backend continúa siendo la autoridad para autorización y persistencia. No se deben usar datos reales ni información identificable en mocks o pruebas.
 
-## Vista standalone sin login
-
-Desde la raíz del monorepo:
-
-```bash
-corepack yarn workspace @sihsalus/esm-blood-bank-app standalone
-```
-
-Abrir `http://localhost:8090`. Esta entrada usa datos mock y no modifica el inicio de sesión de OpenMRS.
-
 ## Desarrollo integrado con OpenMRS
 
 Después de preparar el SPA según el README principal:
@@ -45,7 +35,7 @@ SIHSALUS_DEV_APPS=esm-blood-bank-app yarn start
 ```
 
 El usuario de pruebas necesita el privilegio `app:home.bancoSangre`.
-Tras cambiar `src/routes.json`, vuelve a ejecutar `yarn assemble` y reinicia `yarn start` para registrar el nuevo slot. Prueba la barra compartida en `http://localhost:8080/openmrs/spa/blood-bank`; el puerto standalone 8090 conserva su menú local.
+Tras cambiar `src/routes.json`, vuelve a ejecutar `yarn assemble` y reinicia `yarn start` para registrar el nuevo slot. Prueba la barra compartida en `http://localhost:8080/openmrs/spa/blood-bank` con un usuario de pruebas autorizado.
 
 El cliente HMR de la versión local de Rspack falla al cargar este ESM (`setLogLevel`). Por ahora, `rspack.config.js` desactiva solo ese cliente para Banco de Sangre: el servidor recompila los cambios, pero debes recargar el navegador manualmente. Reinicia `yarn start` después de cambiar esta configuración.
 
@@ -56,5 +46,4 @@ corepack yarn workspace @sihsalus/esm-blood-bank-app lint
 corepack yarn workspace @sihsalus/esm-blood-bank-app typescript
 corepack yarn workspace @sihsalus/esm-blood-bank-app test
 corepack yarn workspace @sihsalus/esm-blood-bank-app build
-corepack yarn workspace @sihsalus/esm-blood-bank-app build:standalone
 ```

@@ -5,72 +5,6 @@
   background: var(--cds-background);
 }
 
-.standaloneShell {
-  display: grid;
-  grid-template-columns: 17rem minmax(0, 1fr);
-  min-height: 100%;
-  color: var(--cds-text-primary);
-  background: var(--cds-background);
-}
-
-.sidebar {
-  min-height: 100vh;
-  padding: 1.5rem 0;
-  color: var(--cds-text-on-color);
-  background: var(--cds-background-inverse);
-}
-
-.brand {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0 1.25rem 1.5rem;
-}
-
-.brand span {
-  color: var(--cds-text-secondary);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
-.brand strong {
-  font-size: 1.25rem;
-}
-.navGroup {
-  display: grid;
-}
-.navHeading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  color: var(--cds-text-on-color);
-  font-weight: 600;
-}
-.sidebar a {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  color: var(--cds-text-on-color-disabled);
-  text-decoration: none;
-}
-.sidebar a:hover {
-  color: var(--cds-text-on-color);
-  background: var(--cds-layer-active-03);
-}
-.sidebar a.active {
-  padding-left: 1rem;
-  border-left: 0.25rem solid var(--cds-link-primary);
-  color: var(--cds-text-on-color);
-  background: var(--cds-layer-selected-inverse);
-}
-.sidebar .navChild {
-  padding-left: 2.25rem;
-  font-size: 0.875rem;
-}
-.sidebar .navChild.active {
-  padding-left: 2rem;
-}
-
 .main {
   min-width: 0;
   padding: 2rem;
@@ -157,21 +91,12 @@
 }
 
 @media (width <= 66rem) {
-  .standaloneShell {
-    grid-template-columns: 13rem minmax(0, 1fr);
-  }
   .metricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (width <= 42rem) {
-  .standaloneShell {
-    display: block;
-  }
-  .sidebar {
-    min-height: auto;
-  }
   .main {
     padding: 1rem;
   }
