@@ -6,7 +6,13 @@ import { BrowserRouter, useLocation } from 'react-router-dom';
 import { ProtectedSection } from '../access/protected-section.component';
 import { RequireAnyPrivilege } from '../access/require-any-privilege.component';
 import { basePath, moduleName } from '../constants';
-import { bloodBankNavigation } from './blood-bank-navigation';
+import { bloodBankNavigation, type NavigationItem } from './blood-bank-navigation';
+
+function decorativeIcon(Icon: NonNullable<NavigationItem['icon']>) {
+  return function DecorativeIcon() {
+    return <span aria-hidden="true"><Icon size={16} /></span>;
+  };
+}
 
 function BloodBankNavContent() {
   const { t } = useTranslation(moduleName);
@@ -29,10 +35,12 @@ function BloodBankNavContent() {
           >
             <SideNavMenu
               title={t(item.labelKey, item.defaultLabel)}
+              renderIcon={item.icon ? decorativeIcon(item.icon) : undefined}
               defaultExpanded={pathname.startsWith(hrefFor(item.path))}
             >
               {item.children.map((child) => {
                 const href = hrefFor(child.path);
+                const ChildIcon = child.icon;
                 return (
                   <ProtectedSection key={child.path} privilege={child.privilege} enforcePrivileges hideUnauthorized>
                     <SideNavMenuItem
@@ -40,7 +48,10 @@ function BloodBankNavContent() {
                       isActive={pathname === href}
                       onClick={(event) => open(event, href)}
                     >
-                      {t(child.labelKey, child.defaultLabel)}
+                      <span className="sihsalus-side-nav__item">
+                        {ChildIcon && <span aria-hidden="true"><ChildIcon className="sihsalus-side-nav__icon" size={20} /></span>}
+                        <span className="sihsalus-side-nav__text">{t(child.labelKey, child.defaultLabel)}</span>
+                      </span>
                     </SideNavMenuItem>
                   </ProtectedSection>
                 );
@@ -51,6 +62,7 @@ function BloodBankNavContent() {
           <ProtectedSection key={item.path} privilege={item.privilege} enforcePrivileges hideUnauthorized>
             <SideNavLink
               href={hrefFor(item.path)}
+              renderIcon={item.icon ? decorativeIcon(item.icon) : undefined}
               isActive={pathname === hrefFor(item.path)}
               onClick={(event) => open(event, hrefFor(item.path))}
             >

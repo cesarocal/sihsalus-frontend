@@ -38,11 +38,17 @@
   display: grid;
 }
 .navHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   color: var(--cds-text-on-color);
   font-weight: 600;
 }
 .sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   color: var(--cds-text-on-color-disabled);
   text-decoration: none;

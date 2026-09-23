@@ -22,11 +22,15 @@ export function BloodBankLayout({ title, enforcePrivileges }: { title: string; e
             <div className={styles.navGroup} key={item.path}>
               {item.children ? (
                 <RequireAnyPrivilege privileges={item.children.map((child) => child.privilege)} enforcePrivileges={enforcePrivileges}>
-                  <span className={styles.navHeading}>{t(item.labelKey, item.defaultLabel)}</span>
+                  <span className={styles.navHeading}>
+                    {item.icon && <span aria-hidden="true"><item.icon size={16} /></span>}
+                    {t(item.labelKey, item.defaultLabel)}
+                  </span>
                 </RequireAnyPrivilege>
               ) : (
                 <ProtectedSection privilege={item.privilege} enforcePrivileges={enforcePrivileges} hideUnauthorized>
                   <NavLink className={({ isActive }) => (isActive ? styles.active : undefined)} end={item.path === '/'} to={item.path}>
+                    {item.icon && <span aria-hidden="true"><item.icon size={16} /></span>}
                     {t(item.labelKey, item.defaultLabel)}
                   </NavLink>
                 </ProtectedSection>
@@ -37,6 +41,7 @@ export function BloodBankLayout({ title, enforcePrivileges }: { title: string; e
                     className={({ isActive }) => `${styles.navChild}${isActive ? ` ${styles.active}` : ''}`}
                     to={child.path}
                   >
+                    {child.icon && <span aria-hidden="true"><child.icon size={16} /></span>}
                     {t(child.labelKey, child.defaultLabel)}
                   </NavLink>
                 </ProtectedSection>

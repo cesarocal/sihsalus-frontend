@@ -36,6 +36,17 @@ describe('BloodBankNav', () => {
 
     expect(screen.getByText('Laboratorio')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Compatibilidad' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tamizaje de donantes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tamizaje' })).not.toBeInTheDocument();
+  });
+
+  it('muestra los nombres breves de las subsecciones autorizadas', () => {
+    allowedPrivileges.add(bloodBankPrivileges.screening);
+    allowedPrivileges.add(bloodBankPrivileges.donorFollowUp);
+    allowedPrivileges.add(bloodBankPrivileges.recipientFollowUp);
+    render(<BloodBankNav />);
+
+    expect(screen.getByRole('link', { name: 'Tamizaje' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Al donante' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Al receptor' })).toBeInTheDocument();
   });
 });
