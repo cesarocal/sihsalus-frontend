@@ -1,0 +1,280 @@
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.page {
+  margin: -2rem;
+}
+.pageHeader {
+  padding-inline: layout.$spacing-05;
+  border-bottom: 1px solid $ui-03;
+  background: $ui-02;
+}
+.pageTitle {
+  @include type.type-style("heading-04");
+  margin: 0;
+}
+.content {
+  padding: layout.$spacing-05;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  margin-bottom: layout.$spacing-05;
+}
+.summaryTile {
+  height: 7.875rem;
+  border: 1px solid $ui-03;
+  background: $ui-02;
+  p {
+    @include type.type-style("heading-compact-01");
+    margin-bottom: layout.$spacing-06;
+    color: $text-02;
+  }
+  span {
+    @include type.type-style("heading-04");
+  }
+}
+.listHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: layout.$spacing-05;
+  margin-bottom: layout.$spacing-03;
+  h2 {
+    @include type.type-style("heading-compact-02");
+  }
+}
+.help {
+  @include type.type-style("helper-text-01");
+  color: $text-02;
+  margin: layout.$spacing-03 0 layout.$spacing-05;
+}
+.surface {
+  border: 1px solid $ui-03;
+  background: $ui-02;
+}
+.filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(16rem, 1.5fr);
+  gap: layout.$spacing-05;
+  padding: layout.$spacing-05;
+  align-items: end;
+  background: $ui-01;
+}
+.tableScroll {
+  overflow-x: auto;
+  table {
+    min-width: 64rem;
+  }
+}
+.empty {
+  padding: layout.$spacing-07;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: layout.$spacing-05;
+  h3 {
+    @include type.type-style("heading-compact-02");
+  }
+}
+.workflow {
+  :global(.cds--modal-container) {
+    width: min(95vw, 90rem);
+    max-width: 90rem;
+    max-height: 94vh;
+  }
+  :global(.cds--modal-content) {
+    padding-top: 0;
+  }
+}
+.progress {
+  padding-block: layout.$spacing-05;
+  overflow-x: auto;
+  min-height: 6rem;
+}
+.stepHeading {
+  margin-block: layout.$spacing-05;
+  h3 {
+    @include type.type-style("heading-compact-02");
+  }
+  p {
+    @include type.type-style("helper-text-01");
+    margin-top: layout.$spacing-03;
+    color: $text-02;
+  }
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+}
+.fullWidth {
+  grid-column: 1 / -1;
+}
+.questionGroup {
+  margin-block: layout.$spacing-06;
+  h3 {
+    @include type.type-style("heading-compact-02");
+    padding-block: layout.$spacing-03;
+    border-bottom: 1px solid $ui-03;
+  }
+}
+.question {
+  padding-block: layout.$spacing-04;
+  border-bottom: 1px solid $ui-03;
+  :global(.cds--text-input-wrapper) {
+    margin-top: layout.$spacing-04;
+  }
+}
+.qualification {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) 2fr;
+  gap: layout.$spacing-06;
+  margin-block: layout.$spacing-05;
+}
+.footer {
+  &:global(.cds--modal-footer) {
+    block-size: auto;
+    :global(.cds--btn) {
+      flex: 0 0 auto;
+      block-size: 3rem;
+      inline-size: auto;
+      padding-block: layout.$spacing-04;
+    }
+  }
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: layout.$spacing-05;
+  margin-top: 0;
+  height: auto;
+  min-height: 5rem;
+  flex-shrink: 0;
+  border-top: 1px solid $ui-03;
+  padding: layout.$spacing-05;
+  > div {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: layout.$spacing-03;
+  }
+}
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+  margin-top: layout.$spacing-06;
+}
+.errors {
+  padding: layout.$spacing-05;
+  background: var(--cds-notification-background-error, #fff1f1);
+  border-inline-start: 3px solid var(--cds-support-error, #da1e28);
+  margin-block: layout.$spacing-05;
+  ul {
+    list-style: disc;
+    padding-left: layout.$spacing-05;
+  }
+}
+.warningList {
+  list-style: disc;
+  padding-left: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+}
+.report {
+  padding: layout.$spacing-06;
+  border: 1px solid $ui-03;
+  background: $ui-02;
+  header {
+    text-align: center;
+    h2 {
+      @include type.type-style("heading-03");
+      margin-block: layout.$spacing-05;
+    }
+  }
+  h3 {
+    @include type.type-style("heading-compact-02");
+    background: $ui-01;
+    padding: layout.$spacing-03;
+    margin-block: layout.$spacing-05;
+  }
+  h4 {
+    @include type.type-style("heading-compact-01");
+    margin-block: layout.$spacing-04;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: layout.$spacing-04 layout.$spacing-06;
+  }
+  dt {
+    font-weight: 600;
+  }
+  dd {
+    margin-top: layout.$spacing-02;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  td {
+    padding: layout.$spacing-03;
+    border: 1px solid $ui-03;
+  }
+  td:last-child {
+    width: 6rem;
+  }
+  [data-signatures] {
+    margin-block: layout.$spacing-07;
+    p {
+      padding-block: layout.$spacing-04;
+    }
+  }
+  [data-fingerprint] {
+    border: 1px solid $ui-04;
+    display: inline-block;
+    width: 5rem;
+    height: 5rem;
+    vertical-align: middle;
+  }
+  footer {
+    border-top: 1px solid $ui-03;
+    padding-top: layout.$spacing-05;
+  }
+}
+@media (max-width: 66rem) {
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    > :last-child {
+      grid-column: 1 / -1;
+    }
+  }
+  .qualification {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 42rem) {
+  .page {
+    margin: -1rem;
+  }
+  .summary,
+  .fields,
+  .filters {
+    grid-template-columns: 1fr;
+  }
+  .listHeading {
+    align-items: start;
+    flex-direction: column;
+  }
+  .report {
+    padding: layout.$spacing-04;
+    dl {
+      grid-template-columns: 1fr;
+    }
+  }
+}

@@ -5,6 +5,9 @@ Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio,
 ## Límites actuales
 
 - Inicio, Donantes e Inventario consumen el contrato `BloodBankApi` con datos sintéticos.
+- Selección del postulante incluye listado, filtros, formulario por etapas e impresión. Su avance se conserva en `sessionStorage` de la pestaña, exclusivamente para datos sintéticos.
+- Extracción incluye cola de seleccionados, etiquetas de unidad/tubo, volumen, registro y constancia imprimible.
+- Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
 - Las demás rutas son bases visuales; todavía no guardan información clínica.
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
@@ -25,6 +28,49 @@ Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio,
   - `GET /ws/rest/v1/bloodbank/inventory`
 
 El backend continúa siendo la autoridad para autorización y persistencia. No se deben usar datos reales ni información identificable en mocks o pruebas.
+
+## Selección del postulante (prototipo navegable)
+
+Ruta integrada: `http://localhost:8080/openmrs/spa/blood-bank/applicant-selection`.
+El usuario necesita `app:home.bancoSangre` y `app:home.bancoSangre.seleccionPostulante`.
+No cambia el login, el navbar compartido, ni añade un standalone.
+
+Incluye Admisión → Datos personales → Examen físico → Entrevista → Precalificación → Revisión.
+Al finalizar el examen físico regresa al listado: **Entrevistar** permite revisar las tres primeras etapas sin editarlas.
+La X confirma la salida y ofrece guardar el avance o descartar solo los cambios no guardados.
+La revisión incluye el formulario imprimible para firmas físicas.
+
+Los borradores sobreviven a recargas en la misma pestaña, no al cierre de la pestaña.
+El navegador no es una base de datos clínica: no use personas reales y no interprete estos controles como autorización del servidor.
+La configuración `useMockData=true` (por defecto) habilita este flujo. Si se desactiva, selección muestra un error seguro: todavía no existe su backend.
+
+Casos de prueba:
+
+| Código de donante | DNI ficticio | Caso                                          |
+| ----------------- | ------------ | --------------------------------------------- |
+| DEMO-001          | 90000001     | Autocompletado editable, sin exclusión previa |
+| DEMO-002          | 90000002     | Mujer, exclusión temporal hasta 2099-12-31    |
+| DEMO-003          | 90000003     | Exclusión permanente                          |
+
+Deje el documento vacío al introducir el código para cargar su identificación, o introduzca el DNI correspondiente.
+Un código y documento que no corresponden bloquean la admisión. El aviso de antecedentes no revela el motivo.
+Al guardar la revisión, solo **Apto** pasa a **Seleccionado**; los otros resultados quedan como **No apto temporal/permanente**.
+Selección por sí sola no crea un donante ni una unidad, ni habilita transfusiones.
+Los seleccionados pasan a Extracción. Completar Etiqueta crea una muestra en Tamizaje; registrar el volumen muestra la unidad en Inventario en cuarentena.
+Guardar Registro actualiza Donantes; guardar Constancia retira la postulación del listado activo y conserva sus antecedentes.
+
+El detalle de archivos, mapeo del modelo y límites clínicos está en [Selección del postulante](src/sections/applicant-selection/README.md).
+
+## Extracción y Tamizaje (prototipo navegable)
+
+- [Extracción y aféresis](http://localhost:8080/openmrs/spa/blood-bank/collection): requiere `app:home.bancoSangre.extraccionAferesis`.
+- [Laboratorio / Tamizaje](http://localhost:8080/openmrs/spa/blood-bank/laboratory/screening): requiere `app:home.bancoSangre.laboratorio.tamizaje`.
+
+También requieren el privilegio de entrada del módulo; mantienen los enlaces y guards existentes, sin cambiar navbar ni login.
+Hay un seleccionado inicial (DNI ficticio `90000012`) y una muestra inicial `M-DEMO-001` para probar ambas pantallas.
+Los contratos de API están en `src/api/blood-bank-processing.api.ts`; los adaptadores reales fallan de forma segura hasta implementar el OMOD.
+No se liberan unidades, diagnostican infecciones, envían correos ni archivan PDF en OpenMRS.
+Ver [Extracción y Tamizaje](src/sections/collection/README.md) para organización, mapeo y evidencia.
 
 ## Desarrollo integrado con OpenMRS
 
