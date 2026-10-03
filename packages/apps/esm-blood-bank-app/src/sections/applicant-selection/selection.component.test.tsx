@@ -68,7 +68,7 @@ describe('applicant selection UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir' }));
     await waitFor(() =>
       expect(showSnackbar).toHaveBeenCalledWith({
-        title: t('draftSaved'),
+        title: t('draftCreated'),
         kind: 'success',
         isLowContrast: true,
         autoClose: true,
@@ -76,7 +76,52 @@ describe('applicant selection UI', () => {
       }),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByText(t('draftSaved'))).not.toBeInTheDocument();
+    expect(screen.queryByText(t('draftCreated'))).not.toBeInTheDocument();
+  });
+  it('distinguishes an updated application draft from a newly created one', async () => {
+    const api = createMockApplicantSelectionApi();
+    const application = await api.saveDraft(validApplication());
+    const saved = vi.fn();
+    render(<SelectionWorkflow application={application} api={api} onClose={vi.fn()} onSaved={saved} t={t} />);
+    fireEvent.change(screen.getByLabelText('Número de documento'), { target: { value: '90000999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir' }));
+    await waitFor(() => expect(saved).toHaveBeenCalledWith('draftUpdated'));
+    expect(saved).not.toHaveBeenCalledWith('draftCreated');
+    expect((await api.listApplications()).find((item) => item.id === application.id)?.admission.documentNumber).toBe(
+      '90000999',
+    );
+  });
+  it.each([
+    'X',
+    'saveAndExit',
+  ])('closes an unchanged application via %s without writing or claiming a save', async (action) => {
+    const api = createMockApplicantSelectionApi();
+    const application = await api.saveDraft(validApplication());
+    const write = vi.spyOn(api, 'saveDraft');
+    const saved = vi.fn();
+    const closed = vi.fn();
+    render(<SelectionWorkflow application={application} api={api} onClose={closed} onSaved={saved} t={t} />);
+    if (action === 'X') {
+      fireEvent.click(screen.getByRole('button', { name: 'Salir del proceso' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
+    } else fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir' }));
+    await waitFor(() => expect(closed).toHaveBeenCalledOnce());
+    expect(write).not.toHaveBeenCalled();
+    expect(saved).not.toHaveBeenCalled();
+    expect(showSnackbar).not.toHaveBeenCalled();
+    expect((await api.listApplications()).find((item) => item.id === application.id)?.revision).toBe(
+      application.revision,
+    );
+  });
+  it('announces completed admission without claiming the whole application is selected', async () => {
+    const api = createMockApplicantSelectionApi();
+    const saved = vi.fn();
+    render(<SelectionWorkflow application={validApplication()} api={api} onClose={vi.fn()} onSaved={saved} t={t} />);
+    await screen.findByText(t('admissionHelp'));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar' }));
+    await screen.findByLabelText('Nombres');
+    expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('admissionCreated') }));
+    expect(saved).not.toHaveBeenCalled();
   });
 
   it('shows conditional interview details and clears hidden values when changed to no', () => {
@@ -117,7 +162,7 @@ describe('applicant selection UI', () => {
     const confirmation = screen.getByRole('dialog', { name: '¿Desea salir del proceso?' });
     expect(within(confirmation).getByLabelText('Guardar el avance antes de salir')).toBeChecked();
     fireEvent.click(within(confirmation).getByRole('button', { name: 'Salir' }));
-    await waitFor(() => expect(saved).toHaveBeenCalledWith('draftSaved'));
+    await waitFor(() => expect(saved).toHaveBeenCalledWith('draftCreated'));
     expect((await api.listApplications()).find((a) => a.number === '000005')?.status).toBe('draft');
   });
 

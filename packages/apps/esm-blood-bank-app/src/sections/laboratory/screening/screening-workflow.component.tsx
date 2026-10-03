@@ -33,11 +33,13 @@ export function ScreeningWorkflow({
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(!initial.receivedOn || !initial.performedOn);
   const finalized = record.status === 'validated';
   const locked = finalized || (step === 0 && record.completedSteps.includes('reception'));
   const stage = screeningSteps[step];
   const change = (next: ScreeningRecord) => {
     setRecord(next);
+    setDirty(true);
   };
   const save = async (advance = false) => {
     if (saving) return false;
@@ -53,14 +55,22 @@ export function ScreeningWorkflow({
     try {
       const result = await api.saveScreening(record, advance ? stage : undefined);
       setRecord(result);
+      setDirty(false);
       if (advance && stage === 'validation') onSaved();
       else {
-        notifySuccess(t('saved'));
+        const message = !advance
+          ? 'screeningDraftUpdated'
+          : stage === 'reception'
+            ? 'screeningReceptionSaved'
+            : record.completedSteps.includes('results')
+              ? 'screeningResultsUpdated'
+              : 'screeningResultsSaved';
+        notifySuccess(t(message));
         if (advance) setStep((value) => value + 1);
       }
       return true;
     } catch {
-      setFailed('saveFailed');
+      setFailed('screeningSaveFailed');
       return false;
     } finally {
       setSaving(false);
@@ -101,8 +111,13 @@ export function ScreeningWorkflow({
       saving={saving}
       errors={errors}
       failed={failed}
+      saveErrorText={t('screeningSaveFailed')}
       onClose={onClose}
       onDraft={() => save()}
+      onSaveBeforeExit={async () => {
+        if (!dirty) return 'unchanged';
+        return (await save()) ? 'saved' : 'failed';
+      }}
       onAdvance={() => {
         void save(true);
       }}

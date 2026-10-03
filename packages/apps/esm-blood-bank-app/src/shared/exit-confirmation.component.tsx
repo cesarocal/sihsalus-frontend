@@ -10,15 +10,18 @@ import {
 import { useId, useState } from 'react';
 import styles from '../sections/applicant-selection/selection.scss';
 
+export type ExitSaveResult = 'saved' | 'unchanged' | 'failed';
+
 interface ExitConfirmationProps {
   title: string;
   description: string;
   closeLabel: string;
   saving: boolean;
+  saveErrorText: string;
   t: (key: string) => string;
   onCancel: () => void;
-  onSave: () => Promise<boolean>;
-  onExit: (saved: boolean) => void;
+  onSave: () => Promise<ExitSaveResult>;
+  onExit: (result: Exclude<ExitSaveResult, 'failed'> | 'discarded') => void;
 }
 
 /** Mount on each close request so saving is always the default choice. */
@@ -27,6 +30,7 @@ export function ExitConfirmation({
   description,
   closeLabel,
   saving,
+  saveErrorText,
   t,
   onCancel,
   onSave,
@@ -44,14 +48,16 @@ export function ExitConfirmation({
   const leave = async () => {
     if (busy) return;
     if (!saveBeforeExit) {
-      onExit(false);
+      onExit('discarded');
       return;
     }
     setSubmitting(true);
     setFailed(false);
     try {
-      if (await onSave()) onExit(true);
-      else onCancel(); // The workflow displays its save error and keeps all inputs.
+      const result = await onSave();
+      if (result === 'failed')
+        onCancel(); // The workflow keeps all inputs and displays its error.
+      else onExit(result);
     } catch {
       setFailed(true); // Do not close or expose technical details on an unexpected rejection.
     } finally {
@@ -72,7 +78,7 @@ export function ExitConfirmation({
             onChange={(_event, { checked }) => setSaveBeforeExit(checked)}
           />
         </div>
-        {failed && <InlineNotification hideCloseButton kind="error" title={t('saveFailed')} />}
+        {failed && <InlineNotification hideCloseButton kind="error" title={saveErrorText} />}
       </ModalBody>
       <ModalFooter>
         <Button type="button" kind="secondary" disabled={busy} onClick={cancel}>

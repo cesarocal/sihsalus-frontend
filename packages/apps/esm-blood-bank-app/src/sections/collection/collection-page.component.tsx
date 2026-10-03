@@ -139,7 +139,7 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
           }}
           onSaved={() => {
             setActive(null);
-            notifySuccess(t('finished'));
+            notifySuccess(t('collectionFinished'));
             reload();
           }}
         />

@@ -1,6 +1,7 @@
 import { ageOnDate, calculateReturnDate, isDate, today } from '../applicant-selection/selection-rules';
 import type { SelectionApplication } from '../applicant-selection/selection.types';
 import type { CollectionRecord, CollectionStep } from './collection.types';
+import { bagLotExceedsLimit } from '../../shared/text-field-contracts';
 
 export function fullName(application: SelectionApplication) {
   return `${application.personal.givenName} ${application.personal.familyName}`.trim();
@@ -44,8 +45,12 @@ export function newCollection(application: SelectionApplication): CollectionReco
 // Storage bounds (DECIMAL(8,2)), not a clinical collection-volume recommendation.
 export const validVolume = (value: string) => /^\d{1,6}(\.\d{1,2})?$/.test(value) && Number(value) > 0;
 
+export function validateCollectionText(record: CollectionRecord): string[] {
+  return bagLotExceedsLimit(record.registry.bagLot) ? ['bagLotTooLong'] : [];
+}
+
 export function validateCollection(record: CollectionRecord, step: CollectionStep): string[] {
-  const missing: string[] = [];
+  const missing = validateCollectionText(record);
   if (step === 'label') {
     for (const field of [
       'component',
@@ -69,7 +74,7 @@ export function validateCollection(record: CollectionRecord, step: CollectionSte
       record.registry.date > today()
     )
       missing.push('collectionDate');
-    if (!record.registry.bagLot.trim() || record.registry.bagLot.length > 50) missing.push('bagLot');
+    if (!record.registry.bagLot.trim()) missing.push('bagLot');
     if (!['yes', 'no'].includes(record.registry.complications)) missing.push('complications');
     if (!['complete', 'incomplete'].includes(record.registry.extractionStatus)) missing.push('extractionStatus');
     if (!record.registry.attendedBy.trim()) missing.push('attendedBy');

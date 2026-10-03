@@ -10,7 +10,7 @@ import {
 } from '@carbon/react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProcessingTranslate } from './processing-page.component';
-import { ExitConfirmation } from './exit-confirmation.component';
+import { ExitConfirmation, type ExitSaveResult } from './exit-confirmation.component';
 import styles from '../sections/applicant-selection/selection.scss';
 
 export function ProcessingModal({
@@ -22,8 +22,10 @@ export function ProcessingModal({
   saving,
   errors,
   failed,
+  saveErrorText,
   onClose,
   onDraft,
+  onSaveBeforeExit,
   onAdvance,
   onPrevious,
   advanceLabel,
@@ -40,8 +42,10 @@ export function ProcessingModal({
   saving: boolean;
   errors: string[];
   failed: string;
+  saveErrorText: string;
   onClose: () => void;
   onDraft: () => Promise<boolean>;
+  onSaveBeforeExit: () => Promise<ExitSaveResult>;
   onAdvance: () => void;
   onPrevious: () => void;
   advanceLabel: string;
@@ -141,9 +145,10 @@ export function ProcessingModal({
           description={t('exitHelp')}
           closeLabel={t('close')}
           saving={saving}
+          saveErrorText={saveErrorText}
           t={t}
           onCancel={() => setConfirm(false)}
-          onSave={onDraft}
+          onSave={onSaveBeforeExit}
           onExit={() => onClose()}
         />
       )}

@@ -1,4 +1,4 @@
-import { newCollection, validateCollection } from '../sections/collection/collection-rules';
+import { newCollection, validateCollection, validateCollectionText } from '../sections/collection/collection-rules';
 import { collectionSteps } from '../sections/collection/collection.types';
 import {
   globalScreeningResult,
@@ -57,6 +57,8 @@ export function createMockProcessingApi(
         certificate: input.certificate,
         application: canonical.application,
       });
+      // Drafts and completed stages share the same bound; never crop historical input.
+      if (validateCollectionText(record).length) throw new Error('COLLECTION_TEXT_LIMIT');
       if (step) {
         const index = collectionSteps.indexOf(step);
         if (

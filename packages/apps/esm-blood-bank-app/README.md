@@ -2,6 +2,8 @@
 
 Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio, Donantes, Selección del postulante, Extracción y aféresis, Laboratorio, Transferencias, Inventario y Transfusiones.
 
+El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) documenta el límite heredado del lote de bolsa, los mensajes por operación, la persistencia mock por pestaña y lo pendiente de verificar en el backend.
+
 ## Límites actuales
 
 - Inicio, Donantes e Inventario consumen el contrato `BloodBankApi` con datos sintéticos.

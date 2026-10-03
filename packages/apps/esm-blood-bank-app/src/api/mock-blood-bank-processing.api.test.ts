@@ -68,6 +68,63 @@ describe('collection and screening mock contracts', () => {
     );
     expect((await recreated.screening.listScreenings()).some((item) => item.collectionId === record.id)).toBe(false);
   });
+  it('rejects an oversized bag lot in a draft without overwriting saved state', async () => {
+    const { api, record } = await collectionFixture();
+    const saved = await api.collection.saveCollection(record);
+    const edited = { ...saved, registry: { ...saved.registry, bagLot: 'X'.repeat(51) } };
+    await expect(api.collection.saveCollection(edited)).rejects.toThrow('COLLECTION_TEXT_LIMIT');
+    expect((await api.collection.listCollections()).find((item) => item.id === saved.id)).toEqual(saved);
+    expect(edited.registry.bagLot).toHaveLength(51);
+  });
+  it.each([49, 50, 51])('applies the bag-lot bound to registry completion at %i units', async (length) => {
+    const { api, record } = await collectionFixture();
+    let saved = await api.collection.saveCollection(record, 'label');
+    saved = await api.collection.saveCollection(saved, 'volume');
+    const edited = { ...saved, registry: { ...saved.registry, bagLot: 'X'.repeat(length) } };
+    if (length > 50) {
+      await expect(api.collection.saveCollection(edited, 'registry')).rejects.toThrow('COLLECTION_TEXT_LIMIT');
+      expect((await api.collection.listCollections()).find((item) => item.id === saved.id)).toEqual(saved);
+    } else {
+      expect((await api.collection.saveCollection(edited, 'registry')).registry.bagLot).toBe(edited.registry.bagLot);
+    }
+  });
+  it.each([
+    'X'.repeat(49),
+    'X'.repeat(50),
+    `${'X'.repeat(48)}áñ`,
+    `${'X'.repeat(48)}😀`,
+    `${'X'.repeat(48)}e\u0301`,
+    `${'X'.repeat(48)}\r\n`,
+  ])('round-trips a bounded draft lot unchanged: %j', async (value) => {
+    const { api, selection, record } = await collectionFixture();
+    record.registry.bagLot = value;
+    const saved = await api.collection.saveCollection(record);
+    const reloaded = (await createMockProcessingApi(selection).collection.listCollections()).find(
+      (item) => item.id === saved.id,
+    );
+    expect(reloaded?.registry.bagLot).toBe(value);
+  });
+  it('preserves a historical overlong lot on read and rejected write, then permits an explicit correction', async () => {
+    const { api, selection, record } = await collectionFixture();
+    const saved = await api.collection.saveCollection(record);
+    const state = JSON.parse(sessionStorage.getItem(processingStorageKey) ?? '{}');
+    const legacyValue = `${'X'.repeat(49)}😀`;
+    state.collections.find((item: CollectionRecord) => item.id === saved.id).registry.bagLot = legacyValue;
+    sessionStorage.setItem(processingStorageKey, JSON.stringify(state));
+    const recreated = createMockProcessingApi(selection);
+    const historical = (await recreated.collection.listCollections()).find((item) => item.id === saved.id);
+    if (!historical) throw new Error('SYNTHETIC_COLLECTION_MISSING');
+    expect(historical.registry.bagLot).toBe(legacyValue);
+    const before = sessionStorage.getItem(processingStorageKey);
+    await expect(recreated.collection.saveCollection(historical)).rejects.toThrow('COLLECTION_TEXT_LIMIT');
+    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
+    const corrected = await recreated.collection.saveCollection({
+      ...historical,
+      registry: { ...historical.registry, bagLot: 'X'.repeat(50) },
+    });
+    expect(corrected.registry.bagLot).toBe('X'.repeat(50));
+    expect(historical.registry.bagLot).toBe(legacyValue);
+  });
   it('creates exactly one sample at labeling and quarantines a unit only after volume capture', async () => {
     const { api, record } = await collectionFixture();
     let saved = await api.collection.saveCollection(record, 'label');

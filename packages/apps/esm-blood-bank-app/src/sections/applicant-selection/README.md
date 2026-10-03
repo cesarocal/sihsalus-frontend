@@ -4,6 +4,8 @@
 
 Primera etapa navegable del Banco de Sangre, con datos mock. Selección termina al guardar la revisión; el flujo posterior vive en [Extracción](../collection/README.md) y Laboratorio / Tamizaje. No modifica roles, login ni componentes globales.
 
+Los mensajes distinguen creación/actualización del borrador y guardado de cada etapa; solo la revisión final anuncia selección o exclusión. Indican **en esta pestaña**, no en OpenMRS. Al salir de una postulación guardada sin nuevas ediciones, no se escribe ni se anuncia un guardado. Un error conserva los cambios en el formulario. Consulte el [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) para los límites aún pendientes y la evidencia del ajuste.
+
 ## Organización
 
 - `applicant-selection-page.component.tsx`: listado, búsqueda por identidad, filtros por estado/modalidad y paginación.

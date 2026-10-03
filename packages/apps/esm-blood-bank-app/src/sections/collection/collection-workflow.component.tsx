@@ -16,6 +16,7 @@ import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { printDocument } from '../../shared/print-document';
 import { notifySuccess } from '../../shared/notify-success';
+import { bagLotExceedsLimit, bagLotTextContract, countUtf16Units } from '../../shared/text-field-contracts';
 import { calculateReturnDate } from '../applicant-selection/selection-rules';
 import styles from '../applicant-selection/selection.scss';
 import {
@@ -23,7 +24,7 @@ import {
   CollectionLabelDocument,
   DonationCertificateDocument,
 } from './collection-documents.component';
-import { validateCollection, validVolume } from './collection-rules';
+import { validateCollection, validateCollectionText, validVolume } from './collection-rules';
 import {
   collectionSteps,
   type CollectionLabel,
@@ -49,11 +50,13 @@ export function CollectionWorkflow({
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const stage = collectionSteps[step];
   const finalized = record.status === 'completed';
   const locked = finalized || record.completedSteps.includes(stage);
   const change = (next: CollectionRecord) => {
     setRecord(next);
+    setDirty(true);
   };
   const save = async (advance = false) => {
     if (saving) return false;
@@ -61,7 +64,7 @@ export function CollectionWorkflow({
       setStep((value) => Math.min(value + 1, 3));
       return true;
     }
-    const missing = advance ? validateCollection(record, stage) : [];
+    const missing = advance ? validateCollection(record, stage) : validateCollectionText(record);
     setErrors(missing);
     setFailed('');
     if (missing.length) return false;
@@ -69,14 +72,24 @@ export function CollectionWorkflow({
     try {
       const result = await api.saveCollection(record, advance ? stage : undefined);
       setRecord(result);
+      setDirty(false);
       if (advance && stage === 'certificate') onSaved();
       else {
-        notifySuccess(t('saved'));
+        const message = advance
+          ? stage === 'label'
+            ? 'collectionLabelSaved'
+            : stage === 'volume'
+              ? 'collectionVolumeSaved'
+              : 'collectionRegistrySaved'
+          : record.revision === 0
+            ? 'collectionDraftCreated'
+            : 'collectionDraftUpdated';
+        notifySuccess(t(message));
         if (advance) setStep((value) => value + 1);
       }
       return true;
     } catch {
-      setFailed('saveFailed');
+      setFailed('collectionSaveFailed');
       return false;
     } finally {
       setSaving(false);
@@ -118,32 +131,48 @@ export function CollectionWorkflow({
   );
   const registryInput = (
     field: Exclude<keyof DonationRegistry, 'complications' | 'extractionStatus' | 'observations'>,
-  ) => (
-    <TextInput
-      key={field}
-      id={`collection-${field}`}
-      labelText={t(field === 'date' ? 'collectionDate' : field)}
-      value={record.registry[field]}
-      type={field === 'date' ? 'date' : 'text'}
-      readOnly={locked}
-      disabled={saving}
-      invalid={errors.includes(field === 'date' ? 'collectionDate' : field)}
-      invalidText={t('requiredFields')}
-      onChange={(event) =>
-        change({
-          ...record,
-          registry: { ...record.registry, [field]: event.target.value },
-          certificate:
-            field === 'date'
-              ? {
-                  ...record.certificate,
-                  resultsAvailableOn: calculateReturnDate(event.target.value, '10', 'days') ?? '',
-                }
-              : record.certificate,
-        })
-      }
-    />
-  );
+  ) => {
+    const lot = field === 'bagLot';
+    const overflow = lot && bagLotExceedsLimit(record.registry.bagLot);
+    const counter = lot
+      ? `${countUtf16Units(record.registry.bagLot)} / ${bagLotTextContract.maxUtf16Units} ${t('textUnits')}. ${t('textLimitHelp')}`
+      : '';
+    return (
+      <TextInput
+        key={field}
+        id={`collection-${field}`}
+        labelText={t(field === 'date' ? 'collectionDate' : field)}
+        value={record.registry[field]}
+        type={field === 'date' ? 'date' : 'text'}
+        readOnly={locked}
+        disabled={saving}
+        helperText={lot ? <span aria-live="polite">{counter}</span> : undefined}
+        invalid={overflow || errors.includes(field === 'date' ? 'collectionDate' : field)}
+        invalidText={
+          lot ? (
+            <span aria-live="polite">
+              {t(overflow ? 'bagLotTooLong' : 'requiredFields')} {counter}
+            </span>
+          ) : (
+            t('requiredFields')
+          )
+        }
+        onChange={(event) =>
+          change({
+            ...record,
+            registry: { ...record.registry, [field]: event.target.value },
+            certificate:
+              field === 'date'
+                ? {
+                    ...record.certificate,
+                    resultsAvailableOn: calculateReturnDate(event.target.value, '10', 'days') ?? '',
+                  }
+                : record.certificate,
+          })
+        }
+      />
+    );
+  };
   const extras =
     step <= 1 ? (
       <>
@@ -174,8 +203,13 @@ export function CollectionWorkflow({
       saving={saving}
       errors={errors}
       failed={failed}
+      saveErrorText={t('collectionSaveFailed')}
       onClose={onClose}
       onDraft={() => save()}
+      onSaveBeforeExit={async () => {
+        if (!dirty && record.revision > 0) return 'unchanged';
+        return (await save()) ? 'saved' : 'failed';
+      }}
       onAdvance={() => {
         void save(true);
       }}

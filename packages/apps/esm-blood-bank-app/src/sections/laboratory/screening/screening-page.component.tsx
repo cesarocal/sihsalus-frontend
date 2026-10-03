@@ -129,7 +129,7 @@ export function ScreeningPage({ api }: { api: ScreeningApi }) {
           }}
           onSaved={() => {
             setActive(null);
-            notifySuccess(t('finished'));
+            notifySuccess(t('screeningFinished'));
             reload();
           }}
         />

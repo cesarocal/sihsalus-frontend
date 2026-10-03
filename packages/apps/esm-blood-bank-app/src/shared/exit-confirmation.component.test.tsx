@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import spanish from '../../translations/es.json';
-import { ExitConfirmation } from './exit-confirmation.component';
+import { ExitConfirmation, type ExitSaveResult } from './exit-confirmation.component';
 
 const t = (key: string) => (spanish.processing as Record<string, string>)[key] ?? key;
 const props = () => ({
@@ -9,9 +9,10 @@ const props = () => ({
   description: t('exitHelp'),
   closeLabel: 'Cerrar confirmación',
   saving: false,
+  saveErrorText: t('collectionSaveFailed'),
   t,
   onCancel: vi.fn(),
-  onSave: vi.fn().mockResolvedValue(true),
+  onSave: vi.fn().mockResolvedValue('saved'),
   onExit: vi.fn(),
 });
 describe('two-action exit confirmation', () => {
@@ -27,7 +28,7 @@ describe('two-action exit confirmation', () => {
         .map((button) => button.textContent),
     ).toEqual(['Seguir editando', 'Salir']);
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
-    await waitFor(() => expect(callbacks.onExit).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(callbacks.onExit).toHaveBeenCalledWith('saved'));
     expect(callbacks.onSave).toHaveBeenCalledOnce();
   });
   it('does not save when discard is explicitly chosen', () => {
@@ -35,7 +36,7 @@ describe('two-action exit confirmation', () => {
     render(<ExitConfirmation {...callbacks} />);
     fireEvent.click(screen.getByLabelText(t('saveBeforeExit')));
     fireEvent.click(screen.getByRole('button', { name: /Salir$/ }));
-    expect(callbacks.onExit).toHaveBeenCalledWith(false);
+    expect(callbacks.onExit).toHaveBeenCalledWith('discarded');
     expect(callbacks.onSave).not.toHaveBeenCalled();
   });
   it('returns to the workflow without saving or exiting when Keep editing is chosen', () => {
@@ -48,7 +49,7 @@ describe('two-action exit confirmation', () => {
   });
   it('does not exit when the workflow reports a save failure', async () => {
     const callbacks = props();
-    callbacks.onSave.mockResolvedValue(false);
+    callbacks.onSave.mockResolvedValue('failed');
     render(<ExitConfirmation {...callbacks} />);
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(callbacks.onCancel).toHaveBeenCalledOnce());
@@ -59,22 +60,22 @@ describe('two-action exit confirmation', () => {
     callbacks.onSave.mockRejectedValue(new Error('PRIVATE_SAVE_TRACE'));
     render(<ExitConfirmation {...callbacks} />);
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
-    expect(await screen.findByText(t('saveFailed'))).toBeInTheDocument();
+    expect(await screen.findByText(t('collectionSaveFailed'))).toBeInTheDocument();
     expect(screen.queryByText('PRIVATE_SAVE_TRACE')).not.toBeInTheDocument();
     expect(callbacks.onExit).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Salir' })).toBeEnabled();
-    callbacks.onSave.mockResolvedValue(true);
+    callbacks.onSave.mockResolvedValue('saved');
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
-    await waitFor(() => expect(callbacks.onExit).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(callbacks.onExit).toHaveBeenCalledWith('saved'));
   });
   it('blocks duplicate saves and all closing paths while saving is pending', async () => {
     const callbacks = props();
-    let finish: (saved: boolean) => void = () => {
+    let finish: (saved: ExitSaveResult) => void = () => {
       throw new Error('No pending save');
     };
     callbacks.onSave.mockImplementation(
       () =>
-        new Promise<boolean>((resolve) => {
+        new Promise<ExitSaveResult>((resolve) => {
           finish = resolve;
         }),
     );
@@ -88,9 +89,16 @@ describe('two-action exit confirmation', () => {
     expect(callbacks.onSave).toHaveBeenCalledOnce();
     expect(callbacks.onExit).not.toHaveBeenCalled();
     await act(async () => {
-      finish(true);
+      finish('saved');
     });
-    expect(callbacks.onExit).toHaveBeenCalledWith(true);
+    expect(callbacks.onExit).toHaveBeenCalledWith('saved');
+  });
+  it('distinguishes an unchanged close from a confirmed write', async () => {
+    const callbacks = props();
+    callbacks.onSave.mockResolvedValue('unchanged');
+    render(<ExitConfirmation {...callbacks} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
+    await waitFor(() => expect(callbacks.onExit).toHaveBeenCalledWith('unchanged'));
   });
   it('starts with saving enabled again after the confirmation is cancelled and reopened', () => {
     const callbacks = props();

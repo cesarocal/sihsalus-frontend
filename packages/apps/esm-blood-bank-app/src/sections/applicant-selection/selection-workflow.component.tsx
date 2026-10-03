@@ -17,7 +17,7 @@ import { hasActiveExclusion, isFinal, physicalWarnings, validateFinal, validateS
 import { printSelectionReport, SelectionReport } from './selection-report.component';
 import { SelectionStageFields } from './selection-stage-fields.component';
 import { notifySuccess } from '../../shared/notify-success';
-import { ExitConfirmation } from '../../shared/exit-confirmation.component';
+import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirmation.component';
 import {
   selectionSteps,
   type ApplicantHistory,
@@ -207,7 +207,17 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
         stage === 'physical' ? 'readyForInterview' : saved.status === 'selected' ? 'selectionSaved' : 'exclusionSaved',
       );
     else {
-      notifySuccess(t('draftSaved'));
+      const message =
+        stage === 'admission'
+          ? data.id
+            ? 'admissionUpdated'
+            : 'admissionCreated'
+          : stage === 'personal'
+            ? 'personalSaved'
+            : stage === 'interview'
+              ? 'interviewSaved'
+              : 'qualificationSaved';
+      notifySuccess(t(message));
       setStep(step + 1);
     }
   };
@@ -224,7 +234,10 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     if (!saved) return;
     setWarningsOpen(false);
     if (continueInterview) onSaved('readyForInterview');
-    else setStep(4);
+    else {
+      notifySuccess(t('physicalStopped'));
+      setStep(4);
+    }
   };
 
   const requestClose = () => {
@@ -235,9 +248,14 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     return false;
   };
 
-  const saveBeforeExit = async () => {
-    if (!dirty && data.id) return true;
-    return Boolean(await persist('draft'));
+  const saveBeforeExit = async (): Promise<ExitSaveResult> => {
+    if (!dirty && data.id) return 'unchanged';
+    return (await persist('draft')) ? 'saved' : 'failed';
+  };
+
+  const finishExit = (result: Exclude<ExitSaveResult, 'failed'> | 'discarded') => {
+    if (result === 'saved') onSaved(data.id ? 'draftUpdated' : 'draftCreated');
+    else onClose();
   };
 
   return (
@@ -364,7 +382,8 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
                 kind="secondary"
                 disabled={saving || locked}
                 onClick={async () => {
-                  if (await persist('draft')) onSaved('draftSaved');
+                  const result = await saveBeforeExit();
+                  if (result !== 'failed') finishExit(result);
                 }}
               >
                 {t('saveAndExit')}
@@ -399,13 +418,11 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
           description={t('leaveExplanation')}
           closeLabel={t('closeConfirmation')}
           saving={saving}
+          saveErrorText={t('saveFailed')}
           t={t}
           onCancel={() => setCloseRequested(false)}
           onSave={saveBeforeExit}
-          onExit={(saved) => {
-            if (saved) onSaved('draftSaved');
-            else onClose();
-          }}
+          onExit={finishExit}
         />
       )}
       <ComposedModal

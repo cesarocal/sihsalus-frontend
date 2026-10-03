@@ -11,6 +11,8 @@ import { newCollection } from './collection-rules';
 import { applicationsMock } from '../../mocks/applicant-selection.mock';
 import { CollectionWorkflow } from './collection-workflow.component';
 import { ScreeningPage } from '../laboratory/screening/screening-page.component';
+import { screeningTests } from '../laboratory/screening/screening.types';
+import { localDateTime } from '../laboratory/screening/screening-rules';
 import { showSnackbar } from '@openmrs/esm-framework';
 
 vi.mock('@openmrs/esm-framework', () => ({
@@ -146,7 +148,9 @@ describe('collection and screening screens', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: t('exitTitle') })).not.toBeInTheDocument());
     expect(screen.getByRole('dialog', { name: title }).closest('.cds--modal')).toHaveClass('is-visible');
     expect(screen.getByLabelText(field)).toHaveValue('Avance pendiente DEMO');
-    expect(screen.getByText(t('saveFailed'))).toBeInTheDocument();
+    expect(
+      screen.getByText(t(section === 'collection' ? 'collectionSaveFailed' : 'screeningSaveFailed')),
+    ).toBeInTheDocument();
     expect(screen.queryByText('PRIVATE_SAVE_ERROR')).not.toBeInTheDocument();
     expect(showSnackbar).not.toHaveBeenCalled();
   });
@@ -169,14 +173,16 @@ describe('collection and screening screens', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar avance' }));
     await waitFor(() =>
       expect(showSnackbar).toHaveBeenCalledWith({
-        title: t('saved'),
+        title: t(section === 'collection' ? 'collectionDraftCreated' : 'screeningDraftUpdated'),
         kind: 'success',
         isLowContrast: true,
         autoClose: true,
         timeoutInMs: 5000,
       }),
     );
-    expect(screen.queryByText(t('saved'))).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(t(section === 'collection' ? 'collectionDraftCreated' : 'screeningDraftUpdated')),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('dialog', { name: t(section === 'collection' ? 'collectionTitle' : 'screeningTitle') }),
     ).toBeInTheDocument();
@@ -188,9 +194,93 @@ describe('collection and screening screens', () => {
     render(<CollectionPage api={processing.collection} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar avance' }));
-    expect(await screen.findByText(t('saveFailed'))).toBeInTheDocument();
+    expect(await screen.findByText(t('collectionSaveFailed'))).toBeInTheDocument();
     expect(showSnackbar).not.toHaveBeenCalled();
     expect(screen.queryByText('PRIVATE_SAVE_ERROR')).not.toBeInTheDocument();
+  });
+  it('shows an accessible lot counter, preserves an oversized paste and blocks draft/exit until corrected', async () => {
+    const record = newCollection(applicationsMock()[2]);
+    record.completedSteps = ['label', 'volume'];
+    const processing = api();
+    const write = vi.spyOn(processing.collection, 'saveCollection');
+    const closed = vi.fn();
+    const finalized = vi.fn();
+    render(
+      <CollectionWorkflow initial={record} api={processing.collection} onClose={closed} onSaved={finalized} t={t} />,
+    );
+    const input = screen.getByLabelText(t('bagLot'));
+    expect(input).not.toHaveAttribute('maxlength');
+    expect(input).toHaveAccessibleDescription(expect.stringContaining('0 / 50'));
+    const overlong = `${'X'.repeat(49)}😀`;
+    fireEvent.change(input, { target: { value: overlong } });
+    expect(input).toHaveValue(overlong);
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(expect.stringContaining('51 / 50'));
+    expect(input).toHaveAccessibleDescription(expect.stringContaining(t('bagLotTooLong')));
+    fireEvent.click(screen.getByRole('button', { name: t('saveDraft') }));
+    expect(write).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: t('collectionTitle') })).getByRole('button', { name: t('close') }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('leave') }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: t('exitTitle') })).not.toBeInTheDocument());
+    expect(input).toHaveValue(overlong);
+    expect(closed).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(showSnackbar).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: 'X'.repeat(50) } });
+    fireEvent.click(screen.getByRole('button', { name: t('saveDraft') }));
+    await waitFor(() => expect(write).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('collectionDraftCreated') })),
+    );
+    expect(input).toHaveValue('X'.repeat(50));
+    expect(finalized).not.toHaveBeenCalled();
+  });
+  it('uses an update message for an existing collection draft', async () => {
+    const processing = api();
+    const record = (await processing.collection.listCollections()).find((item) => item.status === 'pending');
+    if (!record) throw new Error('SYNTHETIC_COLLECTION_MISSING');
+    const initial = await processing.collection.saveCollection(record);
+    render(
+      <CollectionWorkflow initial={initial} api={processing.collection} onClose={vi.fn()} onSaved={vi.fn()} t={t} />,
+    );
+    fireEvent.change(screen.getByLabelText(t('component')), { target: { value: 'Componente actualizado DEMO' } });
+    fireEvent.click(screen.getByRole('button', { name: t('saveDraft') }));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('collectionDraftUpdated') })),
+    );
+  });
+  it.each([
+    'collection',
+    'screening',
+  ])('closes an unchanged saved %s draft without another write or notification', async (section) => {
+    const processing = api();
+    render(
+      section === 'collection' ? (
+        <CollectionPage api={processing.collection} />
+      ) : (
+        <ScreeningPage api={processing.screening} />
+      ),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: section === 'collection' ? 'Extraer sangre' : 'Registrar tamizaje' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('saveDraft') }));
+    await waitFor(() => expect(showSnackbar).toHaveBeenCalled());
+    vi.mocked(showSnackbar).mockClear();
+    const write =
+      section === 'collection'
+        ? vi.spyOn(processing.collection, 'saveCollection')
+        : vi.spyOn(processing.screening, 'saveScreening');
+    const dialog = screen.getByRole('dialog', {
+      name: t(section === 'collection' ? 'collectionTitle' : 'screeningTitle'),
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: t('close') }));
+    fireEvent.click(screen.getByRole('button', { name: t('leave') }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(write).not.toHaveBeenCalled();
+    expect(showSnackbar).not.toHaveBeenCalled();
   });
   it('shows a safe error and retry on a failed laboratory load', async () => {
     const screening = api().screening;
@@ -201,6 +291,93 @@ describe('collection and screening screens', () => {
     expect(await screen.findByText(t('loadFailed'))).toBeInTheDocument();
     expect(screen.queryByText('SECRET_STACK')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+  });
+  it('announces the label stage without claiming collection completion', async () => {
+    const processing = api();
+    const record = (await processing.collection.listCollections()).find((item) => item.status === 'pending');
+    if (!record) throw new Error('SYNTHETIC_COLLECTION_MISSING');
+    record.label = {
+      ...record.label,
+      component: 'Sangre DEMO',
+      anticoagulant: 'CPDA DEMO',
+      plannedVolume: '450',
+      service: 'Banco DEMO',
+      collectedBy: 'Profesional DEMO',
+      sampleType: 'Sangre DEMO',
+      sampleContainer: 'Tubo DEMO',
+    };
+    const finalized = vi.fn();
+    render(
+      <CollectionWorkflow initial={record} api={processing.collection} onClose={vi.fn()} onSaved={finalized} t={t} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    await screen.findByLabelText(t('extractedVolume'));
+    expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('collectionLabelSaved') }));
+    expect(finalized).not.toHaveBeenCalled();
+    expect((await processing.screening.listScreenings()).some((item) => item.collectionId === record.id)).toBe(true);
+  });
+  it('announces collection completion only after saving the certificate', async () => {
+    const processing = api();
+    let record = (await processing.collection.listCollections()).find((item) => item.status === 'pending');
+    if (!record) throw new Error('SYNTHETIC_COLLECTION_MISSING');
+    record.label = {
+      ...record.label,
+      component: 'Sangre DEMO',
+      anticoagulant: 'CPDA DEMO',
+      plannedVolume: '450',
+      service: 'Banco DEMO',
+      collectedBy: 'Profesional DEMO',
+      sampleType: 'Sangre DEMO',
+      sampleContainer: 'Tubo DEMO',
+    };
+    record.extractedVolume = '420';
+    record.registry = {
+      ...record.registry,
+      bagLot: 'LOTE DEMO',
+      complications: 'no',
+      extractionStatus: 'complete',
+      attendedBy: 'Profesional DEMO',
+    };
+    record.certificate.emailConsent = 'no';
+    for (const stage of ['label', 'volume', 'registry'] as const)
+      record = await processing.collection.saveCollection(record, stage);
+    render(<CollectionPage api={processing.collection} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuar extracción' }));
+    expect(showSnackbar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: t('certificateSave') }));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('collectionFinished') })),
+    );
+    expect((await processing.collection.listCollections()).find((item) => item.id === record.id)?.status).toBe(
+      'completed',
+    );
+  });
+  it('announces screening completion only after validation and never says the unit is released', async () => {
+    const processing = api();
+    let record = (await processing.screening.listScreenings())[0];
+    record.identityVerified = true;
+    record.receivedOn = localDateTime();
+    record.receivedBy = 'Recepción DEMO';
+    record.performedOn = localDateTime();
+    record.performedBy = 'Laboratorio DEMO';
+    record.validatedBy = 'Validador DEMO';
+    for (const test of screeningTests)
+      record.tests[test] = { result: 'nonReactive', reagent: 'Reactivo DEMO', brand: 'Marca DEMO', lot: 'Lote DEMO' };
+    record = await processing.screening.saveScreening(record, 'reception');
+    record = await processing.screening.saveScreening(record, 'results');
+    render(<ScreeningPage api={processing.screening} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
+    expect(showSnackbar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: t('validateResults') }));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('screeningFinished') })),
+    );
+    expect((await processing.screening.listScreenings()).find((item) => item.id === record.id)?.status).toBe(
+      'validated',
+    );
+    expect(
+      (await processing.collection.listCollections()).find((item) => item.id === record.collectionId)?.unitStatus,
+    ).toBe('quarantine');
   });
   it('opens laboratory reception, requires identity confirmation and saves only a draft on exit', async () => {
     render(<ScreeningPage api={api().screening} />);
