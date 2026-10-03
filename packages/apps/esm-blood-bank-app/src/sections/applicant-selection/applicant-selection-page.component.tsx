@@ -17,11 +17,15 @@ import {
   Tile,
 } from '@carbon/react';
 import { Add } from '@carbon/react/icons';
-import { BloodBankPictogram, PageHeader } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
+import type { BloodBankApi } from '../../api';
 import { moduleName } from '../../constants';
+import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustration.component';
+import { BloodBankPageHeader } from '../../shared/blood-bank-page-header.component';
+import { notifySuccess } from '../../shared/notify-success';
+import { newApplicationForDonor } from './donor-application';
 import { selectionMessages } from './selection-messages';
 import { isFinal, newApplication } from './selection-rules';
 import { SelectionWorkflow } from './selection-workflow.component';
@@ -49,7 +53,17 @@ const statusColors = {
   excluded: 'red',
 } as const;
 
-export function ApplicantSelectionPage({ api }: { api: ApplicantSelectionApi }) {
+export function ApplicantSelectionPage({
+  api,
+  initialDonorId,
+  loadDonor,
+  onDonorRequestConsumed,
+}: {
+  api: ApplicantSelectionApi;
+  initialDonorId?: string | null;
+  loadDonor?: BloodBankApi['getDonorDetail'];
+  onDonorRequestConsumed?: () => void;
+}) {
   const { t: translate } = useTranslation(moduleName);
   const t = useCallback(
     (key: string) => String(translate(`selection.${key}`, selectionMessages[key]?.es ?? key)),
@@ -65,7 +79,36 @@ export function ApplicantSelectionPage({ api }: { api: ApplicantSelectionApi }) 
   const [pageSize, setPageSize] = useState(10);
   const [active, setActive] = useState<SelectionApplication | null>(null);
   const [refresh, setRefresh] = useState(0);
-  const [message, setMessage] = useState('');
+  const [donorLoading, setDonorLoading] = useState(false);
+  const [donorFailed, setDonorFailed] = useState(false);
+  const [donorAttempt, setDonorAttempt] = useState(0);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: donorAttempt explicitly retries the same donor reference.
+  useEffect(() => {
+    setDonorFailed(false);
+    if (!initialDonorId || !loadDonor) {
+      setDonorLoading(false);
+      return;
+    }
+    let current = true;
+    setDonorLoading(true);
+    void loadDonor(initialDonorId)
+      .then((donor) => {
+        if (!current) return;
+        if (donor.summary.id !== initialDonorId) throw new Error('DONOR_IDENTITY_MISMATCH');
+        setActive(newApplicationForDonor(donor));
+        onDonorRequestConsumed?.();
+      })
+      .catch(() => {
+        if (current) setDonorFailed(true);
+      })
+      .finally(() => {
+        if (current) setDonorLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [initialDonorId, loadDonor, onDonorRequestConsumed, donorAttempt]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refresh is an explicit reload trigger after saving or retrying.
   useEffect(() => {
@@ -105,19 +148,20 @@ export function ApplicantSelectionPage({ api }: { api: ApplicantSelectionApi }) 
   };
   const saved = (key: string) => {
     setActive(null);
-    setMessage(key);
+    notifySuccess(t(key));
     setRefresh((value) => value + 1);
   };
 
   return (
     <div className={styles.page}>
       <h1 className="cds--visually-hidden">{t('title')}</h1>
-      <PageHeader illustration={<BloodBankPictogram />} title={t('title')} className={styles.pageHeader} />
+      <BloodBankPageHeader illustration={<BloodBankPageIllustration section="selection" />} title={t('title')} />
       <div className={styles.content}>
         <section className={styles.summary} aria-label={t('summary')}>
           {['applications', 'awaitingInterview', 'selected'].map((key) => (
             <Tile key={key} className={styles.summaryTile}>
               <p>{t(key)}</p>
+              <small>{t('applicantsUnit')}</small>
               <span>
                 {loading || failed
                   ? '—'
@@ -128,22 +172,32 @@ export function ApplicantSelectionPage({ api }: { api: ApplicantSelectionApi }) 
             </Tile>
           ))}
         </section>
-        {message && <InlineNotification kind="success" title={t(message)} onCloseButtonClick={() => setMessage('')} />}
+        {donorLoading && (
+          <p role="status" className={styles.help}>
+            {t('loadingDonor')}
+          </p>
+        )}
+        {donorFailed && (
+          <div className={styles.prefillError}>
+            <InlineNotification
+              hideCloseButton
+              kind="error"
+              title={t('donorPrefillFailed')}
+              subtitle={t('donorPrefillFailedHelp')}
+            />
+            <div>
+              <Button kind="tertiary" size="sm" onClick={() => setDonorAttempt((value) => value + 1)}>
+                {t('retry')}
+              </Button>
+              <Button kind="ghost" size="sm" onClick={onDonorRequestConsumed}>
+                {t('cancelDonorPrefill')}
+              </Button>
+            </div>
+          </div>
+        )}
         <div className={styles.listHeading}>
           <h2>{t('applicationList')}</h2>
-          <Button
-            type="button"
-            renderIcon={Add}
-            disabled={loading || failed}
-            onClick={() => {
-              setMessage('');
-              setActive(newApplication());
-            }}
-          >
-            {t('newApplication')}
-          </Button>
         </div>
-        <p className={styles.help}>{t('mockNotice')}</p>
         <div className={styles.surface}>
           <div className={styles.filters}>
             <Select
@@ -167,14 +221,26 @@ export function ApplicantSelectionPage({ api }: { api: ApplicantSelectionApi }) 
               <SelectItem value="wholeBlood" text={t('wholeBlood')} />
               <SelectItem value="apheresis" text={t('apheresis')} />
             </Select>
-            <Search
-              id="selection-search"
-              labelText={t('searchApplicants')}
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={(event) => changeFilter(setSearch, event.target.value)}
-              closeButtonLabelText={t('clearSearch')}
-            />
+            <div className={styles.searchActions}>
+              <Search
+                id="selection-search"
+                labelText={t('searchApplicants')}
+                placeholder={t('searchPlaceholder')}
+                value={search}
+                onChange={(event) => changeFilter(setSearch, event.target.value)}
+                closeButtonLabelText={t('clearSearch')}
+              />
+              <Button
+                type="button"
+                renderIcon={Add}
+                disabled={loading || failed || donorLoading || Boolean(initialDonorId)}
+                onClick={() => {
+                  setActive(newApplication());
+                }}
+              >
+                {t('newApplication')}
+              </Button>
+            </div>
           </div>
           {loading ? (
             <DataTableSkeleton columnCount={8} rowCount={5} showHeader={false} showToolbar={false} />
@@ -229,7 +295,6 @@ export function ApplicantSelectionPage({ api }: { api: ApplicantSelectionApi }) 
                               kind="ghost"
                               size="sm"
                               onClick={() => {
-                                setMessage('');
                                 setActive(a);
                               }}
                             >

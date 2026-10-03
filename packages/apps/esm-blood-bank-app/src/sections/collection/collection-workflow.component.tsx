@@ -15,6 +15,7 @@ import type { CollectionApi } from '../../api/blood-bank-processing.api';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { printDocument } from '../../shared/print-document';
+import { notifySuccess } from '../../shared/notify-success';
 import { calculateReturnDate } from '../applicant-selection/selection-rules';
 import styles from '../applicant-selection/selection.scss';
 import {
@@ -48,13 +49,11 @@ export function CollectionWorkflow({
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const stage = collectionSteps[step];
   const finalized = record.status === 'completed';
   const locked = finalized || record.completedSteps.includes(stage);
   const change = (next: CollectionRecord) => {
     setRecord(next);
-    setSaved(false);
   };
   const save = async (advance = false) => {
     if (saving) return false;
@@ -70,9 +69,11 @@ export function CollectionWorkflow({
     try {
       const result = await api.saveCollection(record, advance ? stage : undefined);
       setRecord(result);
-      setSaved(true);
       if (advance && stage === 'certificate') onSaved();
-      else if (advance) setStep((value) => value + 1);
+      else {
+        notifySuccess(t('saved'));
+        if (advance) setStep((value) => value + 1);
+      }
       return true;
     } catch {
       setFailed('saveFailed');
@@ -189,7 +190,6 @@ export function CollectionWorkflow({
       t={t}
     >
       <CollectionIdentity record={record} t={t} />
-      {saved && <InlineNotification hideCloseButton kind="success" title={t('saved')} />}
       {locked && <p className={styles.help}>{t('locked')}</p>}
       {step === 0 && (
         <>

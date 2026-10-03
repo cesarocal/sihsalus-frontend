@@ -1,14 +1,15 @@
-import { dashboardMock, donorsMock, inventoryMock } from '../mocks/blood-bank.mock';
+import { dashboardMock, inventoryMock } from '../mocks/blood-bank.mock';
 import type { BloodBankApi } from './blood-bank.api';
 import { createMockApplicantSelectionApi } from './mock-applicant-selection.api';
 import { createMockProcessingApi } from './mock-blood-bank-processing.api';
 import { readProcessingState } from './mock-processing-store';
-import { fullName } from '../sections/collection/collection-rules';
-import type { DonorSummary } from '../types/blood-bank.types';
+import { readMockDonorDetails } from './mock-donors-store';
 
 const copy = <T>(value: T): T => structuredClone(value);
 const selection = createMockApplicantSelectionApi();
 const processing = createMockProcessingApi(selection);
+
+const donorDetails = () => readMockDonorDetails(() => globalThis.sessionStorage);
 
 export const mockBloodBankApi: BloodBankApi = {
   selection,
@@ -17,26 +18,18 @@ export const mockBloodBankApi: BloodBankApi = {
     return copy(dashboardMock);
   },
   async getDonors() {
-    const records = readProcessingState(() => globalThis.sessionStorage).collections.filter((record) =>
-      record.completedSteps.includes('registry'),
-    );
-    const latestByIdentity = new Map<string, (typeof records)[number]>();
-    for (const record of records.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)))
-      latestByIdentity.set(
-        `${record.application.admission.documentType}:${record.application.admission.documentNumber}`,
-        record,
-      );
+    return copy(donorDetails().map((detail) => detail.summary));
+  },
+  async getDonorDetail(id) {
+    const detail = donorDetails().find((item) => item.summary.id === id);
+    if (!detail) throw new Error('DONOR_NOT_FOUND');
+    return copy(detail);
+  },
+  async getDonorRegistry() {
     return copy(
-      [...latestByIdentity.values()]
-        .map<DonorSummary>((record) => ({
-          id: record.application.admission.donorCode || `DON-${record.application.number}`,
-          documentNumber: record.application.admission.documentNumber,
-          fullName: fullName(record.application),
-          bloodGroup: `${record.application.physical.bloodGroup}${record.application.physical.rh}`,
-          lastDonationDate: record.registry.date,
-          status: 'En evaluación' as const,
-        }))
-        .concat(donorsMock),
+      donorDetails()
+        .flatMap((detail) => detail.donations)
+        .sort((a, b) => b.date.localeCompare(a.date)),
     );
   },
   async getInventory() {

@@ -18,7 +18,7 @@ Se reutilizan Carbon, PageHeader/Pictogram del framework y tokens/layout de `app
 8. Captura siete pruebas: HBsAg, Anti-HBc, Anti-HCV, Anti-VIH 1/2, Anti-HTLV I/II, Chagas y Sífilis. Cada una requiere resultado y reactivo/marca/lote. Fecha y profesional comunes se aplican a todas las pruebas de esta captura.
 9. Revisión exige validador y todas las pruebas completas. Resultado global: Reactivo si alguna es reactiva, luego Indeterminado si corresponde, sino No reactivo. Validar bloquea edición; permite imprimir el resumen.
 
-La X confirma salida y ofrece guardar incluso una etapa incompleta o descartar solo cambios no guardados. Etiqueta/volumen/registro cerrados son de consulta. Revisiones antiguas no sobrescriben registros actualizados.
+La X utiliza la confirmación compartida `../../shared/exit-confirmation.component.tsx`, con **Seguir editando / Salir** y la casilla **Guardar el avance antes de salir** marcada por defecto, también en Tamizaje. Guardar conserva incluso una etapa incompleta; desmarcar descarta solo cambios no guardados, nunca el registro previo. Un fallo devuelve al formulario sin perder su edición. Durante el envío se bloquea la salida y el guardado duplicado. Etiqueta/volumen/registro cerrados son de consulta; un documento finalizado se cierra sin esta confirmación. Revisiones antiguas no sobrescriben registros actualizados.
 
 **La unidad permanece en cuarentena con cualquier resultado. Reactivo no confirma diagnóstico.** Liberación/descarte, confirmaciones/repeticiones, sello de calidad, seguimiento, rechazo/reemplazo de muestras y reacción adversa están pendientes. El riesgo biológico autólogo no se infiere automáticamente de un tamizaje único.
 

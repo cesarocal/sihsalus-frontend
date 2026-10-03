@@ -16,6 +16,8 @@ import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
 import { hasActiveExclusion, isFinal, physicalWarnings, validateFinal, validateStep } from './selection-rules';
 import { printSelectionReport, SelectionReport } from './selection-report.component';
 import { SelectionStageFields } from './selection-stage-fields.component';
+import { notifySuccess } from '../../shared/notify-success';
+import { ExitConfirmation } from '../../shared/exit-confirmation.component';
 import {
   selectionSteps,
   type ApplicantHistory,
@@ -204,7 +206,10 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
       onSaved(
         stage === 'physical' ? 'readyForInterview' : saved.status === 'selected' ? 'selectionSaved' : 'exclusionSaved',
       );
-    else setStep(step + 1);
+    else {
+      notifySuccess(t('draftSaved'));
+      setStep(step + 1);
+    }
   };
 
   const resolvePhysical = async (continueInterview: boolean) => {
@@ -230,14 +235,9 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     return false;
   };
 
-  const closeAndSave = async () => {
-    if (!dirty && data.id) {
-      onSaved('draftSaved');
-      return;
-    }
-    const saved = await persist('draft');
-    if (saved) onSaved('draftSaved');
-    else setCloseRequested(false);
+  const saveBeforeExit = async () => {
+    if (!dirty && data.id) return true;
+    return Boolean(await persist('draft'));
   };
 
   return (
@@ -393,35 +393,21 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
           {saving && <InlineLoading description={t('saving')} />}
         </ModalFooter>
       </ComposedModal>
-      <ComposedModal
-        open={closeRequested}
-        size="sm"
-        aria-label={t('leaveTitle')}
-        onClose={() => setCloseRequested(false)}
-        preventCloseOnClickOutside
-      >
-        <ModalHeader title={t('leaveTitle')} iconDescription={t('closeConfirmation')} />
-        <ModalBody>
-          <p>{t('leaveExplanation')}</p>
-          <div className={styles.confirmActions}>
-            <Button type="button" kind="secondary" disabled={saving} onClick={() => setCloseRequested(false)}>
-              {t('keepEditing')}
-            </Button>
-            <Button type="button" kind="tertiary" disabled={saving} onClick={onClose}>
-              {t('discardUnsaved')}
-            </Button>
-            <Button
-              type="button"
-              disabled={saving}
-              onClick={() => {
-                void closeAndSave();
-              }}
-            >
-              {t('saveAndExit')}
-            </Button>
-          </div>
-        </ModalBody>
-      </ComposedModal>
+      {closeRequested && (
+        <ExitConfirmation
+          title={t('leaveTitle')}
+          description={t('leaveExplanation')}
+          closeLabel={t('closeConfirmation')}
+          saving={saving}
+          t={t}
+          onCancel={() => setCloseRequested(false)}
+          onSave={saveBeforeExit}
+          onExit={(saved) => {
+            if (saved) onSaved('draftSaved');
+            else onClose();
+          }}
+        />
+      )}
       <ComposedModal
         open={warningsOpen}
         size="md"

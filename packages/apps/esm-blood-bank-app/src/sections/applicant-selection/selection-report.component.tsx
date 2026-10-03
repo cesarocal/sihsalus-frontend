@@ -24,7 +24,7 @@ export function SelectionReport({ application: a, t }: { application: SelectionA
       <header>
         <p>{t('hospital')}</p>
         <h2>{t('reportTitle')}</h2>
-        <p>{t('mockDocument')}</p>
+        <p data-demo>{t('mockDocument')}</p>
       </header>
       <h3>{t('admission')}</h3>
       <dl>

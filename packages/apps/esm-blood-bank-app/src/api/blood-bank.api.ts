@@ -1,4 +1,10 @@
-import type { DashboardData, DonorSummary, InventorySummary } from '../types/blood-bank.types';
+import type {
+  DashboardData,
+  DonorDetail,
+  DonorDonation,
+  DonorSummary,
+  InventorySummary,
+} from '../types/blood-bank.types';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
 
@@ -9,5 +15,7 @@ export interface BloodBankApi {
   screening: ScreeningApi;
   getDashboard(): Promise<DashboardData>;
   getDonors(): Promise<DonorSummary[]>;
+  getDonorDetail(id: string): Promise<DonorDetail>;
+  getDonorRegistry(): Promise<DonorDonation[]>;
   getInventory(): Promise<InventorySummary[]>;
 }

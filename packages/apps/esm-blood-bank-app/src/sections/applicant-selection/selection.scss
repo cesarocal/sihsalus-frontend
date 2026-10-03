@@ -4,11 +4,64 @@
 
 .page {
   margin: -2rem;
+  min-height: calc(100vh - 3rem);
+  background: $ui-02;
+}
+.headerIllustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 92px;
+  flex-shrink: 0;
+}
+.selectionIllustration {
+  // Same teal as the repository's clinical pictograms.
+  color: #7bbcb9;
 }
 .pageHeader {
   padding-inline: layout.$spacing-05;
   border-bottom: 1px solid $ui-03;
   background: $ui-02;
+}
+.sectionHeader {
+  height: auto;
+  min-height: layout.$spacing-12;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: layout.$spacing-04;
+  padding-block: layout.$spacing-03;
+}
+.headerRight {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: layout.$spacing-05;
+  margin-inline-start: auto;
+}
+.headerContext {
+  @include type.type-style("body-compact-02");
+  color: $text-02;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: layout.$spacing-03;
+}
+.headerContextItem {
+  display: inline-flex;
+  align-items: center;
+  gap: layout.$spacing-02;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  svg {
+    flex-shrink: 0;
+  }
+}
+.headerSeparator {
+  margin-inline: layout.$spacing-02;
 }
 .pageTitle {
   @include type.type-style("heading-04");
@@ -23,14 +76,20 @@
   gap: layout.$spacing-05;
   margin-bottom: layout.$spacing-05;
 }
-.summaryTile {
+.summaryTile:global(.cds--tile) {
   height: 7.875rem;
   border: 1px solid $ui-03;
   background: $ui-02;
   p {
     @include type.type-style("heading-compact-01");
-    margin-bottom: layout.$spacing-06;
+    margin-bottom: layout.$spacing-04;
     color: $text-02;
+  }
+  small {
+    @include type.type-style("label-01");
+    display: block;
+    color: $text-02;
+    margin-bottom: layout.$spacing-02;
   }
   span {
     @include type.type-style("heading-04");
@@ -46,6 +105,27 @@
     @include type.type-style("heading-compact-02");
   }
 }
+.detailHeading {
+  margin-block: layout.$spacing-06 layout.$spacing-04;
+  h3 {
+    @include type.type-style("heading-compact-02");
+  }
+}
+.donationHistory {
+  margin-top: layout.$spacing-06;
+  .listHeading h2 {
+    @include type.type-style("heading-03");
+  }
+}
+.prefillError {
+  display: grid;
+  gap: layout.$spacing-04;
+  margin-block: layout.$spacing-05;
+  > div:last-child {
+    display: flex;
+    gap: layout.$spacing-04;
+  }
+}
 .help {
   @include type.type-style("helper-text-01");
   color: $text-02;
@@ -57,11 +137,34 @@
 }
 .filters {
   display: grid;
-  grid-template-columns: 1fr 1fr minmax(16rem, 1.5fr);
+  grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr) minmax(
+      24rem,
+      2fr
+    );
   gap: layout.$spacing-05;
   padding: layout.$spacing-05;
   align-items: end;
-  background: $ui-01;
+  background: $ui-02;
+}
+.searchActions {
+  display: flex;
+  align-items: end;
+  gap: layout.$spacing-04;
+  > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+  :global(.cds--btn) {
+    flex-shrink: 0;
+  }
+}
+.dateRangeFilters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-03;
+}
+.filterWarning {
+  padding: layout.$spacing-05;
 }
 .tableScroll {
   overflow-x: auto;
@@ -84,6 +187,7 @@
     width: min(95vw, 90rem);
     max-width: 90rem;
     max-height: 94vh;
+    background: $ui-02;
   }
   :global(.cds--modal-content) {
     padding-top: 0;
@@ -169,6 +273,9 @@
   gap: layout.$spacing-03;
   margin-top: layout.$spacing-06;
 }
+.exitOptions {
+  margin-top: layout.$spacing-05;
+}
 .errors {
   padding: layout.$spacing-05;
   background: var(--cds-notification-background-error, #fff1f1);
@@ -188,6 +295,10 @@
   padding: layout.$spacing-06;
   border: 1px solid $ui-03;
   background: $ui-02;
+  // Printed documents have isolated styles and retain the synthetic-data watermark.
+  [data-demo] {
+    display: none;
+  }
   header {
     text-align: center;
     h2 {
@@ -247,6 +358,15 @@
     padding-top: layout.$spacing-05;
   }
 }
+.donorPersonalData {
+  padding: layout.$spacing-04;
+  > h2 {
+    @include type.type-style("heading-compact-02");
+    background: $ui-01;
+    padding: layout.$spacing-03;
+    margin-bottom: layout.$spacing-04;
+  }
+}
 @media (max-width: 66rem) {
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -262,6 +382,14 @@
   .page {
     margin: -1rem;
   }
+  .headerRight,
+  .headerContext {
+    justify-content: flex-start;
+    margin-inline-start: 0;
+  }
+  .headerSeparator {
+    display: none;
+  }
   .summary,
   .fields,
   .filters {
@@ -270,6 +398,12 @@
   .listHeading {
     align-items: start;
     flex-direction: column;
+  }
+  .searchActions {
+    flex-wrap: wrap;
+    > :first-child {
+      flex-basis: 100%;
+    }
   }
   .report {
     padding: layout.$spacing-04;

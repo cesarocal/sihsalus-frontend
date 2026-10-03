@@ -10,10 +10,16 @@ import { SelectionStageFields } from './selection-stage-fields.component';
 import { validApplication } from './selection.test-helpers';
 import { SelectionWorkflow } from './selection-workflow.component';
 import type { SelectionApplication, SelectionStep } from './selection.types';
+import { showSnackbar } from '@openmrs/esm-framework';
 
 vi.mock('@openmrs/esm-framework', () => ({
-  PageHeader: ({ title }: { title: ReactNode }) => <header>{title}</header>,
+  PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
+  PageHeaderContent: ({ title }: { title: string }) => <div>{title}</div>,
+  useSession: () => ({ sessionLocation: { display: 'Hospital de prueba' } }),
+  formatDatetime: () => '03 oct 2026, 13:47',
+  showSnackbar: vi.fn(),
   BloodBankPictogram: () => null,
+  UserFollowIcon: () => null,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
 const t = (key: string) => selectionMessages[key]?.es ?? key;
@@ -37,6 +43,14 @@ describe('applicant selection UI', () => {
     expect(screen.getByText('No se encontraron postulantes')).toBeInTheDocument();
   });
 
+  it('places the new-application action beside search and adds smaller card descriptions without prototype notices', async () => {
+    render(<ApplicantSelectionPage api={createMockApplicantSelectionApi()} />);
+    const button = await screen.findByRole('button', { name: 'Nueva Postulación' });
+    expect(button.parentElement).toContainElement(screen.getByLabelText('Buscar postulantes'));
+    expect(screen.getAllByText('Postulantes', { selector: 'small' })).toHaveLength(3);
+    expect(screen.queryByText(/Modo de prueba|Prototipo con datos/)).not.toBeInTheDocument();
+  });
+
   it('uses a safe loading error instead of leaking backend information', async () => {
     const api = createMockApplicantSelectionApi();
     api.listApplications = async () => {
@@ -46,6 +60,23 @@ describe('applicant selection UI', () => {
     expect(await screen.findByText('No se pudieron cargar las postulaciones')).toBeInTheDocument();
     expect(screen.queryByText('PRIVATE_STACK_TRACE')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nueva Postulación' })).toBeDisabled();
+  });
+
+  it('announces a successfully saved selection draft through the shell rather than a page notice', async () => {
+    render(<ApplicantSelectionPage api={createMockApplicantSelectionApi()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Nueva Postulación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir' }));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith({
+        title: t('draftSaved'),
+        kind: 'success',
+        isLowContrast: true,
+        autoClose: true,
+        timeoutInMs: 5000,
+      }),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText(t('draftSaved'))).not.toBeInTheDocument();
   });
 
   it('shows conditional interview details and clears hidden values when changed to no', () => {
@@ -84,7 +115,8 @@ describe('applicant selection UI', () => {
     fireEvent.change(screen.getByLabelText('Código de donante (opcional)'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Salir del proceso' }));
     const confirmation = screen.getByRole('dialog', { name: '¿Desea salir del proceso?' });
-    fireEvent.click(within(confirmation).getByRole('button', { name: 'Guardar y salir' }));
+    expect(within(confirmation).getByLabelText('Guardar el avance antes de salir')).toBeChecked();
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(saved).toHaveBeenCalledWith('draftSaved'));
     expect((await api.listApplications()).find((a) => a.number === '000005')?.status).toBe('draft');
   });
@@ -101,11 +133,9 @@ describe('applicant selection UI', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Salir del proceso' }));
-    fireEvent.click(
-      within(screen.getByRole('dialog', { name: '¿Desea salir del proceso?' })).getByRole('button', {
-        name: t('discardUnsaved'),
-      }),
-    );
+    const confirmation = within(screen.getByRole('dialog', { name: '¿Desea salir del proceso?' }));
+    fireEvent.click(confirmation.getByLabelText('Guardar el avance antes de salir'));
+    fireEvent.click(confirmation.getByRole('button', { name: /Salir$/ }));
     expect(closed).toHaveBeenCalledOnce();
   });
 
@@ -123,6 +153,24 @@ describe('applicant selection UI', () => {
     const confirmation = screen.getByRole('dialog', { name: '¿Desea salir del proceso?' });
     fireEvent.click(within(confirmation).getByRole('button', { name: 'Seguir editando' }));
     expect(screen.getByRole('dialog', { name: t('applicationForm') }).closest('.cds--modal')).toHaveClass('is-visible');
+  });
+
+  it('keeps the selection form and pending changes when saving through Exit fails', async () => {
+    const api = createMockApplicantSelectionApi();
+    api.saveDraft = vi.fn().mockRejectedValue(new Error('PRIVATE_EXIT_TRACE'));
+    const saved = vi.fn();
+    const closed = vi.fn();
+    render(<SelectionWorkflow application={validApplication()} api={api} onClose={closed} onSaved={saved} t={t} />);
+    fireEvent.change(screen.getByLabelText('Número de documento'), { target: { value: '90000999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salir del proceso' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: t('leaveTitle') })).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: t('applicationForm') }).closest('.cds--modal')).toHaveClass('is-visible');
+    expect(screen.getByLabelText('Número de documento')).toHaveValue('90000999');
+    expect(screen.getByText(t('saveFailed'))).toBeInTheDocument();
+    expect(screen.queryByText('PRIVATE_EXIT_TRACE')).not.toBeInTheDocument();
+    expect(closed).not.toHaveBeenCalled();
+    expect(saved).not.toHaveBeenCalled();
   });
 
   it('starts an interview by reviewing the three locked earlier sections', async () => {

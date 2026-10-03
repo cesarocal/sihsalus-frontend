@@ -4,10 +4,12 @@ import type { DashboardData, DonorSummary, InventorySummary } from '../types/blo
 import type { BloodBankApi } from './blood-bank.api';
 import { openmrsApplicantSelectionApi } from './applicant-selection.api';
 import { openmrsCollectionApi, openmrsScreeningApi } from './blood-bank-processing.api';
+import { openmrsDonorReadApi } from './donors.api';
 
 const apiBase = '/ws/rest/v1/bloodbank';
 
 export const openmrsBloodBankApi: BloodBankApi = {
+  ...openmrsDonorReadApi,
   selection: openmrsApplicantSelectionApi,
   collection: openmrsCollectionApi,
   screening: openmrsScreeningApi,

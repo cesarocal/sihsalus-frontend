@@ -12,12 +12,13 @@ import {
   TableRow,
   Tile,
 } from '@carbon/react';
-import { BloodBankPictogram, PageHeader } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import spanish from '../../translations/es.json';
 import { moduleName } from '../constants';
 import styles from '../sections/applicant-selection/selection.scss';
+import { BloodBankPageIllustration, type BloodBankIllustration } from './blood-bank-page-illustration.component';
+import { BloodBankPageHeader } from './blood-bank-page-header.component';
 
 export type ProcessingTranslate = (key: string) => string;
 export function useProcessingTranslation() {
@@ -56,32 +57,29 @@ export function useProcessingData<T>(load: () => Promise<T>) {
 }
 export function ProcessingPage({
   title,
-  description,
   counts,
   children,
-  t,
+  illustration,
 }: {
   title: string;
-  description: string;
-  counts: { label: string; value: number | string }[];
+  counts: { label: string; description: string; value: number | string }[];
   children: ReactNode;
-  t: ProcessingTranslate;
+  illustration: BloodBankIllustration;
 }) {
   return (
     <div className={styles.page}>
       <h1 className="cds--visually-hidden">{title}</h1>
-      <PageHeader illustration={<BloodBankPictogram />} title={title} className={styles.pageHeader} />
+      <BloodBankPageHeader illustration={<BloodBankPageIllustration section={illustration} />} title={title} />
       <div className={styles.content}>
-        <p className={styles.help}>{description}</p>
         <section className={styles.summary} aria-label={title}>
           {counts.map((count) => (
             <Tile className={styles.summaryTile} key={count.label}>
               <p>{count.label}</p>
+              <small>{count.description}</small>
               <span>{count.value}</span>
             </Tile>
           ))}
         </section>
-        <p className={styles.help}>{t('mockNotice')}</p>
         {children}
       </div>
     </div>
@@ -95,6 +93,7 @@ export function ProcessingTable({
   failed,
   reload,
   emptyHelp,
+  filterKey,
   t,
 }: {
   title: string;
@@ -104,10 +103,13 @@ export function ProcessingTable({
   failed: boolean;
   reload: () => void;
   emptyHelp: string;
+  filterKey?: string;
   t: ProcessingTranslate;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filterKey explicitly resets the page, not the chosen page size.
+  useEffect(() => setPage(1), [filterKey]);
   const activePage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
   if (loading)
     return <DataTableSkeleton columnCount={columns.length} rowCount={5} showHeader={false} showToolbar={false} />;

@@ -42,6 +42,7 @@ describe('BloodBankApp', () => {
 
   it('muestra un error seguro cuando la API falla', async () => {
     const failingApi: BloodBankApi = {
+      ...mockBloodBankApi,
       selection: mockBloodBankApi.selection,
       collection: mockBloodBankApi.collection,
       screening: mockBloodBankApi.screening,
@@ -86,6 +87,20 @@ describe('BloodBankApp', () => {
     render(<BloodBankApp api={mockBloodBankApi} initialPath="/applicant-selection" />);
     expect(screen.getByText('Sin acceso')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Nueva Postulación' })).not.toBeInTheDocument();
+  });
+
+  it.each(['/donors', '/donors/DON-0001'])('blocks donor data reads at %s without the donor privilege', (path) => {
+    const api: BloodBankApi = {
+      ...mockBloodBankApi,
+      getDonors: vi.fn(),
+      getDonorDetail: vi.fn(),
+      getDonorRegistry: vi.fn(),
+    };
+    render(<BloodBankApp api={api} initialPath={path} />);
+    expect(screen.getByText('Sin acceso')).toBeInTheDocument();
+    expect(api.getDonors).not.toHaveBeenCalled();
+    expect(api.getDonorDetail).not.toHaveBeenCalled();
+    expect(api.getDonorRegistry).not.toHaveBeenCalled();
   });
 
   it('permite selección con el privilegio específico', async () => {

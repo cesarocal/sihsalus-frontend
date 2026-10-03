@@ -4,10 +4,12 @@ import type { BloodBankApi } from './api';
 import { bloodBankPrivileges, type BloodBankPrivilege } from './access/blood-bank-privileges';
 import { ProtectedSection } from './access/protected-section.component';
 import { BloodBankLayout } from './layout/blood-bank-layout.component';
-import { ApplicantSelectionPage } from './sections/applicant-selection/applicant-selection-page.component';
+import { ApplicantSelectionRoute } from './sections/applicant-selection/applicant-selection-route.component';
 import { CollectionPage } from './sections/collection/collection-page.component';
 import { DashboardPage } from './sections/dashboard/dashboard-page.component';
 import { DonorsPage } from './sections/donors/donors-page.component';
+import { DonorDetailPage } from './sections/donors/donor-detail.component';
+import { applicantSelectionPath, donorDetailRoute, donorsPath } from './constants';
 import { DonorFollowUpPage } from './sections/follow-up/donor-follow-up-page.component';
 import { RecipientFollowUpPage } from './sections/follow-up/recipient-follow-up-page.component';
 import { InventoryPage } from './sections/inventory/inventory-page.component';
@@ -33,13 +35,14 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
     <Routes>
       <Route element={<BloodBankLayout />}>
         <Route index element={<DashboardPage api={api} />} />
-        <Route path="donors" element={protectedPage(bloodBankPrivileges.donors, <DonorsPage api={api} />)} />
+        <Route path={donorsPath} element={protectedPage(bloodBankPrivileges.donors, <DonorsPage api={api} />)} />
         <Route
-          path="applicant-selection"
-          element={protectedPage(
-            bloodBankPrivileges.applicantSelection,
-            <ApplicantSelectionPage api={api.selection} />,
-          )}
+          path={donorDetailRoute}
+          element={protectedPage(bloodBankPrivileges.donors, <DonorDetailPage api={api} />)}
+        />
+        <Route
+          path={applicantSelectionPath}
+          element={protectedPage(bloodBankPrivileges.applicantSelection, <ApplicantSelectionRoute api={api} />)}
         />
         <Route
           path="collection"

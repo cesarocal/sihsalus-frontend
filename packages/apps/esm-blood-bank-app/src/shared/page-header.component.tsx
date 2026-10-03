@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { moduleName } from '../constants';
 import styles from '../styles/app.scss';
+import { BloodBankHeaderContext } from './blood-bank-page-header.component';
 
 interface PageHeaderProps {
   title: string;
@@ -14,9 +15,12 @@ export function PageHeader({ title, description, eyebrow = 'Banco de Sangre' }: 
 
   return (
     <header className={styles.pageHeader}>
-      <span>{eyebrow === 'Banco de Sangre' ? t('appTitle', eyebrow) : eyebrow}</span>
-      <h1>{title}</h1>
-      <p>{description}</p>
+      <div className={styles.headerText}>
+        <span>{eyebrow === 'Banco de Sangre' ? t('appTitle', eyebrow) : eyebrow}</span>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </div>
+      <BloodBankHeaderContext />
     </header>
   );
 }

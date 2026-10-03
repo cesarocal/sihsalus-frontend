@@ -1,16 +1,4 @@
-import {
-  Button,
-  InlineNotification,
-  Search,
-  Select,
-  SelectItem,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-  Tag,
-} from '@carbon/react';
+import { Button, Search, Select, SelectItem, Tab, TabList, TabPanel, TabPanels, Tabs, Tag } from '@carbon/react';
 import { useState } from 'react';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
 import {
@@ -22,6 +10,7 @@ import {
 } from '../../shared/processing-page.component';
 import { fullName } from './collection-rules';
 import { CollectionWorkflow } from './collection-workflow.component';
+import { notifySuccess } from '../../shared/notify-success';
 import type { CollectionRecord } from './collection.types';
 import styles from '../applicant-selection/selection.scss';
 
@@ -33,7 +22,6 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
   const [modality, setModality] = useState('');
   const [active, setActive] = useState<CollectionRecord | null>(null);
   const [tab, setTab] = useState(0);
-  const [message, setMessage] = useState(false);
   const records = data ?? [];
   const filtered = records.filter(
     (record) =>
@@ -100,7 +88,6 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
               size="sm"
               onClick={() => {
                 setActive(record);
-                setMessage(false);
               }}
             >
               {t(record.status === 'completed' ? 'viewCertificate' : record.revision ? 'resume' : 'collect')}
@@ -118,16 +105,13 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
   return (
     <ProcessingPage
       title={t('collectionTitle')}
-      description={t('collectionDescription')}
-      t={t}
+      illustration="collection"
       counts={['pending', 'inProgress', 'completed'].map((value) => ({
         label: t(value),
+        description: t('applicationsUnit'),
         value: loading || failed ? '—' : records.filter((record) => record.status === value).length,
       }))}
     >
-      {message && (
-        <InlineNotification kind="success" title={t('finished')} onCloseButtonClick={() => setMessage(false)} />
-      )}
       <Tabs
         selectedIndex={tab}
         onChange={({ selectedIndex }) => {
@@ -155,7 +139,7 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
           }}
           onSaved={() => {
             setActive(null);
-            setMessage(true);
+            notifySuccess(t('finished'));
             reload();
           }}
         />

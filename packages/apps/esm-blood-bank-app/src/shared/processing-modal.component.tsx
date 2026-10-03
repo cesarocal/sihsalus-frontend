@@ -10,6 +10,7 @@ import {
 } from '@carbon/react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProcessingTranslate } from './processing-page.component';
+import { ExitConfirmation } from './exit-confirmation.component';
 import styles from '../sections/applicant-selection/selection.scss';
 
 export function ProcessingModal({
@@ -135,37 +136,16 @@ export function ProcessingModal({
         </ModalFooter>
       </ComposedModal>
       {confirm && (
-        <ComposedModal
-          open
-          size="sm"
-          preventCloseOnClickOutside
-          onClose={() => setConfirm(false)}
-          aria-label={t('exitTitle')}
-        >
-          <ModalHeader title={t('exitTitle')} iconDescription={t('close')} closeModal={() => setConfirm(false)} />
-          <ModalBody>
-            <p>{t('exitHelp')}</p>
-            <div className={styles.confirmActions}>
-              <Button kind="secondary" disabled={saving} onClick={() => setConfirm(false)}>
-                {t('keepEditing')}
-              </Button>
-              <Button kind="danger--tertiary" disabled={saving} onClick={onClose}>
-                {t('leave')}
-              </Button>
-              <Button
-                disabled={saving}
-                onClick={() => {
-                  void onDraft().then((ok) => {
-                    if (ok) onClose();
-                    else setConfirm(false);
-                  });
-                }}
-              >
-                {t('saveAndLeave')}
-              </Button>
-            </div>
-          </ModalBody>
-        </ComposedModal>
+        <ExitConfirmation
+          title={t('exitTitle')}
+          description={t('exitHelp')}
+          closeLabel={t('close')}
+          saving={saving}
+          t={t}
+          onCancel={() => setConfirm(false)}
+          onSave={onDraft}
+          onExit={() => onClose()}
+        />
       )}
     </>
   );

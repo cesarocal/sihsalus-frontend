@@ -16,6 +16,7 @@ import {
 } from '../sections/applicant-selection/selection.types';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import { readProcessingState } from './mock-processing-store';
+import { readMockDonorDetails } from './mock-donors-store';
 
 export const selectionStorageKey = 'sihsalus.blood-bank.selection.mock.v1';
 interface MockState {
@@ -39,16 +40,13 @@ export function createMockApplicantSelectionApi(
   const history = (
     identity: Pick<AdmissionData, 'documentType' | 'documentNumber' | 'donorCode'>,
   ): ApplicantHistory | null => {
-    const donationProfiles: ApplicantHistory[] = readProcessingState(getStorage)
-      .collections.filter((record) => record.completedSteps.includes('registry'))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map((record) => ({
-        donorCode: record.application.admission.donorCode || `DON-${record.application.number}`,
-        documentType: record.application.admission.documentType,
-        documentNumber: record.application.admission.documentNumber,
-        personal: record.application.personal,
-        patientUuid: record.application.patientUuid,
-      }));
+    const donationProfiles: ApplicantHistory[] = readMockDonorDetails(getStorage).map((donor) => ({
+      donorCode: donor.summary.id,
+      documentType: donor.documentType,
+      documentNumber: donor.summary.documentNumber,
+      personal: donor.personal ?? undefined,
+      patientUuid: donor.patientUuid,
+    }));
     const profiles = [...donationProfiles, ...applicantProfilesMock()];
     const code = identity.donorCode.trim().toUpperCase();
     const byCode = profiles.find((profile) => code && profile.donorCode === code);

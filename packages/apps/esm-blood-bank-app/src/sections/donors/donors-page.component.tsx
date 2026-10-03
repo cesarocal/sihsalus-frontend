@@ -1,51 +1,124 @@
-import { Button, Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow, Tag } from '@carbon/react';
-import { useTranslation } from 'react-i18next';
-
+import { Button, Search, Select, SelectItem, Tag } from '@carbon/react';
+import { List } from '@carbon/react/icons';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { BloodBankApi } from '../../api';
-import { useApiData } from '../../api/use-api-data';
-import { moduleName } from '../../constants';
-import { DataErrorState, EmptyState } from '../../shared/data-state.component';
-import { LoadingState } from '../../shared/loading-state.component';
-import { PageHeader } from '../../shared/page-header.component';
-import styles from '../../styles/app.scss';
+import {
+  normalizeSearch,
+  ProcessingPage,
+  ProcessingTable,
+  useProcessingData,
+  useProcessingTranslation,
+} from '../../shared/processing-page.component';
+import { donorDetailPath } from '../../constants';
+import { DonorRegistry } from './donor-registry.component';
+import { donorStatusKey, formatDonorDate } from './donor-utils';
+import styles from '../applicant-selection/selection.scss';
 
 export function DonorsPage({ api }: { api: BloodBankApi }) {
-  const { t } = useTranslation(moduleName);
-  const { data: donors, error, isLoading } = useApiData(api.getDonors);
-  const donorStatusLabels = {
-    Apto: t('donorStatusEligible', 'Apto'),
-    Diferido: t('donorStatusDeferred', 'Diferido'),
-    'En evaluación': t('donorStatusUnderEvaluation', 'En evaluación'),
-  };
-
-  if (isLoading) return <LoadingState />;
-  if (error || !donors) return <DataErrorState />;
-
+  const t = useProcessingTranslation();
+  const navigate = useNavigate();
+  const { data, loading, failed, reload } = useProcessingData(api.getDonors);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [registryOpen, setRegistryOpen] = useState(false);
+  const donors = data ?? [];
+  const filtered = donors.filter(
+    (donor) =>
+      (!status || donor.status === status) &&
+      (!bloodGroup || donor.bloodGroup === bloodGroup) &&
+      normalizeSearch(`${donor.id} ${donor.documentNumber} ${donor.fullName}`).includes(normalizeSearch(search.trim())),
+  );
   return (
-    <div className={styles.page}>
-      <PageHeader description={t('donorsDescription', 'Registro, consulta e historial de las personas donantes.')} title={t('donors', 'Donantes')} />
-      <div className={styles.actions}><Button>{t('registerDonor', 'Registrar donante')}</Button></div>
-      {donors.length === 0 ? <EmptyState message={t('emptyDonors', 'No hay donantes registrados.')} /> : <TableContainer title={t('donorRegistry', 'Registro de donantes')}>
-        <Table useZebraStyles>
-          <TableHead><TableRow>{[
-            t('code', 'Código'), t('document', 'Documento'), t('name', 'Nombre'), t('bloodGroup', 'Grupo'),
-            t('lastDonation', 'Última donación'), t('status', 'Estado'), t('actions', 'Acciones'),
-          ].map((label) => <TableHeader key={label}>{label}</TableHeader>)}</TableRow></TableHead>
-          <TableBody>
-            {donors.map((donor) => (
-              <TableRow key={donor.id}>
-                <TableCell>{donor.id}</TableCell>
-                <TableCell>{donor.documentNumber}</TableCell>
-                <TableCell>{donor.fullName}</TableCell>
-                <TableCell>{donor.bloodGroup}</TableCell>
-                <TableCell>{donor.lastDonationDate}</TableCell>
-                <TableCell><Tag type={donor.status === 'Apto' ? 'green' : 'blue'}>{donorStatusLabels[donor.status]}</Tag></TableCell>
-                <TableCell><Button kind="ghost" size="sm">{t('viewDetail', 'Ver detalle')}</Button></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>}
-    </div>
+    <ProcessingPage
+      title={t('donorsTitle')}
+      illustration="donors"
+      counts={[
+        { label: t('registeredDonors'), description: t('peopleUnit'), value: loading || failed ? '—' : donors.length },
+        ...(['Apto', 'Diferido'] as const).map((value) => ({
+          label: t(value === 'Apto' ? 'eligibleDonors' : 'deferredDonors'),
+          description: t('donorsUnit'),
+          value: loading || failed ? '—' : donors.filter((donor) => donor.status === value).length,
+        })),
+      ]}
+    >
+      {registryOpen ? (
+        <DonorRegistry api={api} onBack={() => setRegistryOpen(false)} />
+      ) : (
+        <>
+          <div className={styles.listHeading}>
+            <h2>{t('donorList')}</h2>
+          </div>
+          <div className={styles.surface}>
+            <div className={styles.filters}>
+              <Select
+                id="donor-status"
+                labelText={t('status')}
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                <SelectItem value="" text={t('allStatuses')} />
+                {Object.entries(donorStatusKey).map(([value, key]) => (
+                  <SelectItem key={value} value={value} text={t(key)} />
+                ))}
+              </Select>
+              <Select
+                id="donor-group"
+                labelText={t('bloodGroup')}
+                value={bloodGroup}
+                onChange={(event) => setBloodGroup(event.target.value)}
+              >
+                <SelectItem value="" text={t('allBloodGroups')} />
+                {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((value) => (
+                  <SelectItem key={value} value={value} text={value} />
+                ))}
+              </Select>
+              <div className={styles.searchActions}>
+                <Search
+                  id="donor-search"
+                  labelText={t('searchDonors')}
+                  placeholder={t('donorSearchPlaceholder')}
+                  value={search}
+                  closeButtonLabelText={t('clearSearch')}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+                <Button renderIcon={List} onClick={() => setRegistryOpen(true)}>
+                  {t('donorRegistry')}
+                </Button>
+              </div>
+            </div>
+            <ProcessingTable
+              title={t('donorList')}
+              columns={['donorCode', 'document', 'donorName', 'bloodGroup', 'lastDonation', 'status', 'actions']}
+              rows={filtered.map((donor) => ({
+                id: donor.id,
+                cells: [
+                  donor.id,
+                  donor.documentNumber,
+                  donor.fullName,
+                  donor.bloodGroup,
+                  formatDonorDate(donor.lastDonationDate),
+                  <Tag
+                    key="status"
+                    type={donor.status === 'Apto' ? 'green' : donor.status === 'Diferido' ? 'magenta' : 'blue'}
+                  >
+                    {t(donorStatusKey[donor.status])}
+                  </Tag>,
+                  <Button key="detail" kind="ghost" size="sm" onClick={() => void navigate(donorDetailPath(donor.id))}>
+                    {t('viewDonorDetail')}
+                  </Button>,
+                ],
+              }))}
+              loading={loading}
+              failed={failed}
+              reload={reload}
+              emptyHelp={t('emptyDonors')}
+              t={t}
+            />
+          </div>
+        </>
+      )}
+    </ProcessingPage>
   );
 }

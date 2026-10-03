@@ -5,12 +5,16 @@ import { BrowserRouter, useLocation } from 'react-router-dom';
 
 import { ProtectedSection } from '../access/protected-section.component';
 import { RequireAnyPrivilege } from '../access/require-any-privilege.component';
-import { basePath, moduleName } from '../constants';
+import { basePath, donorsPath, moduleName } from '../constants';
 import { bloodBankNavigation, type NavigationItem } from './blood-bank-navigation';
 
 function decorativeIcon(Icon: NonNullable<NavigationItem['icon']>) {
   return function DecorativeIcon() {
-    return <span aria-hidden="true"><Icon size={16} /></span>;
+    return (
+      <span aria-hidden="true">
+        <Icon size={16} />
+      </span>
+    );
   };
 }
 
@@ -28,10 +32,7 @@ function BloodBankNavContent() {
     <>
       {bloodBankNavigation.map((item) =>
         item.children ? (
-          <RequireAnyPrivilege
-            key={item.path}
-            privileges={item.children.map((child) => child.privilege)}
-          >
+          <RequireAnyPrivilege key={item.path} privileges={item.children.map((child) => child.privilege)}>
             <SideNavMenu
               title={t(item.labelKey, item.defaultLabel)}
               renderIcon={item.icon ? decorativeIcon(item.icon) : undefined}
@@ -42,13 +43,13 @@ function BloodBankNavContent() {
                 const ChildIcon = child.icon;
                 return (
                   <ProtectedSection key={child.path} privilege={child.privilege} hideUnauthorized>
-                    <SideNavMenuItem
-                      href={href}
-                      isActive={pathname === href}
-                      onClick={(event) => open(event, href)}
-                    >
+                    <SideNavMenuItem href={href} isActive={pathname === href} onClick={(event) => open(event, href)}>
                       <span className="sihsalus-side-nav__item">
-                        {ChildIcon && <span aria-hidden="true"><ChildIcon className="sihsalus-side-nav__icon" size={20} /></span>}
+                        {ChildIcon && (
+                          <span aria-hidden="true">
+                            <ChildIcon className="sihsalus-side-nav__icon" size={20} />
+                          </span>
+                        )}
                         <span className="sihsalus-side-nav__text">{t(child.labelKey, child.defaultLabel)}</span>
                       </span>
                     </SideNavMenuItem>
@@ -62,7 +63,10 @@ function BloodBankNavContent() {
             <SideNavLink
               href={hrefFor(item.path)}
               renderIcon={item.icon ? decorativeIcon(item.icon) : undefined}
-              isActive={pathname === hrefFor(item.path)}
+              isActive={
+                pathname === hrefFor(item.path) ||
+                (item.path === donorsPath && pathname.startsWith(`${hrefFor(item.path)}/`))
+              }
               onClick={(event) => open(event, hrefFor(item.path))}
             >
               {t(item.labelKey, item.defaultLabel)}
@@ -75,5 +79,9 @@ function BloodBankNavContent() {
 }
 
 export default function BloodBankNav() {
-  return <BrowserRouter><BloodBankNavContent /></BrowserRouter>;
+  return (
+    <BrowserRouter>
+      <BloodBankNavContent />
+    </BrowserRouter>
+  );
 }

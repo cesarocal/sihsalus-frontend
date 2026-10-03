@@ -1,4 +1,4 @@
-import { Button, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
+import { Button, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
 import {
@@ -9,6 +9,7 @@ import {
   useProcessingTranslation,
 } from '../../../shared/processing-page.component';
 import { ScreeningWorkflow } from './screening-workflow.component';
+import { notifySuccess } from '../../../shared/notify-success';
 import type { ScreeningRecord } from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 
@@ -19,7 +20,6 @@ export function ScreeningPage({ api }: { api: ScreeningApi }) {
   const [status, setStatus] = useState('');
   const [result, setResult] = useState('');
   const [active, setActive] = useState<ScreeningRecord | null>(null);
-  const [message, setMessage] = useState(false);
   const records = data ?? [];
   const filtered = records.filter(
     (record) =>
@@ -32,16 +32,13 @@ export function ScreeningPage({ api }: { api: ScreeningApi }) {
   return (
     <ProcessingPage
       title={t('screeningTitle')}
-      description={t('screeningDescription')}
-      t={t}
+      illustration="screening"
       counts={['pending', 'inProgress', 'validated'].map((value) => ({
         label: t(value),
+        description: t('samplesUnit'),
         value: loading || failed ? '—' : records.filter((record) => record.status === value).length,
       }))}
     >
-      {message && (
-        <InlineNotification kind="success" title={t('finished')} onCloseButtonClick={() => setMessage(false)} />
-      )}
       <div className={styles.surface}>
         <div className={styles.filters}>
           <Select
@@ -108,7 +105,6 @@ export function ScreeningPage({ api }: { api: ScreeningApi }) {
                 size="sm"
                 onClick={() => {
                   setActive(record);
-                  setMessage(false);
                 }}
               >
                 {t(record.status === 'validated' ? 'viewResults' : 'registerResults')}
@@ -133,7 +129,7 @@ export function ScreeningPage({ api }: { api: ScreeningApi }) {
           }}
           onSaved={() => {
             setActive(null);
-            setMessage(true);
+            notifySuccess(t('finished'));
             reload();
           }}
         />

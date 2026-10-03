@@ -5,6 +5,7 @@ import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
+import { notifySuccess } from '../../../shared/notify-success';
 import styles from '../../applicant-selection/selection.scss';
 import { ScreeningIdentity, ScreeningReport } from './screening-report.component';
 import { localDateTime, validateScreening } from './screening-rules';
@@ -32,13 +33,11 @@ export function ScreeningWorkflow({
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const finalized = record.status === 'validated';
   const locked = finalized || (step === 0 && record.completedSteps.includes('reception'));
   const stage = screeningSteps[step];
   const change = (next: ScreeningRecord) => {
     setRecord(next);
-    setSaved(false);
   };
   const save = async (advance = false) => {
     if (saving) return false;
@@ -54,9 +53,11 @@ export function ScreeningWorkflow({
     try {
       const result = await api.saveScreening(record, advance ? stage : undefined);
       setRecord(result);
-      setSaved(true);
       if (advance && stage === 'validation') onSaved();
-      else if (advance) setStep((value) => value + 1);
+      else {
+        notifySuccess(t('saved'));
+        if (advance) setStep((value) => value + 1);
+      }
       return true;
     } catch {
       setFailed('saveFailed');
@@ -121,7 +122,6 @@ export function ScreeningWorkflow({
       }
     >
       {step < 2 && <ScreeningIdentity record={record} t={t} />}
-      {saved && <InlineNotification hideCloseButton kind="success" title={t('saved')} />}
       {locked && <p className={styles.help}>{t('locked')}</p>}
       {step === 0 && (
         <>

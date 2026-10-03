@@ -34,7 +34,7 @@ No se introducen permisos por etapa en este cambio. En producción deberán veri
 6. Precalificación registra Apto, No apto temporal o No apto permanente, nombres, colegiatura, revisión de jefatura cuando es apto y observaciones. La temporal requiere duración y calcula retorno por días/meses/años calendario.
 7. Revisión permite imprimir y guardar el resultado. Solo Apto queda Seleccionado. El formulario detenido omite la entrevista y queda No apto.
 
-Guardar y salir conserva incluso un paso incompleto. La X solicita confirmación; salir sin guardar descarta solo la edición pendiente, nunca el registro previo.
+Guardar y salir conserva incluso un paso incompleto. La X utiliza `../../shared/exit-confirmation.component.tsx`: **Seguir editando / Salir**, con **Guardar el avance antes de salir** marcado por defecto. Desmarcar la casilla descarta solo la edición pendiente, nunca el registro previo. Si falla el guardado, el formulario conserva sus datos y muestra el error; durante el envío no se permite cerrar ni duplicar el guardado. La confirmación se reinicia con guardado activado cada vez que se abre. Las tres decisiones del aviso clínico del examen físico no cambian.
 La finalización no se puede repetir ni editar; los guardados con una revisión antigua fallan sin sobrescribir otra versión.
 Las tres primeras secciones se bloquean también en el adaptador mock, no solo en los inputs.
 El motivo de exclusión se guarda en el formulario pero no lo devuelve la consulta de antecedentes de admisión.
