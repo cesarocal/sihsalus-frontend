@@ -30,9 +30,11 @@ export function ProcessingModal({
   onPrevious,
   advanceLabel,
   advanceDisabled = false,
+  previousDisabled = false,
   closeDisabled = false,
   children,
   extraActions,
+  footerClassName,
   t,
 }: {
   title: string;
@@ -51,13 +53,20 @@ export function ProcessingModal({
   onPrevious: () => void;
   advanceLabel: string;
   advanceDisabled?: boolean;
+  previousDisabled?: boolean;
   closeDisabled?: boolean;
   children: ReactNode;
   extraActions?: ReactNode;
+  footerClassName?: string;
   t: ProcessingTranslate;
 }) {
   const [confirm, setConfirm] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each stage change explicitly resets the review to its beginning.
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [step]);
   // Carbon's native Escape listener retains the initial callback while open.
   // Read current guards so a nested confirmation or pending save cannot close it.
   const closeState = useRef({ saving, closeDisabled, finalized, onClose });
@@ -100,7 +109,7 @@ export function ProcessingModal({
             </ProgressIndicator>
           </div>
         </ModalHeader>
-        <ModalBody>
+        <ModalBody ref={bodyRef}>
           {failed && <InlineNotification hideCloseButton kind="error" title={t(failed)} />}
           {!!errors.length && (
             <div className={styles.errors} tabIndex={-1} ref={errorRef} role="alert" aria-label={t('requiredFields')}>
@@ -117,11 +126,11 @@ export function ProcessingModal({
           </div>
           {children}
         </ModalBody>
-        <ModalFooter className={styles.footer}>
+        <ModalFooter className={[styles.footer, footerClassName].filter(Boolean).join(' ')}>
           <div>{extraActions}</div>
           <div>
             {step > 0 && (
-              <Button kind="secondary" disabled={saving} onClick={onPrevious}>
+              <Button kind="secondary" disabled={saving || previousDisabled} onClick={onPrevious}>
                 {t('previous')}
               </Button>
             )}

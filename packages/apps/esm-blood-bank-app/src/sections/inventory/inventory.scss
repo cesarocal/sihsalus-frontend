@@ -1,0 +1,104 @@
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.printFooter:global(.cds--modal-footer) > div:first-child {
+  margin-inline-end: auto;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: layout.$spacing-04;
+  padding: layout.$spacing-05;
+  > :first-child {
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  padding: 0 layout.$spacing-05 layout.$spacing-05;
+}
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+  > * {
+    min-width: 0;
+  }
+}
+.checks {
+  display: grid;
+  gap: layout.$spacing-04;
+  margin-block: layout.$spacing-05;
+}
+.help {
+  @include type.type-style("body-01");
+  margin-block: layout.$spacing-05;
+  color: $text-02;
+}
+.reason {
+  margin-bottom: layout.$spacing-05;
+}
+.seals {
+  display: grid;
+  gap: layout.$spacing-05;
+}
+.seal {
+  border: 1px solid $ui-03;
+  padding: layout.$spacing-05;
+}
+.back {
+  gap: layout.$spacing-03;
+  margin-bottom: layout.$spacing-05;
+}
+.review {
+  overflow-wrap: anywhere;
+}
+.review h4 {
+  @include type.type-style("heading-compact-02");
+  margin-block: layout.$spacing-05;
+}
+.review dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+}
+.review dt {
+  @include type.type-style("heading-compact-01");
+}
+.review dd {
+  margin: layout.$spacing-03 0;
+  white-space: pre-wrap;
+}
+.signature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: layout.$spacing-05;
+  margin-top: layout.$spacing-07;
+  padding-top: layout.$spacing-04;
+  > :last-child {
+    border-top: 1px solid $ui-04;
+    padding-top: layout.$spacing-03;
+    text-align: center;
+  }
+}
+.witnesses {
+  white-space: pre-wrap;
+  margin-block: layout.$spacing-05;
+}
+@media (max-width: 42rem) {
+  .toolbar > button {
+    width: 100%;
+  }
+  .filters,
+  .form,
+  .review dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

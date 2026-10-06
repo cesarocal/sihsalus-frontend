@@ -6,6 +6,7 @@ import { openmrsApplicantSelectionApi } from './applicant-selection.api';
 import { openmrsCollectionApi, openmrsScreeningApi } from './blood-bank-processing.api';
 import { openmrsDonorReadApi } from './donors.api';
 import { openmrsFractionationApi } from './fractionation.api';
+import { openmrsInventoryApi } from './inventory.api';
 
 const apiBase = '/ws/rest/v1/bloodbank';
 
@@ -15,6 +16,7 @@ export const openmrsBloodBankApi: BloodBankApi = {
   collection: openmrsCollectionApi,
   screening: openmrsScreeningApi,
   fractionation: openmrsFractionationApi,
+  inventory: openmrsInventoryApi,
   async getDashboard() {
     const response = await openmrsFetch<DashboardData>(`${apiBase}/dashboard`);
     return response.data;

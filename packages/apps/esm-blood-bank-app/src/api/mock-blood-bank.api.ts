@@ -1,10 +1,11 @@
-import { dashboardMock, inventoryMock } from '../mocks/blood-bank.mock';
+import { dashboardMock } from '../mocks/blood-bank.mock';
 import type { BloodBankApi } from './blood-bank.api';
 import { createMockApplicantSelectionApi } from './mock-applicant-selection.api';
 import { createMockProcessingApi } from './mock-blood-bank-processing.api';
 import { readProcessingState } from './mock-processing-store';
 import { readMockDonorDetails } from './mock-donors-store';
-import { createMockFractionationApi, fractionationInventory, fractionationStore } from './mock-fractionation.api';
+import { createMockFractionationApi } from './mock-fractionation.api';
+import { createMockInventoryApi, inventoryWorkspace } from './mock-inventory.api';
 
 const copy = <T>(value: T): T => structuredClone(value);
 const selection = createMockApplicantSelectionApi();
@@ -16,6 +17,7 @@ export const mockBloodBankApi: BloodBankApi = {
   selection,
   ...processing,
   fractionation: createMockFractionationApi(),
+  inventory: createMockInventoryApi(),
   async getDashboard() {
     return copy(dashboardMock);
   },
@@ -36,22 +38,6 @@ export const mockBloodBankApi: BloodBankApi = {
   },
   async getInventory() {
     const state = readProcessingState(() => globalThis.sessionStorage);
-    const managed = fractionationStore(state).units.map((unit) => unit.id);
-    const units = state.collections
-      .filter((record) => record.unitStatus === 'quarantine')
-      .filter((record) => !managed.includes(record.unitCode))
-      .map((record) => ({
-        id: record.unitCode,
-        component: record.label.component,
-        bloodGroup: `${record.application.physical.bloodGroup}${record.application.physical.rh}`,
-        expiresAt: '—',
-        location: record.label.service,
-        status: 'Cuarentena' as const,
-      }));
-    return copy([
-      ...units,
-      ...inventoryMock.filter((unit) => !managed.includes(unit.id)),
-      ...fractionationInventory(state),
-    ]);
+    return copy(inventoryWorkspace(state).units);
   },
 };

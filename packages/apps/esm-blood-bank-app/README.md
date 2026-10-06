@@ -126,6 +126,37 @@ Usa los mocks de procesamiento existentes de forma aditiva y mantiene sus datos.
 Ver [Fraccionamiento](src/sections/laboratory/fractionation/README.md) para los
 contratos propuestos de API/OMOD, referencias aportadas, límites y validación.
 
+## Inventario: sellos y eliminación
+
+`/blood-bank/inventory` conserva su permiso de sección. Añade búsqueda, filtros
+de componente/grupo/estado, selección múltiple y flujos de Sello de calidad y
+Eliminar unidades. Cada popup admite selección previa o búsqueda interna.
+El sello exige tamizaje original validado no reactivo e inspección manual.
+Su popup muestra exclusivamente unidades no reactivas, con o sin selección
+previa. La tabla resume el tamizaje sin columna Verificación para sello;
+Seleccionar resultados filtrados se conserva únicamente en los popups.
+Se añaden tres unidades mock no reactivas y dos reactivas, sin reemplazar datos.
+Solo una solicitud de impresión y confirmación explícita pasan la unidad a
+`APTO`. Estado operativo y resultado de tamizaje permanecen separados, conforme
+al SQL aportado. Eliminar unidades tiene tres pasos: selección, causas (ocho
+opciones del BPMN por unidad) y revisión con impresión del borrador. Imprimir
+no retira stock. El acta EG010-FR02 registra las causas y responsables, marca el lote
+`ELIMINADAS` y lo retira del stock activo sin borrar su historial.
+
+El historial permite retomar borradores y consultar/imprimir actas. Los sellos
+pendientes y unidades eliminadas se bloquean también en Fraccionamiento.
+Persistencia atómica mock en la misma pestaña, sin cambios de backend/login ni
+standalone; el adaptador OMOD nuevo está deshabilitado. Ver [Inventario](src/sections/inventory/README.md)
+para los contratos, límites de impresión y validación clínica pendiente.
+
+Los botones de imprimir acta/sellos usan el estilo azul `ghost` con icono y
+se sitúan en el pie izquierdo de Inventario, también en el detalle histórico.
+El helper de impresión de procesamiento usa el renderer cliente compartido con
+el shell para preparar un árbol temporal desconectado del DOM y lo desmonta antes
+de imprimir. Evita depender de internals de depuración de React al combinar el
+ESM de desarrollo con el shell de producción. No cambia componentes globales,
+estados de unidades ni las reglas de confirmación del sello.
+
 ## Desarrollo integrado con OpenMRS
 
 Después de preparar el SPA según el README principal:

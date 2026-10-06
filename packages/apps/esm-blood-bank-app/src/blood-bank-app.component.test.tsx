@@ -65,6 +65,22 @@ describe('BloodBankApp', () => {
     expect(screen.queryByRole('heading', { name: 'Inventario' })).not.toBeInTheDocument();
   });
 
+  it('does not read inventory operations when its section privilege is denied', () => {
+    allowedPrivileges.add(bloodBankPrivileges.module);
+    const list = vi.fn(mockBloodBankApi.inventory.list);
+    render(
+      <BloodBankApp
+        api={{
+          ...mockBloodBankApi,
+          inventory: { ...mockBloodBankApi.inventory, list },
+        }}
+        initialPath="/inventory"
+      />,
+    );
+    expect(list).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Sello de calidad' })).not.toBeInTheDocument();
+  });
+
   it('permite solo la subsección autorizada de laboratorio', async () => {
     allowedPrivileges.add(bloodBankPrivileges.module);
     allowedPrivileges.add(bloodBankPrivileges.compatibility);

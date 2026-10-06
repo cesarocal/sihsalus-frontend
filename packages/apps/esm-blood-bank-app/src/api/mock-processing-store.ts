@@ -4,6 +4,7 @@ import type { CollectionRecord } from '../sections/collection/collection.types';
 import { localDateTime, newScreeningSample, newScreening } from '../sections/laboratory/screening/screening-rules';
 import type { ApheresisDraft, ScreeningRecord } from '../sections/laboratory/screening/screening.types';
 import type { FractionationStore } from '../sections/laboratory/fractionation/fractionation.types';
+import type { InventoryStore } from '../sections/inventory/inventory.types';
 
 export const processingStorageKey = 'sihsalus.blood-bank.processing.mock.v1';
 export type MockStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -13,6 +14,7 @@ export interface ProcessingState {
   screenings: ScreeningRecord[];
   apheresisDraft?: ApheresisDraft | null;
   fractionation?: FractionationStore;
+  inventory?: InventoryStore;
 }
 function initialState(): ProcessingState {
   const application = applicationsMock().find((item) => item.status === 'selected');

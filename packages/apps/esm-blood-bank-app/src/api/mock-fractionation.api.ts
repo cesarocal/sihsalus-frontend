@@ -17,6 +17,7 @@ import {
 } from '../sections/laboratory/fractionation/fractionation.types';
 import type { InventorySummary } from '../types/blood-bank.types';
 import type { FractionationApi } from './fractionation.api';
+import { inventoryBlocksFractionation } from './mock-inventory-store';
 import {
   readProcessingState,
   writeProcessingState,
@@ -219,7 +220,11 @@ export function createMockFractionationApi(
     writeProcessingState(getStorage, { ...state, fractionation: store });
   return {
     async list() {
-      return structuredClone(load().store);
+      const { state, store } = load();
+      return structuredClone({
+        ...store,
+        units: store.units.filter((unit) => !inventoryBlocksFractionation(state, unit.code)),
+      });
     },
     async start(sourceIds) {
       const { state, store } = load();
@@ -227,7 +232,9 @@ export function createMockFractionationApi(
         throw new Error('FRACTIONATION_INVALID_SELECTION');
       const sources = sourceIds.map((id) => store.units.find((unit) => unit.id === id));
       if (
-        sources.some((source) => !source || !eligibleSource(source)) ||
+        sources.some(
+          (source) => !source || !eligibleSource(source) || inventoryBlocksFractionation(state, source.code),
+        ) ||
         new Set(sources.map((source) => source?.component)).size !== 1
       )
         throw new Error('FRACTIONATION_INVALID_SELECTION');
