@@ -174,4 +174,4 @@ export function ProcessingTable({
     </>
   );
 }
-export const normalizeSearch = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+export { normalizeSearch } from './normalize-search';

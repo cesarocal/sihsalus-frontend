@@ -40,7 +40,7 @@ export function applicationsMock(): SelectionApplication[] {
       ...application.admission,
       documentNumber: `9000001${index}`,
       donationType: 'voluntary',
-      modality: 'wholeBlood',
+      modality: status === 'admitted' ? 'apheresis' : 'wholeBlood',
     };
     application.personal = {
       ...applicantProfilesMock()[0].personal,

@@ -95,9 +95,36 @@ El detalle de archivos, mapeo del modelo y límites clínicos está en [Selecci�
 
 También requieren el privilegio de entrada del módulo; mantienen los enlaces y guards existentes, sin cambiar navbar ni login.
 Hay un seleccionado inicial (DNI ficticio `90000012`) y una muestra inicial `M-DEMO-001` para probar ambas pantallas.
+Tamizaje separa **Donantes** y **Seguimientos**, con colas e historiales validados
+independientes. Solo Donantes registra muestras de aféresis: buscar postulación,
+revisar su identificación y confirmar/imprimir la etiqueta. En una sesión mock
+nueva también hay `M-SEG-DEMO-001` y la postulación de aféresis `000001`
+(DNI ficticio `90000010`); los datos guardados anteriormente no se resetean.
+La muestra de aféresis no crea una unidad ni cambia la decisión de selección.
+Ver [Tamizaje por origen](src/sections/laboratory/screening/README.md) para contratos,
+compatibilidad, permisos, escenarios de prueba y limitaciones del backend pendiente.
 Los contratos de API están en `src/api/blood-bank-processing.api.ts`; los adaptadores reales fallan de forma segura hasta implementar el OMOD.
 No se liberan unidades, diagnostican infecciones, envían correos ni archivan PDF en OpenMRS.
 Ver [Extracción y Tamizaje](src/sections/collection/README.md) para organización, mapeo y evidencia.
+
+## Fraccionamiento (prototipo navegable)
+
+Ruta: `/blood-bank/laboratory/fractionation`, con el privilegio
+`app:home.bancoSangre.laboratorio.fraccionamiento` y el acceso al módulo existente.
+Incluye cola con selección homogénea en lote, árbol por unidad, etiquetas,
+volúmenes, revisión y confirmación para ingresar resultados en cuarentena.
+Cada fila elegible también permite fraccionar su unidad sin usar la selección
+del lote. Dividir queda bloqueado hasta deshacer esa rama; el avance se guarda
+al continuar o, de forma opcional, al salir con la X, sin botón Guardar avance
+en este flujo. Los demás formularios conservan sus acciones existentes.
+El plasma rico en plaquetas puede ser un resultado final del flujo mock sin
+obligar a dividirlo; mantiene etiqueta, volumen y cuarentena. Esta opción no
+aprueba su conservación ni su uso clínico.
+Los orígenes pasan a En laboratorio al iniciar y a Fraccionados al finalizar;
+permanecen trazables en el historial, fuera del inventario activo.
+Usa los mocks de procesamiento existentes de forma aditiva y mantiene sus datos.
+Ver [Fraccionamiento](src/sections/laboratory/fractionation/README.md) para los
+contratos propuestos de API/OMOD, referencias aportadas, límites y validación.
 
 ## Desarrollo integrado con OpenMRS
 

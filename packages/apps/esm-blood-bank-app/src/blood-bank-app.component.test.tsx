@@ -112,21 +112,34 @@ describe('BloodBankApp', () => {
   it.each([
     ['/collection', bloodBankPrivileges.collection, 'Extraer sangre'],
     ['/laboratory/screening', bloodBankPrivileges.screening, 'Registrar tamizaje'],
+    ['/laboratory/fractionation', bloodBankPrivileges.fractionation, 'Fraccionar'],
   ])('permite la nueva pantalla %s solo con su privilegio', async (path, privilege, action) => {
     allowedPrivileges.add(privilege);
     render(<BloodBankApp api={mockBloodBankApi} initialPath={path} />);
     expect(await screen.findByRole('button', { name: action })).toBeInTheDocument();
   });
 
-  it.each(['/collection', '/laboratory/screening'])('bloquea la URL %s sin consultar sus datos', (path) => {
-    const api: BloodBankApi = {
-      ...mockBloodBankApi,
-      collection: { ...mockBloodBankApi.collection, listCollections: vi.fn() },
-      screening: { ...mockBloodBankApi.screening, listScreenings: vi.fn() },
-    };
-    render(<BloodBankApp api={api} initialPath={path} />);
-    expect(screen.getByText('Sin acceso')).toBeInTheDocument();
-    expect(api.collection.listCollections).not.toHaveBeenCalled();
-    expect(api.screening.listScreenings).not.toHaveBeenCalled();
-  });
+  it.each(['/collection', '/laboratory/screening', '/laboratory/fractionation'])(
+    'bloquea la URL %s sin consultar sus datos',
+    (path) => {
+      const api: BloodBankApi = {
+        ...mockBloodBankApi,
+        collection: { ...mockBloodBankApi.collection, listCollections: vi.fn() },
+        fractionation: { ...mockBloodBankApi.fractionation, list: vi.fn() },
+        screening: {
+          ...mockBloodBankApi.screening,
+          listScreenings: vi.fn(),
+          listApheresisCandidates: vi.fn(),
+          getApheresisDraft: vi.fn(),
+        },
+      };
+      render(<BloodBankApp api={api} initialPath={path} />);
+      expect(screen.getByText('Sin acceso')).toBeInTheDocument();
+      expect(api.collection.listCollections).not.toHaveBeenCalled();
+      expect(api.fractionation.list).not.toHaveBeenCalled();
+      expect(api.screening.listScreenings).not.toHaveBeenCalled();
+      expect(api.screening.listApheresisCandidates).not.toHaveBeenCalled();
+      expect(api.screening.getApheresisDraft).not.toHaveBeenCalled();
+    },
+  );
 });

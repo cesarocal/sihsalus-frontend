@@ -1,0 +1,30 @@
+@use "@carbon/layout";
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: layout.$spacing-04;
+  padding: layout.$spacing-05;
+
+  > :first-child {
+    flex: 1 1 20rem;
+    min-width: 0;
+  }
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  padding: 0 layout.$spacing-05 layout.$spacing-05;
+}
+
+@media (max-width: 42rem) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+  .toolbar > button {
+    width: 100%;
+  }
+}

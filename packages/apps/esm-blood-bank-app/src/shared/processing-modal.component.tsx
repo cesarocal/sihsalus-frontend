@@ -30,6 +30,7 @@ export function ProcessingModal({
   onPrevious,
   advanceLabel,
   advanceDisabled = false,
+  closeDisabled = false,
   children,
   extraActions,
   t,
@@ -44,18 +45,23 @@ export function ProcessingModal({
   failed: string;
   saveErrorText: string;
   onClose: () => void;
-  onDraft: () => Promise<boolean>;
+  onDraft?: () => Promise<boolean>;
   onSaveBeforeExit: () => Promise<ExitSaveResult>;
   onAdvance: () => void;
   onPrevious: () => void;
   advanceLabel: string;
   advanceDisabled?: boolean;
+  closeDisabled?: boolean;
   children: ReactNode;
   extraActions?: ReactNode;
   t: ProcessingTranslate;
 }) {
   const [confirm, setConfirm] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
+  // Carbon's native Escape listener retains the initial callback while open.
+  // Read current guards so a nested confirmation or pending save cannot close it.
+  const closeState = useRef({ saving, closeDisabled, finalized, onClose });
+  closeState.current = { saving, closeDisabled, finalized, onClose };
   useEffect(() => {
     if (errors.length) errorRef.current?.focus();
   }, [errors]);
@@ -69,8 +75,9 @@ export function ProcessingModal({
     return () => window.removeEventListener('beforeunload', warn);
   }, [finalized]);
   const requestClose = () => {
-    if (saving) return false;
-    if (finalized) onClose();
+    const current = closeState.current;
+    if (current.saving || current.closeDisabled) return false;
+    if (current.finalized) current.onClose();
     else setConfirm(true);
     return false;
   };
@@ -118,7 +125,7 @@ export function ProcessingModal({
                 {t('previous')}
               </Button>
             )}
-            {!finalized && (
+            {!finalized && onDraft && (
               <Button
                 kind="tertiary"
                 disabled={saving}

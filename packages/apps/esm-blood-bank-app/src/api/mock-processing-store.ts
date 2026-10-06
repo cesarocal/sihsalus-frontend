@@ -1,8 +1,9 @@
 import { applicationsMock } from '../mocks/applicant-selection.mock';
 import { newCollection } from '../sections/collection/collection-rules';
 import type { CollectionRecord } from '../sections/collection/collection.types';
-import { localDateTime, newScreening } from '../sections/laboratory/screening/screening-rules';
-import type { ScreeningRecord } from '../sections/laboratory/screening/screening.types';
+import { localDateTime, newScreeningSample, newScreening } from '../sections/laboratory/screening/screening-rules';
+import type { ApheresisDraft, ScreeningRecord } from '../sections/laboratory/screening/screening.types';
+import type { FractionationStore } from '../sections/laboratory/fractionation/fractionation.types';
 
 export const processingStorageKey = 'sihsalus.blood-bank.processing.mock.v1';
 export type MockStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -10,6 +11,8 @@ export interface ProcessingState {
   version: 1;
   collections: CollectionRecord[];
   screenings: ScreeningRecord[];
+  apheresisDraft?: ApheresisDraft | null;
+  fractionation?: FractionationStore;
 }
 function initialState(): ProcessingState {
   const application = applicationsMock().find((item) => item.status === 'selected');
@@ -47,7 +50,25 @@ function initialState(): ProcessingState {
   const screening = newScreening(collection);
   // Start with a visible synthetic sample, without pre-filling clinical results.
   screening.collectedOn = `${localDateTime().slice(0, 10)}T00:00`;
-  return { version: 1, collections: [collection], screenings: [screening] };
+  const followUp = newScreeningSample({
+    id: 'mock-screening-follow-up-demo',
+    origin: { type: 'followUp', followUpId: 'SEG-DEMO-001', subject: 'donor' },
+    collectionId: '',
+    unitCode: '',
+    sampleCode: 'M-SEG-DEMO-001',
+    applicationNumber: '',
+    applicantName: 'Seguimiento Demostración',
+    documentNumber: '90000021',
+    sampleType: 'Sangre (DEMO)',
+    sampleContainer: 'Tubo (DEMO)',
+  });
+  followUp.collectedOn = screening.collectedOn;
+  return {
+    version: 1,
+    collections: [collection],
+    screenings: [screening, followUp],
+    apheresisDraft: null,
+  };
 }
 export function readProcessingState(getStorage: () => MockStorage): ProcessingState {
   const raw = getStorage().getItem(processingStorageKey);

@@ -1,5 +1,10 @@
 import type { CollectionRecord, CollectionStep } from '../sections/collection/collection.types';
-import type { ScreeningRecord, ScreeningStep } from '../sections/laboratory/screening/screening.types';
+import type {
+  ApheresisCandidate,
+  ApheresisDraft,
+  ScreeningRecord,
+  ScreeningStep,
+} from '../sections/laboratory/screening/screening.types';
 
 export interface CollectionApi {
   listCollections(): Promise<CollectionRecord[]>;
@@ -8,14 +13,28 @@ export interface CollectionApi {
 export interface ScreeningApi {
   listScreenings(): Promise<ScreeningRecord[]>;
   saveScreening(record: ScreeningRecord, step?: ScreeningStep): Promise<ScreeningRecord>;
+  listApheresisCandidates(): Promise<ApheresisCandidate[]>;
+  getApheresisDraft(): Promise<ApheresisDraft | null>;
+  saveApheresisDraft(candidate: ApheresisCandidate, revision: number): Promise<ApheresisDraft>;
+  registerApheresisSample(draft: ApheresisDraft): Promise<ScreeningRecord>;
 }
 /** Proposed OMOD contracts; these paths do not assert that a backend already exists. */
 export const processingEndpoints = {
   collections: '/ws/rest/v1/bloodbank/collections',
   screenings: '/ws/rest/v1/bloodbank/screenings',
+  apheresisCandidates: '/ws/rest/v1/bloodbank/screenings/apheresis/candidates',
+  apheresisDraft: '/ws/rest/v1/bloodbank/screenings/apheresis/draft',
+  apheresisSamples: '/ws/rest/v1/bloodbank/screenings/apheresis/samples',
 };
 const unavailable = async (): Promise<never> => {
   throw new Error('BLOOD_BANK_PROCESSING_BACKEND_NOT_IMPLEMENTED');
 };
 export const openmrsCollectionApi: CollectionApi = { listCollections: unavailable, saveCollection: unavailable };
-export const openmrsScreeningApi: ScreeningApi = { listScreenings: unavailable, saveScreening: unavailable };
+export const openmrsScreeningApi: ScreeningApi = {
+  listScreenings: unavailable,
+  saveScreening: unavailable,
+  listApheresisCandidates: unavailable,
+  getApheresisDraft: unavailable,
+  saveApheresisDraft: unavailable,
+  registerApheresisSample: unavailable,
+};

@@ -2,18 +2,47 @@ import { newCollection, validateCollection, validateCollectionText } from '../se
 import { collectionSteps } from '../sections/collection/collection.types';
 import {
   globalScreeningResult,
+  newApheresisScreening,
   newScreening,
   validateScreening,
 } from '../sections/laboratory/screening/screening-rules';
 import { screeningSteps } from '../sections/laboratory/screening/screening.types';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
+import type { ApheresisCandidate } from '../sections/laboratory/screening/screening.types';
+import { fullName } from '../sections/collection/collection-rules';
 import { readProcessingState, writeProcessingState, type MockStorage } from './mock-processing-store';
 
 export function createMockProcessingApi(
   selection: ApplicantSelectionApi,
   getStorage: () => MockStorage = () => globalThis.sessionStorage,
 ): { collection: CollectionApi; screening: ScreeningApi } {
+  const candidates = async (): Promise<ApheresisCandidate[]> => {
+    const applications = await selection.listApplications();
+    const state = readProcessingState(getStorage);
+    return applications
+      .filter(
+        (item) =>
+          ['admitted', 'awaitingInterview', 'inInterview', 'awaitingQualification', 'selected'].includes(item.status) &&
+          item.admission.modality === 'apheresis' &&
+          !!item.admission.documentNumber.trim() &&
+          !!item.personal.givenName.trim() &&
+          !!item.personal.familyName.trim() &&
+          !state.screenings.some(
+            (sample) => sample.origin?.type === 'apheresis' && sample.origin.applicationId === item.id,
+          ),
+      )
+      .map((item) => ({
+        applicationId: item.id,
+        applicationRevision: item.revision,
+        applicationNumber: item.number,
+        applicantName: fullName(item),
+        documentNumber: item.admission.documentNumber,
+        admissionDate: item.admission.date,
+        donationType: item.admission.donationType,
+        donorCode: item.admission.donorCode,
+      }));
+  };
   const collection: CollectionApi = {
     async listCollections() {
       const applications = await selection.listApplications();
@@ -82,6 +111,47 @@ export function createMockProcessingApi(
     },
   };
   const screening: ScreeningApi = {
+    listApheresisCandidates: candidates,
+    async getApheresisDraft() {
+      return structuredClone(readProcessingState(getStorage).apheresisDraft ?? null);
+    },
+    async saveApheresisDraft(input, revision) {
+      const canonical = (await candidates()).find((item) => item.applicationId === input.applicationId);
+      if (!canonical || canonical.applicationRevision !== input.applicationRevision)
+        throw new Error('APHERESIS_APPLICATION_NOT_AVAILABLE');
+      const state = readProcessingState(getStorage);
+      if ((state.apheresisDraft?.revision ?? 0) !== revision) throw new Error('APHERESIS_DRAFT_CONFLICT');
+      const draft = { candidate: canonical, revision: revision + 1 };
+      state.apheresisDraft = draft;
+      writeProcessingState(getStorage, state);
+      return structuredClone(draft);
+    },
+    async registerApheresisSample(input) {
+      const available = await candidates();
+      const state = readProcessingState(getStorage);
+      const existing = state.screenings.find(
+        (item) => item.origin?.type === 'apheresis' && item.origin.applicationId === input.candidate.applicationId,
+      );
+      // A retry after a lost response returns the same sample, never a second tube.
+      if (existing) return structuredClone(existing);
+      const draft = state.apheresisDraft;
+      const canonical = available.find((item) => item.applicationId === input.candidate.applicationId);
+      if (
+        !draft ||
+        draft.revision !== input.revision ||
+        draft.candidate.applicationId !== input.candidate.applicationId ||
+        !canonical ||
+        canonical.applicationRevision !== draft.candidate.applicationRevision ||
+        canonical.applicationRevision !== input.candidate.applicationRevision
+      )
+        throw new Error('APHERESIS_REGISTRATION_CONFLICT');
+      const record = newApheresisScreening(canonical);
+      state.screenings.push(record);
+      state.apheresisDraft = null;
+      // Registration does not create a unit/donation or change the selection decision.
+      writeProcessingState(getStorage, state);
+      return structuredClone(record);
+    },
     async listScreenings() {
       return structuredClone(readProcessingState(getStorage).screenings);
     },

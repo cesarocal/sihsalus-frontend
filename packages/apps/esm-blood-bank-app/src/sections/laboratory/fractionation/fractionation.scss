@@ -1,0 +1,164 @@
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: layout.$spacing-04;
+  padding: layout.$spacing-05;
+  > :first-child {
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+  > :last-child {
+    margin-inline-start: auto;
+  }
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: layout.$spacing-05;
+  padding: 0 layout.$spacing-05 layout.$spacing-05;
+  > :first-child {
+    flex: 1 1 16rem;
+  }
+  > :nth-child(2) {
+    flex: 1 1 12rem;
+  }
+  > :last-child {
+    margin-inline-start: auto;
+  }
+}
+.help {
+  @include type.type-style("body-01");
+  color: $text-02;
+  margin-block: layout.$spacing-05;
+}
+.backToHistory {
+  gap: layout.$spacing-03;
+  > svg {
+    flex: 0 0 auto;
+  }
+}
+.forest {
+  display: grid;
+  gap: layout.$spacing-05;
+}
+.source {
+  border: 1px solid $ui-03;
+  background: $ui-02;
+  padding: layout.$spacing-05;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  > h4 {
+    @include type.type-style("heading-compact-02");
+    margin-bottom: layout.$spacing-04;
+  }
+}
+.tree {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  ul {
+    list-style: none;
+    padding-inline-start: layout.$spacing-06;
+    margin-inline-start: layout.$spacing-05;
+    border-inline-start: 1px solid $ui-04;
+  }
+  li {
+    position: relative;
+    padding-block: layout.$spacing-03;
+  }
+  ul > li::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: calc(-1 * #{layout.$spacing-06});
+    top: layout.$spacing-07;
+    width: layout.$spacing-06;
+    border-top: 1px solid $ui-04;
+  }
+}
+.node {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: layout.$spacing-04;
+  padding: layout.$spacing-04;
+  border: 1px solid $ui-03;
+  background: $ui-02;
+  > svg {
+    flex: 0 0 auto;
+  }
+}
+.nodeIdentity {
+  flex: 1 1 10rem;
+  min-width: 0;
+  strong {
+    @include type.type-style("heading-compact-01");
+    display: block;
+  }
+  p {
+    @include type.type-style("body-compact-01");
+    margin-block: layout.$spacing-02;
+  }
+}
+.nodeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+  min-width: 0;
+  max-width: 100%;
+  > button {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    height: auto;
+    min-height: layout.$spacing-07;
+    padding-block: layout.$spacing-03;
+    text-align: start;
+  }
+}
+.labelCard {
+  margin-block: layout.$spacing-05;
+  border: 1px solid $ui-03;
+  padding: layout.$spacing-05;
+}
+.labelCard > h4 {
+  @include type.type-style("heading-compact-02");
+  margin-bottom: layout.$spacing-05;
+}
+.review {
+  display: grid;
+  gap: layout.$spacing-05;
+}
+.review > dl {
+  margin: 0;
+}
+.confirmation :global(.cds--modal-footer) {
+  justify-content: flex-end;
+}
+
+@media (max-width: 42rem) {
+  .toolbar > button {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+  .filters > * {
+    width: 100%;
+  }
+  .tree ul {
+    padding-inline-start: layout.$spacing-04;
+    margin-inline-start: layout.$spacing-03;
+  }
+  .tree ul > li::before {
+    inset-inline-start: calc(-1 * #{layout.$spacing-04});
+    width: layout.$spacing-04;
+  }
+  .source,
+  .node {
+    padding: layout.$spacing-03;
+  }
+}

@@ -32,11 +32,12 @@ editable, incluso si no puede guardarse.
 No se añaden máximos genéricos. Quedan pendientes de contrato funcional y
 backend los siguientes grupos de texto libre:
 
-| Grupo       | Campos representativos / destino previsto                                                                             |
-| ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| Postulación | Nombres, domicilio/contacto, detalles de entrevista, observaciones, motivo y responsables; API de selección propuesta |
-| Extracción  | Textos de etiqueta, receptor, servicio/responsable y observaciones del registro; API de extracción propuesta          |
-| Tamizaje    | Responsables, reactivo, marca, lote de reactivo y observaciones; API de tamizaje propuesta                            |
+| Grupo           | Campos representativos / destino previsto                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Postulación     | Nombres, domicilio/contacto, detalles de entrevista, observaciones, motivo y responsables; API de selección propuesta |
+| Extracción      | Textos de etiqueta, receptor, servicio/responsable y observaciones del registro; API de extracción propuesta          |
+| Tamizaje        | Responsables, reactivo, marca, lote de reactivo y observaciones; API de tamizaje propuesta                            |
+| Fraccionamiento | Responsable, servicios, soluciones, temperatura, anticuerpos y observaciones; API de fraccionamiento propuesta        |
 
 Antes de limitar esos campos deben verificarse su destino concreto, capacidad,
 necesidad funcional, unidad de conteo y datos históricos. Las validaciones
@@ -62,6 +63,10 @@ no se cambian en este ajuste.
 - Se reutiliza el snackbar global existente, cerrable y con duración de cinco
   segundos. No se crea un sistema paralelo de notificaciones.
 - Tamizaje nunca anuncia liberación de la unidad: sigue en cuarentena.
+- Fraccionamiento identifica inicio, división, etiquetas, volúmenes, avance y
+  finalización en sus avisos. El inicio bloquea orígenes en laboratorio;
+  finalizar exige confirmación y registra salida/entradas en cuarentena de forma
+  atómica. Una impresión no demuestra verificación física ni persistencia backend.
 
 Los adaptadores OpenMRS continúan deshabilitados. Antes de conectarlos deberán
 distinguir conflicto, rechazo e incertidumbre de un timeout, reconciliar el

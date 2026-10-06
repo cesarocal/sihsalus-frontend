@@ -8,6 +8,7 @@ import { printDocument } from '../../../shared/print-document';
 import { notifySuccess } from '../../../shared/notify-success';
 import styles from '../../applicant-selection/selection.scss';
 import { ScreeningIdentity, ScreeningReport } from './screening-report.component';
+import { ApheresisTubeLabel } from './apheresis-documents.component';
 import { localDateTime, validateScreening } from './screening-rules';
 import { screeningSteps, screeningTests, type ScreeningRecord, type ScreeningResult } from './screening.types';
 
@@ -129,11 +130,30 @@ export function ScreeningWorkflow({
       advanceLabel={t(step === 2 ? 'validateResults' : 'next')}
       t={t}
       extraActions={
-        step === 2 && (
-          <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={print}>
-            {t('printResults')}
-          </Button>
-        )
+        <>
+          {initial.origin?.type === 'apheresis' && (
+            <Button
+              kind="ghost"
+              renderIcon={Printer}
+              disabled={saving}
+              onClick={() => {
+                try {
+                  printDocument(<ApheresisTubeLabel record={initial} t={t} />, t('sampleLabel'));
+                  setFailed('');
+                } catch {
+                  setFailed('printFailed');
+                }
+              }}
+            >
+              {t('printSample')}
+            </Button>
+          )}
+          {step === 2 && (
+            <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={print}>
+              {t('printResults')}
+            </Button>
+          )}
+        </>
       }
     >
       {step < 2 && <ScreeningIdentity record={record} t={t} />}
@@ -219,7 +239,12 @@ export function ScreeningWorkflow({
         <>
           <div className={styles.fields}>{input('validatedBy')}</div>
           <ScreeningReport record={record} t={t} />
-          <InlineNotification hideCloseButton kind="warning" title={t('quarantine')} subtitle={t('screeningWarning')} />
+          <InlineNotification
+            hideCloseButton
+            kind="warning"
+            title={t(record.unitCode ? 'quarantine' : 'results')}
+            subtitle={t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}
+          />
         </>
       )}
     </ProcessingModal>

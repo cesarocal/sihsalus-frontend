@@ -4,6 +4,7 @@ import { createMockApplicantSelectionApi } from './mock-applicant-selection.api'
 import { createMockProcessingApi } from './mock-blood-bank-processing.api';
 import { readProcessingState } from './mock-processing-store';
 import { readMockDonorDetails } from './mock-donors-store';
+import { createMockFractionationApi, fractionationInventory, fractionationStore } from './mock-fractionation.api';
 
 const copy = <T>(value: T): T => structuredClone(value);
 const selection = createMockApplicantSelectionApi();
@@ -14,6 +15,7 @@ const donorDetails = () => readMockDonorDetails(() => globalThis.sessionStorage)
 export const mockBloodBankApi: BloodBankApi = {
   selection,
   ...processing,
+  fractionation: createMockFractionationApi(),
   async getDashboard() {
     return copy(dashboardMock);
   },
@@ -33,8 +35,11 @@ export const mockBloodBankApi: BloodBankApi = {
     );
   },
   async getInventory() {
-    const units = readProcessingState(() => globalThis.sessionStorage)
-      .collections.filter((record) => record.unitStatus === 'quarantine')
+    const state = readProcessingState(() => globalThis.sessionStorage);
+    const managed = fractionationStore(state).units.map((unit) => unit.id);
+    const units = state.collections
+      .filter((record) => record.unitStatus === 'quarantine')
+      .filter((record) => !managed.includes(record.unitCode))
       .map((record) => ({
         id: record.unitCode,
         component: record.label.component,
@@ -43,6 +48,10 @@ export const mockBloodBankApi: BloodBankApi = {
         location: record.label.service,
         status: 'Cuarentena' as const,
       }));
-    return copy([...units, ...inventoryMock]);
+    return copy([
+      ...units,
+      ...inventoryMock.filter((unit) => !managed.includes(unit.id)),
+      ...fractionationInventory(state),
+    ]);
   },
 };

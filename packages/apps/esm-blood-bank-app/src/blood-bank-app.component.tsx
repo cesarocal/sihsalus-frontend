@@ -60,7 +60,7 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
         />
         <Route
           path="laboratory/fractionation"
-          element={protectedPage(bloodBankPrivileges.fractionation, <FractionationPage />)}
+          element={protectedPage(bloodBankPrivileges.fractionation, <FractionationPage api={api.fractionation} />)}
         />
         <Route path="follow-up" element={<Navigate replace to="donor" />} />
         <Route

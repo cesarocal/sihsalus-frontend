@@ -7,12 +7,14 @@ import type {
 } from '../types/blood-bank.types';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
+import type { FractionationApi } from './fractionation.api';
 
 /** Contrato estable entre las pantallas y cualquier implementación de datos. */
 export interface BloodBankApi {
   selection: ApplicantSelectionApi;
   collection: CollectionApi;
   screening: ScreeningApi;
+  fractionation: FractionationApi;
   getDashboard(): Promise<DashboardData>;
   getDonors(): Promise<DonorSummary[]>;
   getDonorDetail(id: string): Promise<DonorDetail>;

@@ -1,15 +1,17 @@
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
-import { globalScreeningResult } from './screening-rules';
+import { globalScreeningResult, screeningOriginLabel } from './screening-rules';
 import { screeningTests, type ScreeningRecord } from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 
 export function ScreeningIdentity({ record, t }: { record: ScreeningRecord; t: ProcessingTranslate }) {
   const values = {
     sampleCode: record.sampleCode,
-    unitCode: record.unitCode,
-    applicant: record.applicantName,
+    sampleOrigin: t(screeningOriginLabel(record)),
+    ...(record.unitCode ? { unitCode: record.unitCode } : {}),
+    ...(record.origin?.type === 'followUp' ? { person: record.applicantName } : { applicant: record.applicantName }),
     document: record.documentNumber,
-    number: record.applicationNumber,
+    ...(record.applicationNumber ? { number: record.applicationNumber } : {}),
+    ...(record.origin?.type === 'followUp' ? { followUpReference: record.origin.followUpId } : {}),
     collectedOn: record.collectedOn,
     sampleType: record.sampleType,
     sampleContainer: record.sampleContainer,
@@ -68,7 +70,7 @@ export function ScreeningReport({ record, t }: { record: ScreeningRecord; t: Pro
         {t('observations')}: {record.observations || '—'}
       </p>
       <footer>
-        <p>{t('screeningWarning')}</p>
+        <p>{t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}</p>
         <p>{t('signature')}: __________________________</p>
       </footer>
     </article>

@@ -1,17 +1,24 @@
 import type { CollectionRecord } from '../../collection/collection.types';
 import { isDate } from '../../applicant-selection/selection-rules';
 import { fullName } from '../../collection/collection-rules';
-import { screeningTests, type ScreeningRecord, type ScreeningStep } from './screening.types';
+import { normalizeSearch } from '../../../shared/normalize-search';
+import {
+  screeningTests,
+  type ApheresisCandidate,
+  type ScreeningCategory,
+  type ScreeningRecord,
+  type ScreeningStep,
+} from './screening.types';
 
 export function localDateTime() {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 export function newScreening(collection: CollectionRecord): ScreeningRecord {
-  return {
+  return newScreeningSample({
     id: `mock-screening-${collection.id}`,
-    revision: 0,
     collectionId: collection.id,
+    origin: { type: 'postExtraction', collectionId: collection.id },
     unitCode: collection.unitCode,
     sampleCode: collection.sampleCode,
     applicationNumber: collection.application.number,
@@ -19,6 +26,27 @@ export function newScreening(collection: CollectionRecord): ScreeningRecord {
     documentNumber: collection.application.admission.documentNumber,
     sampleType: collection.label.sampleType,
     sampleContainer: collection.label.sampleContainer,
+  });
+}
+/** Common empty panel; provenance and identity must be supplied by the source adapter. */
+export function newScreeningSample(
+  identity: Pick<
+    ScreeningRecord,
+    | 'id'
+    | 'origin'
+    | 'collectionId'
+    | 'unitCode'
+    | 'sampleCode'
+    | 'applicationNumber'
+    | 'applicantName'
+    | 'documentNumber'
+    | 'sampleType'
+    | 'sampleContainer'
+  >,
+): ScreeningRecord {
+  return {
+    ...identity,
+    revision: 0,
     collectedOn: localDateTime(),
     receivedOn: '',
     receivedBy: '',
@@ -35,6 +63,37 @@ export function newScreening(collection: CollectionRecord): ScreeningRecord {
     completedSteps: [],
     status: 'pending',
   };
+}
+export function screeningCategory(record: ScreeningRecord): ScreeningCategory | null {
+  const origin = record.origin?.type;
+  if (origin === 'followUp') return 'followUps';
+  if (origin === 'postExtraction' || origin === 'apheresis') return 'donors';
+  // Only legacy unit-associated samples may be treated as post-extraction.
+  return !record.origin && record.collectionId && record.unitCode ? 'donors' : null;
+}
+export function matchesScreeningSearch(record: ScreeningRecord, search: string) {
+  return normalizeSearch(
+    `${record.sampleCode} ${record.unitCode} ${record.applicationNumber} ${record.documentNumber} ${record.applicantName} ${record.origin?.type === 'followUp' ? record.origin.followUpId : ''}`,
+  ).includes(normalizeSearch(search.trim()));
+}
+export function screeningOriginLabel(record: ScreeningRecord) {
+  if (record.origin?.type === 'followUp')
+    return record.origin.subject === 'donor' ? 'donorFollowUp' : 'recipientFollowUp';
+  return record.origin?.type === 'apheresis' ? 'apheresisSample' : 'postExtractionSample';
+}
+export function newApheresisScreening(candidate: ApheresisCandidate): ScreeningRecord {
+  return newScreeningSample({
+    id: `mock-apheresis-${candidate.applicationId}`,
+    origin: { type: 'apheresis', applicationId: candidate.applicationId },
+    collectionId: '',
+    unitCode: '',
+    sampleCode: `M-AF-${candidate.applicationNumber}`,
+    applicationNumber: candidate.applicationNumber,
+    applicantName: candidate.applicantName,
+    documentNumber: candidate.documentNumber,
+    sampleType: 'Sangre (DEMO)',
+    sampleContainer: 'Tubo (DEMO)',
+  });
 }
 export function globalScreeningResult(record: ScreeningRecord) {
   const results = screeningTests.map((test) => record.tests[test]?.result);
