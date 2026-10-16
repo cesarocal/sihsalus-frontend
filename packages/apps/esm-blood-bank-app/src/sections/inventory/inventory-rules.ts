@@ -1,8 +1,8 @@
+import type { InventorySummary } from '../../types/blood-bank.types';
 import { isDate } from '../applicant-selection/selection-rules';
 import { localDateTime } from '../laboratory/screening/screening-rules';
-import type { InventorySummary } from '../../types/blood-bank.types';
-import type { InventoryOperation, InventoryUnit } from './inventory.types';
 import { isDisposalCause } from './disposal-causes';
+import type { InventoryOperation, InventoryUnit } from './inventory.types';
 
 export const inventoryStatusKey: Record<InventorySummary['status'], string> = {
   Disponible: 'inventoryAvailable',
@@ -10,6 +10,7 @@ export const inventoryStatusKey: Record<InventorySummary['status'], string> = {
   Cuarentena: 'quarantine',
   'En laboratorio': 'fractionationInLab',
   APTO: 'inventorySuitable',
+  'Por transferir': 'inventoryPendingTransfer',
 };
 export function newInventoryOperation(
   kind: InventoryOperation['kind'],

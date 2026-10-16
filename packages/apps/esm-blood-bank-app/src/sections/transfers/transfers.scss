@@ -1,0 +1,136 @@
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: layout.$spacing-04;
+  padding: layout.$spacing-05;
+  > :first-child {
+    flex: 1 1 20rem;
+    min-width: 0;
+  }
+}
+.toolbarAction {
+  inline-size: 100%;
+  white-space: nowrap;
+}
+.toolbarActions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: layout.$spacing-04;
+  flex-shrink: 0;
+}
+.tabPanel {
+  padding-inline: 0;
+}
+.filters,
+.summary,
+.itemFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+  > * {
+    min-width: 0;
+  }
+}
+.filters {
+  padding-inline: layout.$spacing-05;
+}
+.itemFields {
+  grid-template-columns: 2fr 1fr 1fr auto;
+  align-items: end;
+}
+.summary {
+  dt {
+    @include type.type-style("heading-compact-01");
+  }
+  dd {
+    @include type.type-style("body-01");
+    margin-top: layout.$spacing-02;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+}
+.subheading {
+  @include type.type-style("heading-compact-02");
+  margin-block: layout.$spacing-05;
+}
+.notice {
+  margin-block: layout.$spacing-05;
+}
+.document {
+  overflow-wrap: anywhere;
+  padding: layout.$spacing-05;
+  h2 {
+    @include type.type-style("heading-03");
+    margin-bottom: layout.$spacing-06;
+  }
+  h3 {
+    @include type.type-style("heading-compact-02");
+    margin-block: layout.$spacing-05;
+  }
+  p {
+    margin-block: layout.$spacing-04;
+    white-space: pre-wrap;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  th,
+  td {
+    padding: layout.$spacing-03;
+    border: 1px solid $ui-03;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  [data-transfer-signature] {
+    margin-top: layout.$spacing-09;
+    border-top: 1px solid $ui-04;
+    text-align: center;
+  }
+}
+.printFooter:global(.cds--modal-footer) > div:first-child {
+  margin-inline-end: auto;
+}
+.modal :global(.cds--modal-container) {
+  width: min(90vw, 85rem);
+  max-width: 85rem;
+}
+@media (max-width: 42rem) {
+  .responsive :global(.cds--pagination),
+  .modal :global(.cds--pagination) {
+    flex-wrap: wrap;
+    block-size: auto;
+    max-inline-size: 100%;
+  }
+  .responsive :global(.cds--pagination__left),
+  .responsive :global(.cds--pagination__right),
+  .modal :global(.cds--pagination__left),
+  .modal :global(.cds--pagination__right) {
+    flex-wrap: wrap;
+    min-inline-size: 0;
+    block-size: auto;
+  }
+  .responsive :global(.cds--pagination__text),
+  .modal :global(.cds--pagination__text) {
+    white-space: normal;
+  }
+  .filters,
+  .summary,
+  .itemFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .toolbarActions {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+  .document {
+    padding: layout.$spacing-03;
+  }
+}

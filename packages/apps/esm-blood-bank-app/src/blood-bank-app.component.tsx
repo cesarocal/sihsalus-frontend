@@ -1,15 +1,14 @@
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
-
-import type { BloodBankApi } from './api';
-import { bloodBankPrivileges, type BloodBankPrivilege } from './access/blood-bank-privileges';
+import { type BloodBankPrivilege, bloodBankPrivileges } from './access/blood-bank-privileges';
 import { ProtectedSection } from './access/protected-section.component';
+import type { BloodBankApi } from './api';
+import { applicantSelectionPath, donorDetailRoute, donorsPath } from './constants';
 import { BloodBankLayout } from './layout/blood-bank-layout.component';
 import { ApplicantSelectionRoute } from './sections/applicant-selection/applicant-selection-route.component';
 import { CollectionPage } from './sections/collection/collection-page.component';
 import { DashboardPage } from './sections/dashboard/dashboard-page.component';
-import { DonorsPage } from './sections/donors/donors-page.component';
 import { DonorDetailPage } from './sections/donors/donor-detail.component';
-import { applicantSelectionPath, donorDetailRoute, donorsPath } from './constants';
+import { DonorsPage } from './sections/donors/donors-page.component';
 import { DonorFollowUpPage } from './sections/follow-up/donor-follow-up-page.component';
 import { RecipientFollowUpPage } from './sections/follow-up/recipient-follow-up-page.component';
 import { InventoryPage } from './sections/inventory/inventory-page.component';
@@ -71,7 +70,10 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
           path="follow-up/recipient"
           element={protectedPage(bloodBankPrivileges.recipientFollowUp, <RecipientFollowUpPage />)}
         />
-        <Route path="transfers" element={protectedPage(bloodBankPrivileges.transfers, <TransfersPage />)} />
+        <Route
+          path="transfers"
+          element={protectedPage(bloodBankPrivileges.transfers, <TransfersPage api={api.transfers} />)}
+        />
         <Route path="inventory" element={protectedPage(bloodBankPrivileges.inventory, <InventoryPage api={api} />)} />
         <Route path="transfusions" element={protectedPage(bloodBankPrivileges.transfusions, <TransfusionsPage />)} />
         <Route path="*" element={<Navigate replace to="/" />} />

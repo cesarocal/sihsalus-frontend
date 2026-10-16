@@ -1,7 +1,7 @@
 import {
+  Button,
   DataTableSkeleton,
   InlineNotification,
-  Button,
   Pagination,
   Table,
   TableBody,
@@ -12,13 +12,13 @@ import {
   TableRow,
   Tile,
 } from '@carbon/react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import spanish from '../../translations/es.json';
 import { moduleName } from '../constants';
 import styles from '../sections/applicant-selection/selection.scss';
-import { BloodBankPageIllustration, type BloodBankIllustration } from './blood-bank-page-illustration.component';
 import { BloodBankPageHeader } from './blood-bank-page-header.component';
+import { type BloodBankIllustration, BloodBankPageIllustration } from './blood-bank-page-illustration.component';
 
 export type ProcessingTranslate = (key: string) => string;
 export function useProcessingTranslation() {
@@ -60,16 +60,19 @@ export function ProcessingPage({
   counts,
   children,
   illustration,
+  tabs,
 }: {
   title: string;
   counts: { label: string; description: string; value: number | string }[];
   children: ReactNode;
   illustration: BloodBankIllustration;
+  tabs?: ReactNode;
 }) {
   return (
     <div className={styles.page}>
       <h1 className="cds--visually-hidden">{title}</h1>
       <BloodBankPageHeader illustration={<BloodBankPageIllustration section={illustration} />} title={title} />
+      {tabs}
       <div className={styles.content}>
         <section className={styles.summary} aria-label={title}>
           {counts.map((count) => (

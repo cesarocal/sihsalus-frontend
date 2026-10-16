@@ -2,10 +2,11 @@ import { dashboardMock } from '../mocks/blood-bank.mock';
 import type { BloodBankApi } from './blood-bank.api';
 import { createMockApplicantSelectionApi } from './mock-applicant-selection.api';
 import { createMockProcessingApi } from './mock-blood-bank-processing.api';
-import { readProcessingState } from './mock-processing-store';
 import { readMockDonorDetails } from './mock-donors-store';
 import { createMockFractionationApi } from './mock-fractionation.api';
 import { createMockInventoryApi, inventoryWorkspace } from './mock-inventory.api';
+import { readProcessingState } from './mock-processing-store';
+import { createMockTransfersApi } from './mock-transfers.api';
 
 const copy = <T>(value: T): T => structuredClone(value);
 const selection = createMockApplicantSelectionApi();
@@ -18,6 +19,7 @@ export const mockBloodBankApi: BloodBankApi = {
   ...processing,
   fractionation: createMockFractionationApi(),
   inventory: createMockInventoryApi(),
+  transfers: createMockTransfersApi(),
   async getDashboard() {
     return copy(dashboardMock);
   },

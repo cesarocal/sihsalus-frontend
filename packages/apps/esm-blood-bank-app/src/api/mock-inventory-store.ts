@@ -1,5 +1,6 @@
 import type { InventoryStore } from '../sections/inventory/inventory.types';
 import type { ProcessingState } from './mock-processing-store';
+import { transferUnitState } from './mock-transfers-store';
 
 /** Same atomic session-storage document as extraction, screening and fractionation. */
 export function inventoryStore(state: ProcessingState): InventoryStore {
@@ -35,9 +36,12 @@ export function inventoryStore(state: ProcessingState): InventoryStore {
   return store;
 }
 export function inventoryBlocksFractionation(state: ProcessingState, code: string): boolean {
-  return inventoryStore(state).operations.some(
-    (op) =>
-      op.units.some((unit) => unit.id === code) &&
-      (op.kind === 'qualitySeal' ? ['ready', 'printRequested'].includes(op.stage) : op.stage === 'completed'),
+  return (
+    !!transferUnitState(state, code) ||
+    inventoryStore(state).operations.some(
+      (op) =>
+        op.units.some((unit) => unit.id === code) &&
+        (op.kind === 'qualitySeal' ? ['ready', 'printRequested'].includes(op.stage) : op.stage === 'completed'),
+    )
   );
 }

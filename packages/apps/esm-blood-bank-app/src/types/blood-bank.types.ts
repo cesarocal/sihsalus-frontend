@@ -32,7 +32,7 @@ export interface InventorySummary {
   bloodGroup: string;
   expiresAt: string;
   location: string;
-  status: 'Disponible' | 'Reservada' | 'Cuarentena' | 'En laboratorio' | 'APTO';
+  status: 'Disponible' | 'Reservada' | 'Cuarentena' | 'En laboratorio' | 'APTO' | 'Por transferir';
 }
 
 /** Read-only projection; never includes interview answers or deferral reasons. */

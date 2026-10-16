@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bloodBankPrivileges } from './access/blood-bank-privileges';
-import { mockBloodBankApi } from './api/mock-blood-bank.api';
 import type { BloodBankApi } from './api/blood-bank.api';
+import { mockBloodBankApi } from './api/mock-blood-bank.api';
 import { BloodBankApp } from './blood-bank-app.component';
 
 const allowedPrivileges = vi.hoisted(() => new Set<string>());
@@ -81,6 +81,19 @@ describe('BloodBankApp', () => {
     expect(screen.queryByRole('button', { name: 'Sello de calidad' })).not.toBeInTheDocument();
   });
 
+  it('protects transfer reads by the existing section privilege', async () => {
+    const list = vi.fn(mockBloodBankApi.transfers.list);
+    const api = { ...mockBloodBankApi, transfers: { ...mockBloodBankApi.transfers, list } };
+    const denied = render(<BloodBankApp api={api} initialPath="/transfers" />);
+    expect(list).not.toHaveBeenCalled();
+    expect(screen.getByText('Sin acceso')).toBeInTheDocument();
+    denied.unmount();
+    allowedPrivileges.add(bloodBankPrivileges.transfers);
+    render(<BloodBankApp api={api} initialPath="/transfers" />);
+    expect(await screen.findByRole('button', { name: 'Registrar solicitud' })).toBeEnabled();
+    expect(list).toHaveBeenCalledOnce();
+  });
+
   it('permite solo la subsección autorizada de laboratorio', async () => {
     allowedPrivileges.add(bloodBankPrivileges.module);
     allowedPrivileges.add(bloodBankPrivileges.compatibility);
@@ -135,27 +148,28 @@ describe('BloodBankApp', () => {
     expect(await screen.findByRole('button', { name: action })).toBeInTheDocument();
   });
 
-  it.each(['/collection', '/laboratory/screening', '/laboratory/fractionation'])(
-    'bloquea la URL %s sin consultar sus datos',
-    (path) => {
-      const api: BloodBankApi = {
-        ...mockBloodBankApi,
-        collection: { ...mockBloodBankApi.collection, listCollections: vi.fn() },
-        fractionation: { ...mockBloodBankApi.fractionation, list: vi.fn() },
-        screening: {
-          ...mockBloodBankApi.screening,
-          listScreenings: vi.fn(),
-          listApheresisCandidates: vi.fn(),
-          getApheresisDraft: vi.fn(),
-        },
-      };
-      render(<BloodBankApp api={api} initialPath={path} />);
-      expect(screen.getByText('Sin acceso')).toBeInTheDocument();
-      expect(api.collection.listCollections).not.toHaveBeenCalled();
-      expect(api.fractionation.list).not.toHaveBeenCalled();
-      expect(api.screening.listScreenings).not.toHaveBeenCalled();
-      expect(api.screening.listApheresisCandidates).not.toHaveBeenCalled();
-      expect(api.screening.getApheresisDraft).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    '/collection',
+    '/laboratory/screening',
+    '/laboratory/fractionation',
+  ])('bloquea la URL %s sin consultar sus datos', (path) => {
+    const api: BloodBankApi = {
+      ...mockBloodBankApi,
+      collection: { ...mockBloodBankApi.collection, listCollections: vi.fn() },
+      fractionation: { ...mockBloodBankApi.fractionation, list: vi.fn() },
+      screening: {
+        ...mockBloodBankApi.screening,
+        listScreenings: vi.fn(),
+        listApheresisCandidates: vi.fn(),
+        getApheresisDraft: vi.fn(),
+      },
+    };
+    render(<BloodBankApp api={api} initialPath={path} />);
+    expect(screen.getByText('Sin acceso')).toBeInTheDocument();
+    expect(api.collection.listCollections).not.toHaveBeenCalled();
+    expect(api.fractionation.list).not.toHaveBeenCalled();
+    expect(api.screening.listScreenings).not.toHaveBeenCalled();
+    expect(api.screening.listApheresisCandidates).not.toHaveBeenCalled();
+    expect(api.screening.getApheresisDraft).not.toHaveBeenCalled();
+  });
 });

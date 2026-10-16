@@ -12,6 +12,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - Selección del postulante incluye listado, filtros, formulario por etapas e impresión. Su avance se conserva en `sessionStorage` de la pestaña, exclusivamente para datos sintéticos.
 - Extracción incluye cola de seleccionados, etiquetas de unidad/tubo, volumen, registro y constancia imprimible.
 - Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
+- Transferencias separa Recibidas / Pendientes y Solicitadas con pestañas Carbon. Incluye registro manual e historial independiente, generación e impresión FR09 de solicitudes a otras instituciones, selección y reserva de recibidas, constancia FR11, entrega y proyección administrativa del libro FR10. Generar una solicitud no envía correos ni compromete stock local. Las unidades entregadas pasan de Por transferir a Transferido, sin En tránsito. Ver [Transferencias](src/sections/transfers/README.md).
 - Las demás rutas son bases visuales; todavía no guardan información clínica.
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.

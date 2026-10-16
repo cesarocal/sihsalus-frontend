@@ -1,7 +1,7 @@
 import { inventoryMock } from '../mocks/blood-bank.mock';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
-import { inventoryExpiry, validateInventoryOperation } from '../sections/inventory/inventory-rules';
 import type { InventoryOperation, InventoryUnit, InventoryWorkspace } from '../sections/inventory/inventory.types';
+import { inventoryExpiry, validateInventoryOperation } from '../sections/inventory/inventory-rules';
 import {
   globalScreeningResult,
   localDateTime,
@@ -12,11 +12,12 @@ import type { InventoryApi } from './inventory.api';
 import { fractionationInventory, fractionationStore } from './mock-fractionation.api';
 import { inventoryStore } from './mock-inventory-store';
 import {
-  readProcessingState,
-  writeProcessingState,
   type MockStorage,
   type ProcessingState,
+  readProcessingState,
+  writeProcessingState,
 } from './mock-processing-store';
+import { transferUnitState } from './mock-transfers-store';
 
 const mutable = (op: InventoryOperation) => ({
   units: op.units,
@@ -61,6 +62,7 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
   const units: InventoryUnit[] = base
     .filter(
       (unit) =>
+        transferUnitState(state, unit.id) !== 'delivered' &&
         !operations.some(
           (op) => op.kind === 'disposal' && op.stage === 'completed' && op.units.some((item) => item.id === unit.id),
         ),
@@ -116,12 +118,17 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
         qualityIssues.push('inventoryIdentityIncomplete');
       return {
         ...summary(unit),
-        status: seal?.stage === 'completed' && unit.status !== 'En laboratorio' ? 'APTO' : unit.status,
+        status:
+          transferUnitState(state, unit.id) === 'prepared'
+            ? 'Por transferir'
+            : seal?.stage === 'completed' && unit.status !== 'En laboratorio'
+              ? 'APTO'
+              : unit.status,
         originalCode,
         screeningResult,
         qualityIssues,
         ...(seal ? { sealId: seal.id } : {}),
-        canDispose: !['En laboratorio', 'Reservada'].includes(unit.status),
+        canDispose: !transferUnitState(state, unit.id) && !['En laboratorio', 'Reservada'].includes(unit.status),
       };
     });
   if (new Set(units.map((unit) => unit.id)).size !== units.length) throw new Error('INVALID_INVENTORY_IDENTITY');
