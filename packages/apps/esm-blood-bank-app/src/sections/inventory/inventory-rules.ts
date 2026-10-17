@@ -11,6 +11,8 @@ export const inventoryStatusKey: Record<InventorySummary['status'], string> = {
   'En laboratorio': 'fractionationInLab',
   APTO: 'inventorySuitable',
   'Por transferir': 'inventoryPendingTransfer',
+  'En pruebas de compatibilidad': 'inventoryCompatibilityTesting',
+  'Reservados para transfusión': 'inventoryReservedTransfusion',
 };
 export function newInventoryOperation(
   kind: InventoryOperation['kind'],

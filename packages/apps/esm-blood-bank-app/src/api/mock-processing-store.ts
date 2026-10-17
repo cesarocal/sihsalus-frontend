@@ -6,6 +6,7 @@ import type { FractionationStore } from '../sections/laboratory/fractionation/fr
 import type { ApheresisDraft, ScreeningRecord } from '../sections/laboratory/screening/screening.types';
 import { localDateTime, newScreening, newScreeningSample } from '../sections/laboratory/screening/screening-rules';
 import type { TransferStore } from '../sections/transfers/transfers.types';
+import type { TransfusionStore } from '../sections/transfusions/transfusions.types';
 
 export const processingStorageKey = 'sihsalus.blood-bank.processing.mock.v1';
 export type MockStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -16,7 +17,10 @@ export interface ProcessingState {
   apheresisDraft?: ApheresisDraft | null;
   fractionation?: FractionationStore;
   inventory?: InventoryStore;
+  /** Pre-existing approvals of the twenty synthetic transfusion stock units only. */
+  fixtureQualitySeals?: Record<string, string>;
   transfers?: TransferStore;
+  transfusions?: TransfusionStore;
 }
 function initialState(): ProcessingState {
   const application = applicationsMock().find((item) => item.status === 'selected');

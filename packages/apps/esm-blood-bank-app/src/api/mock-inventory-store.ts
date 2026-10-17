@@ -1,6 +1,7 @@
 import type { InventoryStore } from '../sections/inventory/inventory.types';
 import type { ProcessingState } from './mock-processing-store';
 import { transferUnitState } from './mock-transfers-store';
+import { transfusionUnitState } from './mock-transfusions-store';
 
 /** Same atomic session-storage document as extraction, screening and fractionation. */
 export function inventoryStore(state: ProcessingState): InventoryStore {
@@ -38,6 +39,7 @@ export function inventoryStore(state: ProcessingState): InventoryStore {
 export function inventoryBlocksFractionation(state: ProcessingState, code: string): boolean {
   return (
     !!transferUnitState(state, code) ||
+    !!transfusionUnitState(state, code) ||
     inventoryStore(state).operations.some(
       (op) =>
         op.units.some((unit) => unit.id === code) &&

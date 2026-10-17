@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { withInventoryFixtures } from '../mocks/inventory.mock';
 import { canSeal } from '../sections/inventory/inventory-rules';
 import {
   disposalOperation,
@@ -6,12 +7,11 @@ import {
   seedInventoryReadyUnits,
 } from '../sections/inventory/inventory-test-fixtures';
 import { reviewBatch } from '../sections/laboratory/fractionation/fractionation-test-fixtures';
+import { openmrsInventoryApi } from './inventory.api';
+import { mockBloodBankApi } from './mock-blood-bank.api';
 import { createMockFractionationApi, fractionationStore } from './mock-fractionation.api';
 import { createMockInventoryApi } from './mock-inventory.api';
-import { mockBloodBankApi } from './mock-blood-bank.api';
 import { processingStorageKey, readProcessingState, writeProcessingState } from './mock-processing-store';
-import { openmrsInventoryApi } from './inventory.api';
-import { withInventoryFixtures } from '../mocks/inventory.mock';
 
 describe('mock inventory state transitions and retained traceability', () => {
   beforeEach(() => {
@@ -33,14 +33,16 @@ describe('mock inventory state transitions and retained traceability', () => {
     const state = readProcessingState(() => sessionStorage);
     writeProcessingState(() => sessionStorage, state);
     const before = sessionStorage.getItem(processingStorageKey);
-    expect((await api().list()).units).toHaveLength(9);
+    expect((await api().list()).units).toHaveLength(29);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
     expect(await mockBloodBankApi.getInventory()).toEqual((await api().list()).units);
   });
   it('keeps pending, missing or unrelated screenings ineligible', async () => {
-    expect((await api().list()).units.filter((unit) => !unit.id.startsWith('BB-SELLO-DEMO-')).filter(canSeal)).toEqual(
-      [],
-    );
+    expect(
+      (await api().list()).units
+        .filter((unit) => !unit.id.startsWith('BB-SELLO-DEMO-') && !unit.id.startsWith('BB-TX-DEMO-'))
+        .filter(canSeal),
+    ).toEqual([]);
     const units = await ready();
     expect(units.every(canSeal)).toBe(true);
     const state = readProcessingState(() => sessionStorage);
@@ -102,7 +104,7 @@ describe('mock inventory state transitions and retained traceability', () => {
     await expect(instance.requestSealPrint(assigned)).rejects.toThrow('INVENTORY_CONFLICT');
     const completed = await instance.confirmSeal(requested);
     expect(completed.outcome).toBe('APTO');
-    expect((await mockBloodBankApi.getInventory()).filter((unit) => unit.status === 'APTO')).toHaveLength(2);
+    expect((await mockBloodBankApi.getInventory()).filter((unit) => unit.status === 'APTO')).toHaveLength(22);
     const before = sessionStorage.getItem(processingStorageKey);
     expect(await instance.confirmSeal(requested)).toEqual(completed);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
@@ -118,7 +120,7 @@ describe('mock inventory state transitions and retained traceability', () => {
     expect(await api().saveDraft(saved)).toEqual(saved);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
     expect((await createMockInventoryApi().list()).operations[0].witnesses).toBe(input.witnesses);
-    expect((await api().list()).units).toHaveLength(11);
+    expect((await api().list()).units).toHaveLength(31);
   });
   it('rejects unknown, duplicate, tampered and stale unit snapshots without any stock change', async () => {
     const units = await ready();
@@ -258,5 +260,75 @@ describe('mock inventory state transitions and retained traceability', () => {
     writeProcessingState(() => sessionStorage, state);
     const current = (await createMockInventoryApi().list()).units;
     expect(current.some((unit) => unit.id === units[0].id || unit.id === units[1].id)).toBe(false);
+  });
+  it('enriches older tabs with twenty initial seals without writing, resetting records or adding print events', async () => {
+    const state = withInventoryFixtures(readProcessingState(() => sessionStorage));
+    delete state.fixtureQualitySeals;
+    writeProcessingState(() => sessionStorage, state);
+    const before = sessionStorage.getItem(processingStorageKey);
+    const workspace = await api().list();
+    const stock = workspace.units.filter((unit) => unit.id.startsWith('BB-TX-DEMO-'));
+    expect(stock).toHaveLength(20);
+    expect(stock.every((unit) => unit.status === 'APTO' && !!unit.sealId && !canSeal(unit))).toBe(true);
+    expect(new Set(stock.map((unit) => unit.sealId)).size).toBe(20);
+    expect(workspace.operations).toEqual([]);
+    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
+    expect((await api().list()).units).toEqual(workspace.units);
+  });
+  it('never upgrades unsafe, expired or pending-seal legacy fixtures to initial approved stock', async () => {
+    const workspace = await api().list();
+    const state = withInventoryFixtures(readProcessingState(() => sessionStorage));
+    delete state.fixtureQualitySeals;
+    const unsafe = state.screenings.find((panel) => panel.unitCode === 'BB-TX-DEMO-001');
+    const expired = state.fractionation?.units.find((unit) => unit.code === 'BB-TX-DEMO-002');
+    const pending = workspace.units.find((unit) => unit.id === 'BB-TX-DEMO-003');
+    if (!unsafe || !expired || !pending) throw new Error('TEST_FIXTURE_MISSING');
+    unsafe.tests.hiv.result = 'reactive';
+    expired.label.expiresAt = '2020-01-01';
+    state.inventory = {
+      operations: [
+        {
+          ...sealOperation([{ ...pending, status: 'Cuarentena' }]),
+          id: 'Q-PENDING-DEMO',
+          revision: 1,
+          stage: 'printRequested',
+          requestedAt: new Date().toISOString(),
+        },
+      ],
+    };
+    writeProcessingState(() => sessionStorage, state);
+    const before = sessionStorage.getItem(processingStorageKey);
+    const units = (await api().list()).units;
+    expect(units.find((unit) => unit.id === 'BB-TX-DEMO-001')).toMatchObject({
+      status: 'Cuarentena',
+      screeningResult: 'reactive',
+    });
+    expect(units.find((unit) => unit.id === 'BB-TX-DEMO-002')).toMatchObject({
+      status: 'Cuarentena',
+      qualityIssues: expect.arrayContaining(['inventoryExpiryInvalid']),
+    });
+    expect(units.find((unit) => unit.id === 'BB-TX-DEMO-003')).toMatchObject({
+      status: 'Cuarentena',
+      sealId: 'Q-PENDING-DEMO',
+    });
+    expect(units.filter((unit) => unit.id.startsWith('BB-TX-DEMO-') && unit.status === 'APTO')).toHaveLength(17);
+    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
+  });
+  it('retains stock exits and lab locks and does not pass initial seals to fractionation children', async () => {
+    const inventory = api();
+    const units = (await inventory.list()).units;
+    const disposed = units.find((unit) => unit.id === 'BB-TX-DEMO-001');
+    if (!disposed) throw new Error('TEST_FIXTURE_MISSING');
+    await inventory.dispose(disposalOperation([disposed]));
+    const fractions = createMockFractionationApi();
+    let batch = await fractions.start(['BB-TX-DEMO-011']);
+    expect((await api().list()).units.find((unit) => unit.id === 'BB-TX-DEMO-011')?.status).toBe('En laboratorio');
+    batch = await reviewBatch(fractions, batch);
+    await fractions.finalize(batch);
+    const current = (await api().list()).units;
+    expect(current.some((unit) => ['BB-TX-DEMO-001', 'BB-TX-DEMO-011'].includes(unit.id))).toBe(false);
+    const children = current.filter((unit) => unit.id.startsWith('BB-TX-DEMO-011-'));
+    expect(children).toHaveLength(2);
+    expect(children.every((unit) => unit.status === 'Cuarentena' && !unit.sealId)).toBe(true);
   });
 });

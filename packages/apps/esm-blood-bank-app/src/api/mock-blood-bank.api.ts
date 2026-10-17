@@ -7,6 +7,7 @@ import { createMockFractionationApi } from './mock-fractionation.api';
 import { createMockInventoryApi, inventoryWorkspace } from './mock-inventory.api';
 import { readProcessingState } from './mock-processing-store';
 import { createMockTransfersApi } from './mock-transfers.api';
+import { createMockTransfusionsApi } from './mock-transfusions.api';
 
 const copy = <T>(value: T): T => structuredClone(value);
 const selection = createMockApplicantSelectionApi();
@@ -20,6 +21,7 @@ export const mockBloodBankApi: BloodBankApi = {
   fractionation: createMockFractionationApi(),
   inventory: createMockInventoryApi(),
   transfers: createMockTransfersApi(),
+  transfusions: createMockTransfusionsApi(),
   async getDashboard() {
     return copy(dashboardMock);
   },

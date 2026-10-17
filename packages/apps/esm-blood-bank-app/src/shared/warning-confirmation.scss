@@ -1,0 +1,62 @@
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@carbon/colors";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.modal :global(.cds--modal-container) {
+  inline-size: min(92vw, 34rem);
+  max-inline-size: 34rem;
+  background: $ui-02;
+}
+.modal :global(.cds--modal-header) {
+  margin-block-end: layout.$spacing-05;
+}
+.modal :global(.cds--modal-content) {
+  padding-block-end: layout.$spacing-05;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-04;
+  padding-inline-end: layout.$spacing-07;
+}
+.icon {
+  color: colors.$yellow-70;
+  flex-shrink: 0;
+}
+.message {
+  padding: layout.$spacing-05;
+  border-inline-start: 4px solid colors.$yellow-50;
+  background: colors.$yellow-10;
+  overflow-wrap: anywhere;
+  @include type.type-style("body-01");
+  ul {
+    list-style: disc;
+    padding-inline-start: layout.$spacing-05;
+    margin-block: layout.$spacing-05;
+  }
+  li + li {
+    margin-block-start: layout.$spacing-03;
+  }
+}
+.note {
+  @include type.type-style("helper-text-01");
+  padding-block-start: layout.$spacing-04;
+  margin-block-start: layout.$spacing-05;
+  border-block-start: 1px solid colors.$yellow-30;
+}
+.footer:global(.cds--modal-footer) {
+  block-size: auto;
+  padding: layout.$spacing-05;
+  gap: layout.$spacing-03;
+  border-block-start: 1px solid $ui-03;
+  > :global(.cds--btn.cds--btn--sm) {
+    flex: 0 1 auto;
+    block-size: layout.$spacing-07;
+    min-block-size: layout.$spacing-07;
+    inline-size: auto;
+    padding: layout.$spacing-02 layout.$spacing-05;
+    white-space: nowrap;
+    align-items: center;
+  }
+}

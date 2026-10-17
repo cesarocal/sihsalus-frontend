@@ -198,6 +198,19 @@
   overflow-x: auto;
   min-height: 6rem;
 }
+.workflow.compactHeader {
+  :global(.cds--modal-header) {
+    padding-bottom: 0;
+    margin-block-end: 0;
+  }
+  .progress {
+    min-height: 0;
+    padding-block: layout.$spacing-03 layout.$spacing-02;
+  }
+  .stepHeading {
+    margin-block: layout.$spacing-03;
+  }
+}
 .stepHeading {
   margin-block: layout.$spacing-05;
   h3 {

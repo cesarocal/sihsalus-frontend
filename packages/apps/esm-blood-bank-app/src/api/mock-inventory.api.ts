@@ -18,6 +18,7 @@ import {
   writeProcessingState,
 } from './mock-processing-store';
 import { transferUnitState } from './mock-transfers-store';
+import { transfusionUnitState } from './mock-transfusions-store';
 
 const mutable = (op: InventoryOperation) => ({
   units: op.units,
@@ -63,6 +64,7 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
     .filter(
       (unit) =>
         transferUnitState(state, unit.id) !== 'delivered' &&
+        transfusionUnitState(state, unit.id) !== 'delivered' &&
         !operations.some(
           (op) => op.kind === 'disposal' && op.stage === 'completed' && op.units.some((item) => item.id === unit.id),
         ),
@@ -71,6 +73,7 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
       const seal = operations.find(
         (op) => op.kind === 'qualitySeal' && op.stage !== 'draft' && op.units.some((item) => item.id === unit.id),
       );
+      const fixtureSealId = state.fixtureQualitySeals?.[unit.id];
       const originalCode = fractions.find((item) => item.code === unit.id)?.originalWholeBloodCode ?? unit.id;
       const panels = state.screenings.filter(
         (panel) =>
@@ -119,16 +122,23 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
       return {
         ...summary(unit),
         status:
-          transferUnitState(state, unit.id) === 'prepared'
-            ? 'Por transferir'
-            : seal?.stage === 'completed' && unit.status !== 'En laboratorio'
-              ? 'APTO'
-              : unit.status,
+          transfusionUnitState(state, unit.id) === 'testing'
+            ? 'En pruebas de compatibilidad'
+            : transfusionUnitState(state, unit.id) === 'reserved'
+              ? 'Reservados para transfusión'
+              : transferUnitState(state, unit.id) === 'prepared'
+                ? 'Por transferir'
+                : (seal?.stage === 'completed' || !!fixtureSealId) && unit.status !== 'En laboratorio'
+                  ? 'APTO'
+                  : unit.status,
         originalCode,
         screeningResult,
         qualityIssues,
-        ...(seal ? { sealId: seal.id } : {}),
-        canDispose: !transferUnitState(state, unit.id) && !['En laboratorio', 'Reservada'].includes(unit.status),
+        ...(seal || fixtureSealId ? { sealId: seal?.id ?? fixtureSealId } : {}),
+        canDispose:
+          !transferUnitState(state, unit.id) &&
+          !transfusionUnitState(state, unit.id) &&
+          !['En laboratorio', 'Reservada'].includes(unit.status),
       };
     });
   if (new Set(units.map((unit) => unit.id)).size !== units.length) throw new Error('INVALID_INVENTORY_IDENTITY');

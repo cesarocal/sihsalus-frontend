@@ -10,6 +10,7 @@ import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
 import type { FractionationApi } from './fractionation.api';
 import type { InventoryApi } from './inventory.api';
 import type { TransfersApi } from './transfers.api';
+import type { TransfusionsApi } from './transfusions.api';
 
 /** Contrato estable entre las pantallas y cualquier implementación de datos. */
 export interface BloodBankApi {
@@ -19,6 +20,7 @@ export interface BloodBankApi {
   fractionation: FractionationApi;
   inventory: InventoryApi;
   transfers: TransfersApi;
+  transfusions: TransfusionsApi;
   getDashboard(): Promise<DashboardData>;
   getDonors(): Promise<DonorSummary[]>;
   getDonorDetail(id: string): Promise<DonorDetail>;

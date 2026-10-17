@@ -1,18 +1,18 @@
+import { showSnackbar } from '@openmrs/esm-framework';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { showSnackbar } from '@openmrs/esm-framework';
-import spanish from '../../../translations/es.json';
 import english from '../../../translations/en.json';
+import spanish from '../../../translations/es.json';
 import { mockBloodBankApi } from '../../api/mock-blood-bank.api';
 import { createMockInventoryApi } from '../../api/mock-inventory.api';
 import { printDocument } from '../../shared/print-document';
+import { disposalCauses } from './disposal-causes';
+import { DisposalAct, QualitySeals } from './inventory-documents.component';
 import { InventoryPage } from './inventory-page.component';
-import { InventoryWorkflow } from './inventory-workflow.component';
-import { QualitySeals, DisposalAct } from './inventory-documents.component';
 import { newInventoryOperation } from './inventory-rules';
 import { disposalOperation, sealOperation, seedInventoryReadyUnits } from './inventory-test-fixtures';
-import { disposalCauses } from './disposal-causes';
+import { InventoryWorkflow } from './inventory-workflow.component';
 
 vi.mock('@openmrs/esm-framework', () => ({
   useSession: () => ({ sessionLocation: { display: 'Hospital DEMO' } }),
@@ -40,6 +40,7 @@ describe('inventory selection, seals and disposal UI', () => {
   });
   it('combines search, component/group/status filters, multi-selection and deselection', async () => {
     render(<InventoryPage api={instance()} />);
+    fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
     const first = await screen.findByRole('checkbox', {
       name: 'Seleccionar PFC-2026-002',
     });
@@ -71,6 +72,7 @@ describe('inventory selection, seals and disposal UI', () => {
   ] as const)('opens %s with row selections or an empty searchable selector', async (kind) => {
     seedInventoryReadyUnits();
     const { unmount } = render(<InventoryPage api={instance()} />);
+    fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
     fireEvent.click(
       await screen.findByRole('checkbox', {
         name: 'Seleccionar PFC-2026-002',
@@ -82,6 +84,7 @@ describe('inventory selection, seals and disposal UI', () => {
       }),
     );
     const modal = screen.getByRole('dialog');
+    fireEvent.change(within(modal).getByLabelText(t('search')), { target: { value: 'PFC' } });
     expect(within(modal).getByRole('button', { name: t('inventorySelectFiltered') })).toBeInTheDocument();
     expect(within(modal).queryByRole('columnheader', { name: t('inventorySealReadiness') })).not.toBeInTheDocument();
     expect(
@@ -92,6 +95,7 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(within(modal).getByLabelText(t('search'))).toBeEnabled();
     unmount();
     render(<InventoryPage api={instance()} />);
+    fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
     await screen.findByText('PFC-2026-002');
     fireEvent.click(
       screen.getByRole('button', {
@@ -160,11 +164,11 @@ describe('inventory selection, seals and disposal UI', () => {
     fireEvent.click(print);
     await waitFor(() => expect(printDocument).toHaveBeenCalledOnce());
     expect(print).toBeDisabled();
-    expect((await api.list()).units.filter((unit) => unit.status === 'APTO')).toHaveLength(0);
+    expect((await api.list()).units.filter((unit) => unit.status === 'APTO')).toHaveLength(20);
     fireEvent.click(screen.getByLabelText(t('inventoryPrintConfirmed')));
     fireEvent.click(screen.getByRole('button', { name: t('inventoryConfirmPrinting') }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
-    expect((await api.list()).units.filter((unit) => unit.status === 'APTO')).toHaveLength(2);
+    expect((await api.list()).units.filter((unit) => unit.status === 'APTO')).toHaveLength(22);
     expect(showSnackbar).toHaveBeenCalledWith(
       expect.objectContaining({
         title: t('inventorySealsCompleted'),
@@ -186,7 +190,11 @@ describe('inventory selection, seals and disposal UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('inventoryPrintSeals') }));
     await screen.findByText(t('printFailed'));
     expect(screen.queryByText('private printer trace')).not.toBeInTheDocument();
-    expect((await api.list()).units.every((unit) => unit.status !== 'APTO')).toBe(true);
+    expect(
+      (await api.list()).units
+        .filter((unit) => units.some((selected) => selected.id === unit.id))
+        .every((unit) => unit.status !== 'APTO'),
+    ).toBe(true);
     const requested = (await api.list()).operations[0];
     unmount();
     render(<InventoryWorkflow initial={requested} units={units} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
@@ -196,6 +204,7 @@ describe('inventory selection, seals and disposal UI', () => {
   });
   it('saves a partial draft through the two-action X dialog and resumes through history', async () => {
     render(<InventoryPage api={instance()} />);
+    fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Seleccionar PFC-2026-002' }));
     fireEvent.click(screen.getByRole('button', { name: t('inventoryDispose') }));
     let modal = screen.getByRole('dialog');
@@ -212,6 +221,7 @@ describe('inventory selection, seals and disposal UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('inventoryHistory') }));
     fireEvent.click(screen.getByRole('button', { name: t('inventoryResume') }));
     modal = screen.getByRole('dialog');
+    fireEvent.change(within(modal).getByLabelText(t('search')), { target: { value: 'PFC' } });
     expect(within(modal).getByRole('checkbox', { name: 'Seleccionar PFC-2026-002' })).toBeChecked();
     fireEvent.click(within(modal).getByRole('button', { name: t('next') }));
     expect(await screen.findByLabelText(t('inventoryServiceResponsible'))).toHaveValue('Edición DEMO');
@@ -222,6 +232,7 @@ describe('inventory selection, seals and disposal UI', () => {
     if (!unit) throw new Error('TEST_FIXTURE_MISSING');
     const draft = await api.saveDraft(disposalOperation([unit]));
     render(<InventoryPage api={{ ...mockBloodBankApi, inventory: api }} />);
+    fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
     await screen.findByText(unit.id);
     fireEvent.click(screen.getByRole('button', { name: t('inventoryHistory') }));
     fireEvent.click(screen.getByRole('button', { name: t('inventoryResume') }));
@@ -380,6 +391,7 @@ describe('inventory selection, seals and disposal UI', () => {
     await screen.findByText(t('loadFailed'));
     expect(screen.queryByText('private backend trace')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: t('retry') }));
+    fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
     await screen.findByText('PFC-2026-002');
     expect(screen.getByRole('button', { name: t('inventoryDispose') })).toBeEnabled();
     expect(list).toHaveBeenCalledTimes(2);

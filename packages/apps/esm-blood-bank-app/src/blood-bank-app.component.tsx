@@ -55,7 +55,7 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
         <Route path="laboratory/follow-up" element={<Navigate replace to="/follow-up/donor" />} />
         <Route
           path="laboratory/compatibility"
-          element={protectedPage(bloodBankPrivileges.compatibility, <CompatibilityPage />)}
+          element={protectedPage(bloodBankPrivileges.compatibility, <CompatibilityPage api={api.transfusions} />)}
         />
         <Route
           path="laboratory/fractionation"
@@ -75,7 +75,10 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
           element={protectedPage(bloodBankPrivileges.transfers, <TransfersPage api={api.transfers} />)}
         />
         <Route path="inventory" element={protectedPage(bloodBankPrivileges.inventory, <InventoryPage api={api} />)} />
-        <Route path="transfusions" element={protectedPage(bloodBankPrivileges.transfusions, <TransfusionsPage />)} />
+        <Route
+          path="transfusions"
+          element={protectedPage(bloodBankPrivileges.transfusions, <TransfusionsPage api={api.transfusions} />)}
+        />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Route>
     </Routes>

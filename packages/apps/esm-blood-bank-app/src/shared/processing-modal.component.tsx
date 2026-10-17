@@ -13,6 +13,9 @@ import type { ProcessingTranslate } from './processing-page.component';
 import { ExitConfirmation, type ExitSaveResult } from './exit-confirmation.component';
 import styles from '../sections/applicant-selection/selection.scss';
 
+// Let the nested warning own focus without the underlying workflow trapping it.
+const warningDialogs = ['[data-blood-bank-warning]'];
+
 export function ProcessingModal({
   title,
   steps,
@@ -35,6 +38,7 @@ export function ProcessingModal({
   children,
   extraActions,
   footerClassName,
+  compactHeader = false,
   t,
 }: {
   title: string;
@@ -58,6 +62,7 @@ export function ProcessingModal({
   children: ReactNode;
   extraActions?: ReactNode;
   footerClassName?: string;
+  compactHeader?: boolean;
   t: ProcessingTranslate;
 }) {
   const [confirm, setConfirm] = useState(false);
@@ -95,9 +100,10 @@ export function ProcessingModal({
       <ComposedModal
         open
         size="lg"
-        className={styles.workflow}
+        className={[styles.workflow, compactHeader && styles.compactHeader].filter(Boolean).join(' ')}
         onClose={requestClose}
         preventCloseOnClickOutside
+        selectorsFloatingMenus={warningDialogs}
         aria-label={title}
       >
         <ModalHeader title={title} iconDescription={t('close')} closeModal={requestClose}>

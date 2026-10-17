@@ -1,4 +1,4 @@
-import { Fork, Movement } from '@carbon/react/icons';
+import { Fork, IbmDevopsTest, Movement, RainDrop } from '@carbon/react/icons';
 import {
   BloodBankPictogram,
   LaboratoryPictogram,
@@ -15,7 +15,9 @@ export type BloodBankIllustration =
   | 'screening'
   | 'fractionation'
   | 'inventory'
-  | 'transfers';
+  | 'transfers'
+  | 'transfusions'
+  | 'compatibility';
 
 /** Only the blood-bank page headers are customized; the shared navigation is unchanged. */
 export function BloodBankPageIllustration({ section }: { section: BloodBankIllustration }) {
@@ -28,6 +30,8 @@ export function BloodBankPageIllustration({ section }: { section: BloodBankIllus
       {section === 'fractionation' && <Fork size={64} className={styles.selectionIllustration} />}
       {section === 'inventory' && <StockManagementPictogram />}
       {section === 'transfers' && <Movement size={64} className={styles.selectionIllustration} />}
+      {section === 'transfusions' && <RainDrop size={64} className={styles.selectionIllustration} />}
+      {section === 'compatibility' && <IbmDevopsTest size={64} className={styles.selectionIllustration} />}
     </span>
   );
 }

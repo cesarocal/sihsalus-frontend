@@ -1,8 +1,14 @@
 import type { ProcessingState } from '../api/mock-processing-store';
 import { newCollection } from '../sections/collection/collection-rules';
-import type { FractionationUnit } from '../sections/laboratory/fractionation/fractionation.types';
-import { localDateTime, newScreening } from '../sections/laboratory/screening/screening-rules';
+import { inventoryExpiry } from '../sections/inventory/inventory-rules';
+import type { ComponentType, FractionationUnit } from '../sections/laboratory/fractionation/fractionation.types';
 import { screeningTests } from '../sections/laboratory/screening/screening.types';
+import {
+  globalScreeningResult,
+  localDateTime,
+  newScreening,
+  validateScreening,
+} from '../sections/laboratory/screening/screening-rules';
 import { applicationsMock } from './applicant-selection.mock';
 
 /** Synthetic stock only. Never replace a saved unit, panel or collection. Reads do not write storage. */
@@ -17,8 +23,47 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
   const expires = new Date(`${day}T12:00`);
   expires.setDate(expires.getDate() + 7);
   const expiry = new Date(expires.getTime() - expires.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  for (const number of [1, 2, 3, 4, 5]) {
-    const code = `BB-SELLO-DEMO-${String(number).padStart(3, '0')}`;
+  for (let number = 1; number <= 25; number++) {
+    const additional = number > 5;
+    const code = additional
+      ? `BB-TX-DEMO-${String(number - 5).padStart(3, '0')}`
+      : `BB-SELLO-DEMO-${String(number).padStart(3, '0')}`;
+    const component: ComponentType =
+      number <= 5
+        ? 'wholeBlood'
+        : number <= 11
+          ? 'redCells'
+          : number <= 15
+            ? 'wholeBlood'
+            : number <= 19
+              ? 'freshFrozenPlasma'
+              : number <= 22
+                ? 'platelets'
+                : 'cryoprecipitate';
+    const groups = [
+      'O+',
+      'O+',
+      'O+',
+      'O+',
+      'A+',
+      'O-',
+      'A+',
+      'A+',
+      'O+',
+      'B+',
+      'O+',
+      'A+',
+      'AB+',
+      'B+',
+      'O+',
+      'A+',
+      'B+',
+      'O+',
+      'A+',
+      'AB+',
+    ] as const;
+    const bloodGroup = additional ? groups[number - 6] : number % 2 ? 'O+' : 'A+';
+    const reactive = number === 4 || number === 5;
     const collectionId = `mock-inventory-seal-${number}`;
     const panelId = `mock-screening-${collectionId}`;
     // Do not invent approvals for partial/edited fixtures or resurrect units removed from storage.
@@ -33,16 +78,18 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
     application.id = collectionId;
     application.number = `SELLO-DEMO-${String(number).padStart(3, '0')}`;
     application.admission.date = date;
-    application.admission.documentNumber = `9000010${number}`;
+    application.admission.documentNumber = additional ? String(90001000 + number) : `9000010${number}`;
     application.personal.givenName = `Persona DEMO ${number}`;
     application.personal.familyName = 'Inventario sintético';
-    application.physical.bloodGroup = number % 2 ? 'O' : 'A';
-    application.physical.rh = '+';
+    application.physical.bloodGroup = bloodGroup.slice(0, -1) as typeof application.physical.bloodGroup;
+    application.physical.rh = bloodGroup.endsWith('-') ? '-' : '+';
     const collection = newCollection(application);
     collection.id = collectionId;
+    collection.unitCode = code;
+    if (additional) collection.sampleCode = `M-STOCK-${code}`;
     collection.label = {
       ...collection.label,
-      component: 'Sangre total (DEMO)',
+      component: additional ? `${component} (DEMO)` : 'Sangre total (DEMO)',
       anticoagulant: 'CPDA-1 (DEMO)',
       plannedVolume: '450',
       service: 'Banco de sangre (DEMO)',
@@ -74,21 +121,21 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
     panel.performedBy = 'Laboratorio DEMO';
     for (const test of screeningTests)
       panel.tests[test] = {
-        result: number > 3 && test === 'hiv' ? 'reactive' : 'nonReactive',
+        result: reactive && test === 'hiv' ? 'reactive' : 'nonReactive',
         reagent: 'Reactivo DEMO',
         brand: 'Marca DEMO',
         lot: 'LOTE-DEMO',
       };
     panel.validatedBy = 'Validación DEMO';
     panel.validatedAt = collection.updatedAt;
-    panel.result = number > 3 ? 'reactive' : 'nonReactive';
+    panel.result = reactive ? 'reactive' : 'nonReactive';
     panel.status = 'validated';
     panel.completedSteps = ['reception', 'results', 'validation'];
     const unit: FractionationUnit = {
       id: code,
       code,
       originalWholeBloodCode: code,
-      component: 'wholeBlood',
+      component,
       volume: '450',
       nominalVolume: '450',
       collectedAt: date,
@@ -102,7 +149,7 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
         processingService: '',
         storageTemperature: 'DEMO',
         expiresAt: expiry,
-        bloodGroup: `${application.physical.bloodGroup}+`,
+        bloodGroup,
         antibodies: '',
         voluntary: true,
         remunerated: false,
@@ -117,6 +164,52 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
     state.collections.push(collection);
     state.screenings.push(panel);
     store.units.push(unit);
+  }
+  // Initial mock stock approvals, not print/confirmation events performed by an operator.
+  // Also enrich older tabs without resetting records, pending seals or stock movements.
+  for (let number = 1; number <= 20; number++) {
+    const code = `BB-TX-DEMO-${String(number).padStart(3, '0')}`;
+    if (
+      state.fixtureQualitySeals?.[code] ||
+      state.inventory?.operations.some((op) => op.units.some((unit) => unit.id === code))
+    )
+      continue;
+    const unit = store.units.find((item) => item.code === code && item.id === code);
+    const collection = state.collections.find(
+      (item) => item.id === `mock-inventory-seal-${number + 5}` && item.unitCode === code,
+    );
+    const panels = state.screenings.filter((panel) => panel.unitCode === code);
+    const expiration = unit ? inventoryExpiry(unit.label.expiresAt) : '';
+    if (
+      !unit ||
+      unit.originalWholeBloodCode !== code ||
+      unit.state !== 'quarantine' ||
+      !collection ||
+      collection.application.admission.donationType === 'autologous' ||
+      unit.label.autologous ||
+      !expiration ||
+      expiration < day ||
+      new Date(unit.label.expiresAt).getTime() <= Date.now() ||
+      !/^(A|B|AB|O)[+−-]$/.test(unit.label.bloodGroup) ||
+      !unit.location.trim() ||
+      !panels.length ||
+      panels.some(
+        (panel) =>
+          panel.collectionId !== collection.id ||
+          (panel.origin && (panel.origin.type !== 'postExtraction' || panel.origin.collectionId !== collection.id)) ||
+          panel.status !== 'validated' ||
+          !panel.validatedAt ||
+          !Number.isFinite(Date.parse(panel.validatedAt)) ||
+          Date.parse(panel.validatedAt) > Date.now() ||
+          Date.parse(panel.validatedAt) < Date.parse(panel.performedOn) ||
+          panel.result !== 'nonReactive' ||
+          globalScreeningResult(panel) !== 'nonReactive' ||
+          validateScreening(panel, 'validation').length,
+      )
+    )
+      continue;
+    state.fixtureQualitySeals ??= {};
+    state.fixtureQualitySeals[code] = `Q-TX-DEMO-${String(number).padStart(3, '0')}`;
   }
   return state;
 }

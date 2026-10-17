@@ -102,6 +102,21 @@ describe('BloodBankApp', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Compatibilidad' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Tamizaje de donantes' })).not.toBeInTheDocument();
   });
+  it.each([
+    ['/transfusions', bloodBankPrivileges.transfusions, 'Historial de solicitudes'],
+    ['/laboratory/compatibility', bloodBankPrivileges.compatibility, 'Historial de compatibilidad'],
+  ])('protects %s reads and allows its existing section privilege', async (path, privilege, action) => {
+    const list = vi.fn(mockBloodBankApi.transfusions.list);
+    const api = { ...mockBloodBankApi, transfusions: { ...mockBloodBankApi.transfusions, list } };
+    const denied = render(<BloodBankApp api={api} initialPath={path} />);
+    expect(list).not.toHaveBeenCalled();
+    expect(screen.getByText('Sin acceso')).toBeInTheDocument();
+    denied.unmount();
+    allowedPrivileges.add(privilege);
+    render(<BloodBankApp api={api} initialPath={path} />);
+    expect(await screen.findByRole('button', { name: action })).toBeEnabled();
+    expect(list).toHaveBeenCalledOnce();
+  });
 
   it('separa el seguimiento del donante y el del receptor', async () => {
     allowedPrivileges.add(bloodBankPrivileges.module);

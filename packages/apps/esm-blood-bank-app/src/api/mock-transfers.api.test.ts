@@ -55,13 +55,20 @@ describe('transfer requests, stock commitments and administrative logbook', () =
     sessionStorage.clear();
   });
 
-  it('adds received examples without writing, overwriting other flows or approving stock', async () => {
+  it('adds received examples without writes and preserves only the explicitly pre-approved fixture stock', async () => {
     const api = createMockTransfersApi();
     const before = sessionStorage.getItem(processingStorageKey);
     const workspace = await api.list();
     expect(workspace.requests).toHaveLength(3);
     expect(workspace.requests.every((item) => item.status === 'received')).toBe(true);
-    expect(workspace.units.filter((unit) => candidateForRequest(unit, workspace.requests[0]))).toHaveLength(0);
+    const candidates = workspace.units.filter((unit) => candidateForRequest(unit, workspace.requests[0]));
+    expect(candidates.map((unit) => unit.id)).toEqual(['BB-TX-DEMO-009']);
+    expect(candidates[0].sealId).toBe('Q-TX-DEMO-009');
+    expect(
+      workspace.units
+        .filter((unit) => unit.id.startsWith('BB-SELLO-DEMO-'))
+        .every((unit) => unit.status === 'Cuarentena' && !unit.sealId),
+    ).toBe(true);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });
   it('preserves drafts, requires full FR09 data for submission and retains external identities', async () => {

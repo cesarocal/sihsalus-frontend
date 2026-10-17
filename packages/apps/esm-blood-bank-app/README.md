@@ -13,7 +13,8 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - Extracción incluye cola de seleccionados, etiquetas de unidad/tubo, volumen, registro y constancia imprimible.
 - Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
 - Transferencias separa Recibidas / Pendientes y Solicitadas con pestañas Carbon. Incluye registro manual e historial independiente, generación e impresión FR09 de solicitudes a otras instituciones, selección y reserva de recibidas, constancia FR11, entrega y proyección administrativa del libro FR10. Generar una solicitud no envía correos ni compromete stock local. Las unidades entregadas pasan de Por transferir a Transferido, sin En tránsito. Ver [Transferencias](src/sections/transfers/README.md).
-- Las demás rutas son bases visuales; todavía no guardan información clínica.
+- Transfusiones y Laboratorio / Compatibilidad incluyen atención regular de órdenes recibidas sintéticas, muestra del receptor, selección en dos bloques, pruebas por pares, reemplazos, reserva, entrega e historial/libro de egresos. No generan solicitudes médicas ni administraciones clínicas y bloquean el flujo urgente. Ver [Atención transfusional](src/sections/transfusions/README.md).
+- Seguimientos continúa como base visual. Ningún flujo mock guarda información clínica en OpenMRS.
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
 
@@ -40,6 +41,14 @@ El backend continúa siendo la autoridad para autorización y persistencia. No s
 Donantes, Selección, Extracción y Tamizaje comparten fondo blanco, `PageHeader` de `esm-styleguide`, tarjetas con título/unidad pequeña/valor y tablas Carbon. Los colores de campos y encabezados de tabla se mantienen para distinguir controles. Los cambios están limitados al ESM, sin alterar componentes globales ni privilegios existentes; el detalle añade una ruta interna protegida por el permiso de Donantes.
 
 `src/shared/blood-bank-page-illustration.component.tsx` centraliza las ilustraciones de cabecera: `PatientsPictogram` (Donantes), `UserFollowIcon` ampliado (Selección, mismo símbolo que el navbar), `BloodBankPictogram` (Extracción) y `LaboratoryPictogram` (Tamizaje, igual que Laboratorio).
+
+Transfusiones utiliza `RainDrop` y Compatibilidad `IbmDevopsTest` de Carbon; este
+último coincide con el símbolo de su barra lateral. Se amplían con los mismos
+tokens del ESM y mantienen ubicación/hora y permisos de sus secciones. Los
+formularios transfusionales compactan el espacio entre progreso y contenido;
+sus confirmaciones de asignación, resultados y entrega usan un triángulo de
+advertencia, efectos resumidos y acciones pequeñas. Las muestras se representan
+con tubos de ensayo rojos en SVG, sin cambiar estados ni reglas clínicas.
 
 El detalle no repite el nombre del donante debajo de la cabecera: lo conserva en Datos personales. Volver al listado utiliza la composición `PageHeader`/`PageHeaderContent`. El marco de datos reduce espacios con tokens de Carbon y el título Historial de donaciones utiliza `heading-03`, sin tamaños tipográficos personalizados ni cambios a otros formularios.
 
@@ -136,8 +145,12 @@ El sello exige tamizaje original validado no reactivo e inspección manual.
 Su popup muestra exclusivamente unidades no reactivas, con o sin selección
 previa. La tabla resume el tamizaje sin columna Verificación para sello;
 Seleccionar resultados filtrados se conserva únicamente en los popups.
-Se añaden tres unidades mock no reactivas y dos reactivas, sin reemplazar datos.
-Solo una solicitud de impresión y confirmación explícita pasan la unidad a
+Se conservan tres unidades mock no reactivas y dos reactivas y se añaden veinte
+unidades no reactivas de cinco tipos para probar Transfusiones. Estas veinte
+unidades `BB-TX-DEMO-001..020` se precargan aptas con sellos sintéticos distintos;
+no se reemplazan datos ni movimientos existentes. Son aprobaciones iniciales de
+la fixture, no impresiones realizadas por el operador. Para el flujo normal,
+solo una solicitud de impresión y confirmación explícita pasan la unidad a
 `APTO`. Estado operativo y resultado de tamizaje permanecen separados, conforme
 al SQL aportado. Eliminar unidades tiene tres pasos: selección, causas (ocho
 opciones del BPMN por unidad) y revisión con impresión del borrador. Imprimir

@@ -8,6 +8,7 @@ import { openmrsDonorReadApi } from './donors.api';
 import { openmrsFractionationApi } from './fractionation.api';
 import { openmrsInventoryApi } from './inventory.api';
 import { openmrsTransfersApi } from './transfers.api';
+import { openmrsTransfusionsApi } from './transfusions.api';
 
 const apiBase = '/ws/rest/v1/bloodbank';
 
@@ -19,6 +20,7 @@ export const openmrsBloodBankApi: BloodBankApi = {
   fractionation: openmrsFractionationApi,
   inventory: openmrsInventoryApi,
   transfers: openmrsTransfersApi,
+  transfusions: openmrsTransfusionsApi,
   async getDashboard() {
     const response = await openmrsFetch<DashboardData>(`${apiBase}/dashboard`);
     return response.data;
