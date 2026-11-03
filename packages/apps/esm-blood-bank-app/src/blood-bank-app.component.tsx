@@ -1,4 +1,5 @@
-import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { readDashboardShortcut } from './sections/dashboard/dashboard-shortcuts';
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { type BloodBankPrivilege, bloodBankPrivileges } from './access/blood-bank-privileges';
 import { ProtectedSection } from './access/protected-section.component';
 import type { BloodBankApi } from './api';
@@ -20,12 +21,14 @@ import { TransfusionsPage } from './sections/transfusions/transfusions-page.comp
 
 interface BloodBankAppProps {
   api: BloodBankApi;
+  expiryWarningDays?: number;
   router?: 'browser' | 'memory';
   initialPath?: string;
   basename?: string;
 }
 
-function BloodBankRoutes({ api }: { api: BloodBankApi }) {
+function BloodBankRoutes({ api, expiryWarningDays }: { api: BloodBankApi; expiryWarningDays?: number }) {
+  const shortcut = readDashboardShortcut(useLocation().search);
   const protectedPage = (privilege: BloodBankPrivilege, page: React.ReactNode) => (
     <ProtectedSection privilege={privilege}>{page}</ProtectedSection>
   );
@@ -33,7 +36,7 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
   return (
     <Routes>
       <Route element={<BloodBankLayout />}>
-        <Route index element={<DashboardPage api={api} />} />
+        <Route index element={<DashboardPage api={api} expiryWarningDays={expiryWarningDays} />} />
         <Route path={donorsPath} element={protectedPage(bloodBankPrivileges.donors, <DonorsPage api={api} />)} />
         <Route
           path={donorDetailRoute}
@@ -41,40 +44,58 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
         />
         <Route
           path={applicantSelectionPath}
-          element={protectedPage(bloodBankPrivileges.applicantSelection, <ApplicantSelectionRoute api={api} />)}
+          element={protectedPage(
+            bloodBankPrivileges.applicantSelection,
+            <ApplicantSelectionRoute api={api} shortcut={shortcut} />,
+          )}
         />
         <Route
           path="collection"
-          element={protectedPage(bloodBankPrivileges.collection, <CollectionPage api={api.collection} />)}
+          element={protectedPage(
+            bloodBankPrivileges.collection,
+            <CollectionPage api={api.collection} shortcut={shortcut} />,
+          )}
         />
         <Route path="laboratory" element={<Navigate replace to="screening" />} />
         <Route
           path="laboratory/screening"
-          element={protectedPage(bloodBankPrivileges.screening, <ScreeningPage api={api.screening} />)}
+          element={protectedPage(
+            bloodBankPrivileges.screening,
+            <ScreeningPage api={api.screening} shortcut={shortcut} />,
+          )}
         />
         <Route path="laboratory/follow-up" element={<Navigate replace to="/follow-up/donor" />} />
         <Route
           path="laboratory/compatibility"
-          element={protectedPage(bloodBankPrivileges.compatibility, <CompatibilityPage api={api.transfusions} />)}
+          element={protectedPage(
+            bloodBankPrivileges.compatibility,
+            <CompatibilityPage api={api.transfusions} shortcut={shortcut} />,
+          )}
         />
         <Route
           path="laboratory/fractionation"
-          element={protectedPage(bloodBankPrivileges.fractionation, <FractionationPage api={api.fractionation} />)}
+          element={protectedPage(
+            bloodBankPrivileges.fractionation,
+            <FractionationPage api={api.fractionation} shortcut={shortcut} />,
+          )}
         />
         <Route path="follow-up" element={<Navigate replace to="donor" />} />
         <Route
           path="follow-up/donor"
-          element={protectedPage(bloodBankPrivileges.donorFollowUp, <DonorFollowUpPage />)}
+          element={protectedPage(bloodBankPrivileges.donorFollowUp, <DonorFollowUpPage api={api.followUp} />)}
         />
         <Route
           path="follow-up/recipient"
-          element={protectedPage(bloodBankPrivileges.recipientFollowUp, <RecipientFollowUpPage />)}
+          element={protectedPage(bloodBankPrivileges.recipientFollowUp, <RecipientFollowUpPage api={api.followUp} />)}
         />
         <Route
           path="transfers"
           element={protectedPage(bloodBankPrivileges.transfers, <TransfersPage api={api.transfers} />)}
         />
-        <Route path="inventory" element={protectedPage(bloodBankPrivileges.inventory, <InventoryPage api={api} />)} />
+        <Route
+          path="inventory"
+          element={protectedPage(bloodBankPrivileges.inventory, <InventoryPage api={api} shortcut={shortcut} />)}
+        />
         <Route
           path="transfusions"
           element={protectedPage(bloodBankPrivileges.transfusions, <TransfusionsPage api={api.transfusions} />)}
@@ -85,18 +106,24 @@ function BloodBankRoutes({ api }: { api: BloodBankApi }) {
   );
 }
 
-export function BloodBankApp({ api, router = 'memory', initialPath = '/', basename }: BloodBankAppProps) {
+export function BloodBankApp({
+  api,
+  router = 'memory',
+  initialPath = '/',
+  basename,
+  expiryWarningDays,
+}: BloodBankAppProps) {
   if (router === 'browser') {
     return (
       <BrowserRouter basename={basename}>
-        <BloodBankRoutes api={api} />
+        <BloodBankRoutes api={api} expiryWarningDays={expiryWarningDays} />
       </BrowserRouter>
     );
   }
 
   return (
     <MemoryRouter initialEntries={[initialPath]}>
-      <BloodBankRoutes api={api} />
+      <BloodBankRoutes api={api} expiryWarningDays={expiryWarningDays} />
     </MemoryRouter>
   );
 }

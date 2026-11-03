@@ -28,6 +28,14 @@ No se introducen permisos por etapa en este cambio. En producción deberán veri
 
 ## Flujo y guardado parcial
 
+Inicio puede abrir una entrevista mediante `?application=<id>`. El listado
+reconsulta las postulaciones y valida coincidencia exacta y estado pendiente de
+entrevista antes de abrir el formulario habitual. Una referencia no disponible
+muestra un aviso; no crea postulaciones ni cambia estados. La apertura conserva
+las etapas previas en consulta. La referencia se consume una vez para evitar que
+la X o un refresco del listado reabran el formulario. La ruta conserva su permiso
+de Selección; una URL no sustituye la autorización.
+
 1. Nueva Postulación abre Admisión. Guardar asigna un número secuencial ficticio; completar Admisión marca Admitido.
 2. Datos personales se autocompletan cuando existe identidad de prueba. Son editables hasta cerrar el examen físico.
 3. Examen físico captura valores y observaciones. Advertencias permiten revisar valores, continuar la entrevista con justificación, o detener el proceso y registrar una exclusión.

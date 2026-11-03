@@ -1,6 +1,7 @@
+import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import { Button, Checkbox, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { Fork, RecentlyViewed } from '@carbon/react/icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FractionationApi } from '../../../api/fractionation.api';
 import { notifySuccess } from '../../../shared/notify-success';
 import {
@@ -17,11 +18,13 @@ import { FractionationHistory } from './fractionation-history.component';
 import shared from '../../applicant-selection/selection.scss';
 import styles from './fractionation.scss';
 
-export function FractionationPage({ api }: { api: FractionationApi }) {
+export function FractionationPage({ api, shortcut }: { api: FractionationApi; shortcut?: DashboardShortcut }) {
   const t = useProcessingTranslation();
   const load = useCallback(() => api.list(), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
   const [search, setSearch] = useState('');
+  const [onlyEligible, setOnlyEligible] = useState(shortcut?.category === 'eligible');
+  useEffect(() => setOnlyEligible(shortcut?.category === 'eligible'), [shortcut?.category]);
   const [component, setComponent] = useState('');
   const [status, setStatus] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -29,11 +32,35 @@ export function FractionationPage({ api }: { api: FractionationApi }) {
   const [history, setHistory] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
+  const [exactUnit, setExactUnit] = useState(shortcut?.unit ?? '');
+  const [shortcutUnavailable, setShortcutUnavailable] = useState(false);
+  const handledUnit = useRef('');
+  useEffect(() => {
+    const id = shortcut?.unit;
+    if (!id) {
+      handledUnit.current = '';
+      setExactUnit('');
+      setShortcutUnavailable(false);
+      return;
+    }
+    if (loading || failed || !data || active || history || starting || handledUnit.current === id) return;
+    handledUnit.current = id;
+    const unit = data.units.find((item) => item.id === id && eligibleSource(item));
+    setExactUnit(id);
+    setComponent('');
+    setStatus('');
+    setOnlyEligible(true);
+    setSearch(unit?.code ?? '');
+    setSelected(unit ? [unit.id] : []);
+    setShortcutUnavailable(!unit);
+  }, [shortcut?.unit, data, loading, failed, active, history, starting]);
   const queue = (data?.units ?? []).filter(
     (unit) => ['wholeBlood', 'freshFrozenPlasma'].includes(unit.component) && unit.state !== 'fractionated',
   );
   const filtered = queue.filter(
     (unit) =>
+      (!exactUnit || unit.id === exactUnit) &&
+      (!onlyEligible || eligibleSource(unit)) &&
       (!component || unit.component === component) &&
       (!status || unit.state === status) &&
       normalizeSearch(
@@ -88,6 +115,24 @@ export function FractionationPage({ api }: { api: FractionationApi }) {
         },
       ]}
     >
+      {(onlyEligible || exactUnit) && (
+        <Button
+          kind="ghost"
+          size="sm"
+          onClick={() => {
+            setOnlyEligible(false);
+            setExactUnit('');
+            setShortcutUnavailable(false);
+            setSearch('');
+            resetSelection();
+          }}
+        >
+          {t('homeClearFilters')}
+        </Button>
+      )}
+      {shortcutUnavailable && (
+        <InlineNotification kind="warning" hideCloseButton title={t('homeFractionationUnavailable')} />
+      )}
       <section className={shared.list}>
         <div className={styles.toolbar}>
           <Search
@@ -98,6 +143,8 @@ export function FractionationPage({ api }: { api: FractionationApi }) {
             closeButtonLabelText={t('clearSearch')}
             onChange={(event) => {
               setSearch(event.target.value);
+              setExactUnit('');
+              setShortcutUnavailable(false);
               resetSelection();
             }}
           />
@@ -238,7 +285,7 @@ export function FractionationPage({ api }: { api: FractionationApi }) {
           failed={failed}
           reload={reload}
           emptyHelp={t('fractionationEmpty')}
-          filterKey={`${search}:${component}:${status}`}
+          filterKey={`${search}:${component}:${status}:${exactUnit}:${onlyEligible}`}
           t={t}
         />
       </section>

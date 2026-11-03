@@ -1,3 +1,4 @@
+import { createMockFollowUpApi } from './mock-follow-up.api';
 import { dashboardMock } from '../mocks/blood-bank.mock';
 import type { BloodBankApi } from './blood-bank.api';
 import { createMockApplicantSelectionApi } from './mock-applicant-selection.api';
@@ -16,6 +17,7 @@ const processing = createMockProcessingApi(selection);
 const donorDetails = () => readMockDonorDetails(() => globalThis.sessionStorage);
 
 export const mockBloodBankApi: BloodBankApi = {
+  followUp: createMockFollowUpApi(),
   selection,
   ...processing,
   fractionation: createMockFractionationApi(),

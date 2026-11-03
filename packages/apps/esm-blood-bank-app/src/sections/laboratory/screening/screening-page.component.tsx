@@ -1,6 +1,19 @@
-import { Button, Search, Select, SelectItem, Tab, TabList, TabPanel, TabPanels, Tabs, Tag } from '@carbon/react';
+import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
+import {
+  Button,
+  InlineNotification,
+  Search,
+  Select,
+  SelectItem,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tag,
+} from '@carbon/react';
 import { Add, RecentlyViewed } from '@carbon/react/icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
 import {
   ProcessingPage,
@@ -18,17 +31,37 @@ import styles from '../../applicant-selection/selection.scss';
 import screeningStyles from './screening.scss';
 
 const categories: ScreeningCategory[] = ['donors', 'followUps'];
-export function ScreeningPage({ api }: { api: ScreeningApi }) {
+export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?: DashboardShortcut }) {
   const t = useProcessingTranslation();
   const { data, loading, failed, reload } = useProcessingData(api.listScreenings);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(shortcut?.category === 'followUps' ? 1 : 0);
   const [filters, setFilters] = useState({
     donors: { search: '', status: '', origin: '' },
     followUps: { search: '', status: '', origin: '' },
   });
+  useEffect(() => setTab(shortcut?.category === 'followUps' ? 1 : 0), [shortcut?.category]);
   const [active, setActive] = useState<ScreeningRecord | null>(null);
   const [history, setHistory] = useState<ScreeningCategory | null>(null);
   const [apheresis, setApheresis] = useState(false);
+  const handledScreening = useRef('');
+  const [shortcutUnavailable, setShortcutUnavailable] = useState(false);
+  useEffect(() => {
+    const id = shortcut?.screening;
+    if (!id) {
+      handledScreening.current = '';
+      setShortcutUnavailable(false);
+      return;
+    }
+    if (loading || failed || !data || active || history || apheresis || handledScreening.current === id) return;
+    handledScreening.current = id;
+    const record = data.find((item) => item.id === id && item.status !== 'validated');
+    const recordCategory = record ? screeningCategory(record) : null;
+    setShortcutUnavailable(!record || !recordCategory);
+    if (record && recordCategory) {
+      setTab(recordCategory === 'followUps' ? 1 : 0);
+      setActive(record);
+    }
+  }, [shortcut?.screening, data, loading, failed, active, history, apheresis]);
   const category = categories[tab];
   const filter = filters[category];
   const update = (key: keyof typeof filter, value: string) =>
@@ -45,6 +78,9 @@ export function ScreeningPage({ api }: { api: ScreeningApi }) {
     .sort((left, right) => left.collectedOn.localeCompare(right.collectedOn));
   const queue = (
     <div className={styles.surface}>
+      {shortcutUnavailable && (
+        <InlineNotification kind="warning" hideCloseButton title={t('homeScreeningUnavailable')} />
+      )}
       <div className={screeningStyles.toolbar}>
         <Search
           id={`screening-${category}-search`}

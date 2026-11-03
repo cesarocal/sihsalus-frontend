@@ -1,0 +1,374 @@
+@use "@carbon/layout";
+@use "@carbon/type";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: layout.$spacing-05;
+  min-block-size: calc(100dvh - 15rem);
+}
+.intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: layout.$spacing-05;
+  p {
+    @include type.type-style("body-01");
+  }
+}
+.groups {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  align-content: start;
+}
+.group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.groupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+  margin-bottom: layout.$spacing-03;
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: layout.$spacing-03;
+    @include type.type-style("heading-03");
+    svg {
+      flex-shrink: 0;
+      color: #7bbcb9;
+    }
+  }
+}
+.cards {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.source {
+  display: contents;
+}
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: layout.$spacing-03 layout.$spacing-04;
+  min-width: 0;
+  flex: 1;
+  min-height: layout.$spacing-08;
+  padding: layout.$spacing-03 0;
+  background: $ui-02;
+  border-bottom: 1px solid $ui-03;
+  text-decoration: none;
+  color: $ui-05;
+  overflow-wrap: anywhere;
+  > strong {
+    grid-column: 2;
+    grid-row: 1;
+    @include type.type-style("heading-03");
+  }
+  > .cardLabel {
+    grid-column: 1;
+    grid-row: 1;
+    @include type.type-style("body-01");
+  }
+  &:hover {
+    background: $ui-01;
+  }
+  &:focus-visible {
+    outline: 2px solid $interactive-01;
+    outline-offset: 2px;
+  }
+}
+.cardDescription {
+  display: none;
+}
+.cardAction {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-03;
+  color: $interactive-01;
+  > span {
+    display: none;
+  }
+}
+.alerts {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-top: layout.$spacing-05;
+  border-top: 1px solid $ui-03;
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: layout.$spacing-03;
+    margin-bottom: layout.$spacing-04;
+    @include type.type-style("heading-compact-01");
+  }
+}
+.alertList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: layout.$spacing-03;
+}
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: layout.$spacing-03;
+  padding: layout.$spacing-04;
+  color: $ui-05;
+  background: $ui-01;
+  text-decoration: none;
+  border-inline-start: 3px solid #b28600;
+  overflow-wrap: anywhere;
+  @include type.type-style("body-01");
+  > span {
+    display: grid;
+    gap: layout.$spacing-02;
+  }
+  svg {
+    flex-shrink: 0;
+    color: $interactive-01;
+  }
+  &:hover {
+    background: $ui-03;
+  }
+}
+.empty {
+  padding: layout.$spacing-05;
+  @include type.type-style("body-01");
+}
+.mosaic {
+  .cards > .source:last-child > .card:last-child {
+    border-bottom: 0;
+  }
+  .group {
+    border: 1px solid $ui-03;
+    padding: layout.$spacing-05;
+    min-height: 14rem;
+    background: $ui-02;
+  }
+  .group:last-of-type:nth-of-type(odd) {
+    grid-column: 1 / -1;
+    min-height: 10rem;
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+      gap: layout.$spacing-05;
+    }
+    .card {
+      border-bottom: 0;
+    }
+  }
+}
+.focused {
+  .groups {
+    display: flex;
+    flex-direction: column;
+    gap: layout.$spacing-06;
+  }
+  .group {
+    flex: 1;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: layout.$spacing-05;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: layout.$spacing-04;
+    min-height: 12rem;
+    padding: layout.$spacing-05;
+    border: 1px solid $ui-03;
+    > strong {
+      @include type.type-style("heading-05");
+    }
+    > .cardLabel {
+      @include type.type-style("body-02");
+    }
+  }
+  .cardDescription {
+    display: block;
+    color: $text-02;
+    @include type.type-style("body-01");
+  }
+  .cardAction {
+    margin-top: auto;
+    padding-top: layout.$spacing-04;
+    @include type.type-style("label-01");
+    > span {
+      display: inline;
+    }
+  }
+  .group[data-area="laboratoryGroup"] .cards {
+    display: block;
+  }
+  .group[data-area="selectionGroup"] .cards {
+    display: block;
+    grid-template-columns: minmax(0, 1fr);
+    .card {
+      display: grid;
+      grid-template-columns: layout.$spacing-10 minmax(0, 1fr) auto;
+      align-content: center;
+      align-items: center;
+      > strong {
+        grid-column: 1;
+        grid-row: 1 / 3;
+      }
+      > .cardLabel {
+        grid-column: 2;
+        grid-row: 1;
+      }
+      > .cardDescription {
+        grid-column: 2;
+        grid-row: 2;
+      }
+      > .cardAction {
+        grid-column: 3;
+        grid-row: 1 / 3;
+        margin: 0;
+        padding: 0;
+      }
+    }
+  }
+  .alertList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 42rem) {
+  .groups,
+  .focused .cards,
+  .focused .group[data-area="laboratoryGroup"] .cards,
+  .mosaic .group:last-of-type:nth-of-type(odd) .cards,
+  .alertList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .intro {
+    flex-wrap: wrap;
+  }
+  .focused .group[data-area="selectionGroup"] .cards .card {
+    display: flex;
+    .cardAction {
+      margin-top: auto;
+    }
+  }
+}
+
+.quickAction,
+.seeAll {
+  display: inline-flex;
+  align-items: center;
+  gap: layout.$spacing-03;
+  padding: layout.$spacing-03;
+  @include type.type-style("body-01");
+}
+.selectionOverview {
+  min-width: 0;
+}
+.focused .group[data-area="selectionGroup"],
+.focused .group[data-area="laboratoryGroup"] {
+  flex: 0;
+}
+.selectionSummaries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: layout.$spacing-05;
+  margin-bottom: layout.$spacing-06;
+}
+.selectionSummary {
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-05;
+  min-width: 0;
+  padding: layout.$spacing-05;
+  border: 1px solid $ui-03;
+  background: $ui-02;
+  color: $ui-05;
+  text-decoration: none;
+  > strong {
+    @include type.type-style("heading-05");
+  }
+  > span {
+    display: grid;
+    gap: layout.$spacing-03;
+  }
+  &:hover {
+    background: $ui-01;
+  }
+  &:focus-visible {
+    outline: 2px solid $interactive-01;
+    outline-offset: 2px;
+  }
+}
+.selectionSummaryTitle {
+  @include type.type-style("body-02");
+}
+.selectionSummaryHelp {
+  @include type.type-style("body-01");
+  color: $text-02;
+}
+.selectionSummaryAction,
+.pendingAction {
+  display: inline-flex;
+  align-items: center;
+  gap: layout.$spacing-03;
+  color: $interactive-01;
+  @include type.type-style("body-01");
+}
+.pendingTable {
+  min-width: 0;
+  overflow-x: auto;
+  :global(.cds--data-table-header) {
+    padding: 0 0 layout.$spacing-04;
+    background: $ui-02;
+  }
+  :global(.cds--data-table-header__title) {
+    @include type.type-style("heading-03");
+  }
+  table {
+    min-width: 32rem;
+  }
+}
+.previewHelp {
+  margin-top: layout.$spacing-04;
+  color: $text-02;
+  @include type.type-style("body-01");
+}
+.seeAll {
+  margin-top: layout.$spacing-03;
+  float: inline-end;
+}
+
+.laboratorySummaries {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  .selectionSummary {
+    align-items: flex-start;
+  }
+}
+.pendingFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+  margin-bottom: layout.$spacing-05;
+}
+@media (max-width: 82rem) {
+  .laboratorySummaries {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 42rem) {
+  .laboratorySummaries {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

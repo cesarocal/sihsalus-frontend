@@ -28,6 +28,12 @@ registro clínico ni una calificación biológica de producción.
   el flujo existente. Validar retira la muestra de la cola y la incorpora al
   historial de su origen, sin liberar una unidad ni diagnosticar una infección.
 
+El acceso de Inicio `?screening=<id>` revalida el ID exacto y exige una muestra
+pendiente/en proceso de un origen reconocido. Abre el mismo formulario y activa
+su pestaña real, sin guardar ni validar automáticamente. Una muestra ya validada
+o inexistente muestra un aviso seguro; cerrar consume la referencia y no reabre
+el formulario al refrescar la cola. Se conserva el guard de Tamizaje.
+
 ## Archivos y contratos
 
 - `screening-page.component.tsx`: pestañas, colas, filtros y acciones.

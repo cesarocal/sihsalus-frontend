@@ -6,7 +6,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 
 ## Límites actuales
 
-- Inicio, Donantes e Inventario consumen el contrato `BloodBankApi` con datos sintéticos.
+- Inicio compone accesos operativos según cuatro permisos de vista y los permisos de destino. Sus tarjetas consultan los adaptadores de cada sección, y las alertas abren Inventario filtrado por una unidad exacta. Ver [Inicio y permisos de backend](src/sections/dashboard/README.md). Donantes e Inventario consumen `BloodBankApi` con datos sintéticos.
 - Donantes y Registro de donantes incluyen búsqueda, filtros y paginación. Ver detalle abre una pantalla completa en `/blood-bank/donors/:donorId`, con opción de volver al listado, datos personales de la última donación registrada e Historial de donaciones ordenado por fecha. No permite editar ni muestra respuestas de entrevista/motivos de exclusión.
 - El botón Registrar donación, a la derecha del historial, abre Selección con una nueva postulación y datos personales editables. Requiere permisos de Donantes y Selección. Solo copia identidad/datos personales; modalidad, examen, entrevista y calificación requieren una evaluación nueva. Los viajes previos no se copian.
 - Selección del postulante incluye listado, filtros, formulario por etapas e impresión. Su avance se conserva en `sessionStorage` de la pestaña, exclusivamente para datos sintéticos.
@@ -14,7 +14,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
 - Transferencias separa Recibidas / Pendientes y Solicitadas con pestañas Carbon. Incluye registro manual e historial independiente, generación e impresión FR09 de solicitudes a otras instituciones, selección y reserva de recibidas, constancia FR11, entrega y proyección administrativa del libro FR10. Generar una solicitud no envía correos ni compromete stock local. Las unidades entregadas pasan de Por transferir a Transferido, sin En tránsito. Ver [Transferencias](src/sections/transfers/README.md).
 - Transfusiones y Laboratorio / Compatibilidad incluyen atención regular de órdenes recibidas sintéticas, muestra del receptor, selección en dos bloques, pruebas por pares, reemplazos, reserva, entrega e historial/libro de egresos. No generan solicitudes médicas ni administraciones clínicas y bloquean el flujo urgente. Ver [Atención transfusional](src/sections/transfusions/README.md).
-- Seguimientos continúa como base visual. Ningún flujo mock guarda información clínica en OpenMRS.
+- Seguimientos al donante y al receptor incluyen casos abiertos, historial con filtros, detalle por etapas, trazabilidad, notificación documentada, muestras vinculadas a Tamizaje y cierre con impresión FR13/FR14. Ver [Seguimientos](src/sections/follow-up/README.md). Ningún flujo mock guarda información clínica en OpenMRS.
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
 
@@ -37,6 +37,23 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 El backend continúa siendo la autoridad para autorización y persistencia. No se deben usar datos reales ni información identificable en mocks o pruebas.
 
 ### Presentación de las pantallas de Banco de Sangre
+
+Inicio usa una vista amplia de tareas para un único perfil y un mosaico compacto
+para Responsable o dos o más permisos de Inicio distintos. Conserva cabecera,
+menú, orden de áreas y accesos autorizados, sin comparar nombres de roles ni
+duplicar contenido. El bloque de vencimientos queda al final, separado de las
+métricas de Inventario; ambos comparten una consulta autorizada.
+
+El Inicio de un único perfil de Selección y extracción incluye resúmenes y una
+vista previa de pendientes con accesos al formulario de entrevista y a la
+extracción concreta. Cada acceso revalida el ID y estado actual, conserva los
+guards de su destino y no guarda ni avanza el proceso al abrirlo.
+
+El perfil único de Laboratorio también incluye resúmenes compactos y pendientes
+filtrables por Tamizaje, Compatibilidad o Fraccionamiento. Las acciones abren la
+muestra o ronda exacta; Fraccionar localiza y selecciona la unidad, sin iniciar
+un lote hasta pulsar la acción habitual. Indicadores y filas comparten una
+lectura por fuente autorizada. Los perfiles combinados conservan el mosaico.
 
 Donantes, Selección, Extracción y Tamizaje comparten fondo blanco, `PageHeader` de `esm-styleguide`, tarjetas con título/unidad pequeña/valor y tablas Carbon. Los colores de campos y encabezados de tabla se mantienen para distinguir controles. Los cambios están limitados al ESM, sin alterar componentes globales ni privilegios existentes; el detalle añade una ruta interna protegida por el permiso de Donantes.
 
@@ -183,6 +200,16 @@ El usuario de pruebas necesita el privilegio `app:home.bancoSangre`.
 Tras cambiar `src/routes.json`, vuelve a ejecutar `yarn assemble` y reinicia `yarn start` para registrar el nuevo slot. Prueba la barra compartida en `http://localhost:8080/openmrs/spa/blood-bank` con un usuario de pruebas autorizado.
 
 El cliente HMR de la versión local de Rspack falla al cargar este ESM (`setLogLevel`). Por ahora, `rspack.config.js` desactiva solo ese cliente para Banco de Sangre: el servidor recompila los cambios, pero debes recargar el navegador manualmente. Reinicia `yarn start` después de cambiar esta configuración.
+
+Los bundles de desarrollo se escriben en `node_modules/.cache/blood-bank-dev`,
+separados de `dist`, que sigue reservado para la compilación de producción y el
+ensamblado de la SPA. Así, ejecutar `build` mientras está abierto `yarn start` no
+elimina los chunks que necesita el servidor. En desarrollo se envía
+`Cache-Control: no-store`; se mantienen CORS y la recarga manual. Al aplicar un
+cambio de configuración hay que reiniciar el servidor de desarrollo. Un servidor
+iniciado antes de esta separación puede seguir solicitando archivos eliminados;
+reiniciarlo y recargar la página recupera el módulo sin borrar datos mock de la
+pestaña ni modificar roles.
 
 ## Verificación
 

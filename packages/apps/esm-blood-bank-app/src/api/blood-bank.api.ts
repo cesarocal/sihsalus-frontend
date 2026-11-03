@@ -1,3 +1,4 @@
+import type { FollowUpApi } from './follow-up.api';
 import type {
   DashboardData,
   DonorDetail,
@@ -14,6 +15,7 @@ import type { TransfusionsApi } from './transfusions.api';
 
 /** Contrato estable entre las pantallas y cualquier implementación de datos. */
 export interface BloodBankApi {
+  followUp: FollowUpApi;
   selection: ApplicantSelectionApi;
   collection: CollectionApi;
   screening: ScreeningApi;

@@ -8,6 +8,14 @@ Se reutilizan Carbon, PageHeader/Pictogram del framework y tokens/layout de `app
 
 ## Flujo
 
+El resumen de Inicio enlaza las extracciones pendientes mediante
+`/collection?collection=<id>`. La pantalla vuelve a consultar la cola y exige
+coincidencia exacta y estado no finalizado antes de abrir el formulario existente.
+Una referencia no disponible muestra un aviso y mantiene el listado. Abrir no
+guarda ni avanza etapas. La referencia se consume una vez, por lo que cerrar no
+reabre el formulario al recargar la cola. Se mantienen el permiso de Extracción, las etapas cerradas
+en consulta y la confirmación de salida.
+
 1. Extracción lista solo Seleccionados. **Extraer sangre** abre cuatro etapas: Etiqueta, Cantidad extraída, Registro y Constancia.
 2. Etiqueta captura componente, anticoagulante, conservación/agente opcionales, volumen aproximado, servicio/responsable, muestra/recipiente y leucocitos reducidos. Autóloga habilita receptor, documento, servicio e historia.
 3. Completar Etiqueta genera una muestra visible en Tamizaje, sin duplicarla. Puede imprimir vistas de unidad/tubo con marca DEMO, no etiquetas institucionales ni barcodes. Las impresiones son vistas previas; no se auditan contadores.

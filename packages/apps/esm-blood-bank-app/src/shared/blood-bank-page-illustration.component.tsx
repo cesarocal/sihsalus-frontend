@@ -1,4 +1,4 @@
-import { Fork, IbmDevopsTest, Movement, RainDrop } from '@carbon/react/icons';
+import { Home, DecisionTree, IbmWatsonStudio, Fork, IbmDevopsTest, Movement, RainDrop } from '@carbon/react/icons';
 import {
   BloodBankPictogram,
   LaboratoryPictogram,
@@ -9,6 +9,7 @@ import {
 import styles from '../sections/applicant-selection/selection.scss';
 
 export type BloodBankIllustration =
+  | 'dashboard'
   | 'donors'
   | 'selection'
   | 'collection'
@@ -17,12 +18,17 @@ export type BloodBankIllustration =
   | 'inventory'
   | 'transfers'
   | 'transfusions'
-  | 'compatibility';
+  | 'compatibility'
+  | 'donorFollowUp'
+  | 'recipientFollowUp';
 
 /** Only the blood-bank page headers are customized; the shared navigation is unchanged. */
 export function BloodBankPageIllustration({ section }: { section: BloodBankIllustration }) {
   return (
     <span className={styles.headerIllustration} aria-hidden="true">
+      {section === 'dashboard' && <Home size={64} className={styles.selectionIllustration} />}
+      {section === 'donorFollowUp' && <IbmWatsonStudio size={64} className={styles.selectionIllustration} />}
+      {section === 'recipientFollowUp' && <DecisionTree size={64} className={styles.selectionIllustration} />}
       {section === 'donors' && <PatientsPictogram />}
       {section === 'selection' && <UserFollowIcon size={64} className={styles.selectionIllustration} />}
       {section === 'collection' && <BloodBankPictogram />}

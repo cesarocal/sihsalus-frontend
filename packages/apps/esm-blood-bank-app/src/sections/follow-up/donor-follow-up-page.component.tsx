@@ -1,9 +1,6 @@
-import { useTranslation } from 'react-i18next';
+import type { FollowUpApi } from '../../api/follow-up.api';
+import { FollowUpPage } from './follow-up-page.component';
 
-import { moduleName } from '../../constants';
-import { SectionPlaceholderPage } from '../../shared/section-placeholder-page.component';
-
-export function DonorFollowUpPage() {
-  const { t } = useTranslation(moduleName);
-  return <SectionPlaceholderPage title={t('donorFollowUp', 'Seguimiento del donante')} description={t('donorFollowUpDescription', 'Seguimiento de la persona donante y sus resultados.')} />;
+export function DonorFollowUpPage({ api }: { api: FollowUpApi }) {
+  return <FollowUpPage kind="donor" api={api} />;
 }

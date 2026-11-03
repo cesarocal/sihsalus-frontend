@@ -27,6 +27,8 @@ describe('BloodBankApp', () => {
   beforeEach(() => allowedPrivileges.clear());
 
   it('muestra el inicio integrado con datos sintéticos', async () => {
+    allowedPrivileges.add(bloodBankPrivileges.homeInventory);
+    allowedPrivileges.add(bloodBankPrivileges.inventory);
     render(<BloodBankApp api={mockBloodBankApi} />);
 
     expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
@@ -41,8 +43,11 @@ describe('BloodBankApp', () => {
   });
 
   it('muestra un error seguro cuando la API falla', async () => {
+    allowedPrivileges.add(bloodBankPrivileges.homeInventory);
+    allowedPrivileges.add(bloodBankPrivileges.inventory);
     const failingApi: BloodBankApi = {
       ...mockBloodBankApi,
+      inventory: { ...mockBloodBankApi.inventory, list: () => Promise.reject(new Error('technical backend detail')) },
       selection: mockBloodBankApi.selection,
       collection: mockBloodBankApi.collection,
       screening: mockBloodBankApi.screening,
@@ -53,7 +58,7 @@ describe('BloodBankApp', () => {
 
     render(<BloodBankApp api={failingApi} />);
 
-    expect(await screen.findByText('No se pudieron cargar los datos')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudieron consultar estos pendientes.')).toBeInTheDocument();
     expect(screen.queryByText('technical backend detail')).not.toBeInTheDocument();
   });
 
@@ -123,7 +128,7 @@ describe('BloodBankApp', () => {
     allowedPrivileges.add(bloodBankPrivileges.recipientFollowUp);
     render(<BloodBankApp api={mockBloodBankApi} initialPath="/follow-up/recipient" />);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Seguimiento del receptor' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Seguimiento al receptor' })).toBeInTheDocument();
   });
 
   it('bloquea selección del postulante por URL si falta su privilegio', () => {
@@ -186,5 +191,25 @@ describe('BloodBankApp', () => {
     expect(api.screening.listScreenings).not.toHaveBeenCalled();
     expect(api.screening.listApheresisCandidates).not.toHaveBeenCalled();
     expect(api.screening.getApheresisDraft).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('follow-up section access', () => {
+  beforeEach(() => allowedPrivileges.clear());
+  it.each([
+    ['/follow-up/donor', bloodBankPrivileges.donorFollowUp, 'Seguimiento al donante'],
+    ['/follow-up/recipient', bloodBankPrivileges.recipientFollowUp, 'Seguimiento al receptor'],
+  ])('keeps %s inaccessible without its specific privilege', async (path, privilege, title) => {
+    const list = vi.fn(mockBloodBankApi.followUp.list);
+    const api = { ...mockBloodBankApi, followUp: { ...mockBloodBankApi.followUp, list } };
+    const view = render(<BloodBankApp api={api} initialPath={path} />);
+    expect(screen.getByText('Sin acceso')).toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    view.unmount();
+    allowedPrivileges.add(privilege);
+    render(<BloodBankApp api={api} initialPath={path} />);
+    expect(await screen.findByRole('heading', { name: title, level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(list).toHaveBeenCalled());
   });
 });

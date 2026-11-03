@@ -1,3 +1,4 @@
+import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import {
   Button,
   DataTableSkeleton,
@@ -17,7 +18,7 @@ import {
   Tile,
 } from '@carbon/react';
 import { Add } from '@carbon/react/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
 import type { BloodBankApi } from '../../api';
@@ -56,11 +57,13 @@ const statusColors = {
 export function ApplicantSelectionPage({
   api,
   initialDonorId,
+  shortcut,
   loadDonor,
   onDonorRequestConsumed,
 }: {
   api: ApplicantSelectionApi;
   initialDonorId?: string | null;
+  shortcut?: DashboardShortcut;
   loadDonor?: BloodBankApi['getDonorDetail'];
   onDonorRequestConsumed?: () => void;
 }) {
@@ -72,16 +75,29 @@ export function ApplicantSelectionPage({
   const [applications, setApplications] = useState<SelectionApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState(shortcut?.q ?? '');
+  const [status, setStatus] = useState(
+    shortcut?.status && applicationStatuses.includes(shortcut.status as ApplicationStatus) ? shortcut.status : '',
+  );
   const [modality, setModality] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [active, setActive] = useState<SelectionApplication | null>(null);
+  const [active, setActive] = useState<SelectionApplication | null>(() =>
+    shortcut?.newApplication ? newApplication() : null,
+  );
   const [refresh, setRefresh] = useState(0);
   const [donorLoading, setDonorLoading] = useState(false);
   const [donorFailed, setDonorFailed] = useState(false);
   const [donorAttempt, setDonorAttempt] = useState(0);
+  const handledApplication = useRef('');
+  const [applicationUnavailable, setApplicationUnavailable] = useState(false);
+  useEffect(() => {
+    setSearch(shortcut?.q ?? '');
+    setStatus(
+      shortcut?.status && applicationStatuses.includes(shortcut.status as ApplicationStatus) ? shortcut.status : '',
+    );
+    setPage(1);
+  }, [shortcut?.q, shortcut?.status]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: donorAttempt explicitly retries the same donor reference.
   useEffect(() => {
@@ -131,6 +147,21 @@ export function ApplicantSelectionPage({
     };
   }, [api, refresh]);
 
+  useEffect(() => {
+    const id = shortcut?.application ?? '';
+    if (!id) {
+      handledApplication.current = '';
+      setApplicationUnavailable(false);
+      return;
+    }
+    if (loading || failed || active || initialDonorId || shortcut?.newApplication || handledApplication.current === id)
+      return;
+    handledApplication.current = id;
+    const application = applications.find((item) => item.id === id && item.status === 'awaitingInterview');
+    setApplicationUnavailable(!application);
+    if (application) setActive(application);
+  }, [shortcut?.application, shortcut?.newApplication, initialDonorId, loading, failed, applications, active]);
+
   const normalize = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
   const filtered = applications.filter(
     (a) =>
@@ -172,6 +203,9 @@ export function ApplicantSelectionPage({
             </Tile>
           ))}
         </section>
+        {applicationUnavailable && (
+          <InlineNotification hideCloseButton kind="warning" title={t('homeApplicationUnavailable')} />
+        )}
         {donorLoading && (
           <p role="status" className={styles.help}>
             {t('loadingDonor')}

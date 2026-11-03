@@ -1,3 +1,4 @@
+import type { FollowUpCase } from '../sections/follow-up/follow-up.types';
 import { applicationsMock } from '../mocks/applicant-selection.mock';
 import type { CollectionRecord } from '../sections/collection/collection.types';
 import { newCollection } from '../sections/collection/collection-rules';
@@ -21,6 +22,7 @@ export interface ProcessingState {
   fixtureQualitySeals?: Record<string, string>;
   transfers?: TransferStore;
   transfusions?: TransfusionStore;
+  followUps?: FollowUpCase[];
 }
 function initialState(): ProcessingState {
   const application = applicationsMock().find((item) => item.status === 'selected');

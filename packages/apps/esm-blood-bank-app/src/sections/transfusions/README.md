@@ -22,6 +22,12 @@ no forman parte de este cambio. Una solicitud urgente sintética permite comprob
 el orden de prioridad, pero su acción está deshabilitada. Ambos tipos urgentes
 también se rechazan en el adaptador; no existe una excepción sin prueba cruzada.
 
+El acceso de Inicio de Laboratorio `?round=<id>` en Compatibilidad revalida
+una ronda exacta no completada y abre el formulario existente, bajo su guard.
+Abrir o cerrar sin guardar no registra resultados ni cambia estados. Una ronda
+completada o inexistente muestra un aviso seguro. La referencia se consume una
+vez para evitar reapertura al refrescar; recargar la URL vuelve a validarla.
+
 ## Estados, muestras y stock
 
 | Operación confirmada                        | Solicitud                                                   | Unidades                                                                    |

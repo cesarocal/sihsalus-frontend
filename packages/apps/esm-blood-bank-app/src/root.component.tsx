@@ -18,6 +18,7 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
   return (
     <BloodBankApp
       api={config.useMockData ? mockBloodBankApi : openmrsBloodBankApi}
+      expiryWarningDays={config.dashboardExpiryWarningDays}
       basename={modulePath}
       router="browser"
     />

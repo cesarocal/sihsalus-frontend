@@ -10,6 +10,8 @@ export function ScreeningIdentity({ record, t }: { record: ScreeningRecord; t: P
     ...(record.unitCode ? { unitCode: record.unitCode } : {}),
     ...(record.origin?.type === 'followUp' ? { person: record.applicantName } : { applicant: record.applicantName }),
     document: record.documentNumber,
+    ...(record.historyNumber ? { historyNumber: record.historyNumber } : {}),
+    ...(record.collectedBy ? { collectedBy: record.collectedBy } : {}),
     ...(record.applicationNumber ? { number: record.applicationNumber } : {}),
     ...(record.origin?.type === 'followUp' ? { followUpReference: record.origin.followUpId } : {}),
     collectedOn: record.collectedOn,

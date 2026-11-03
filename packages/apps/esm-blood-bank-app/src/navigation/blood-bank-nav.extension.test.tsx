@@ -35,7 +35,12 @@ function showNavigation(path: string) {
 describe('blood bank navigation active state', () => {
   beforeEach(() => {
     allowed.clear();
-    [bloodBankPrivileges.module, bloodBankPrivileges.donors, bloodBankPrivileges.applicantSelection].forEach((p) => {
+    [
+      bloodBankPrivileges.module,
+      bloodBankPrivileges.homeSelection,
+      bloodBankPrivileges.donors,
+      bloodBankPrivileges.applicantSelection,
+    ].forEach((p) => {
       allowed.add(p);
     });
     vi.stubGlobal('getOpenmrsSpaBase', () => '/openmrs/spa/');
@@ -53,6 +58,12 @@ describe('blood bank navigation active state', () => {
     expect(screen.queryByText('Laboratorio')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Donantes' }));
     expect(vi.mocked(navigate)).toHaveBeenCalledWith({ to: '/openmrs/spa/blood-bank/donors' });
+  });
+  it('hides Home when no Home view privilege is assigned, without hiding authorized sections', () => {
+    allowed.delete(bloodBankPrivileges.homeSelection);
+    showNavigation('/openmrs/spa/blood-bank/donors');
+    expect(screen.queryByRole('link', { name: 'Inicio' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Donantes' })).toBeInTheDocument();
   });
   it('shows a group when only one subsection is authorized', () => {
     allowed.clear();

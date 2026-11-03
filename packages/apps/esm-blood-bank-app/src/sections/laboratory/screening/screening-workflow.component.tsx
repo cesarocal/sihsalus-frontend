@@ -131,7 +131,7 @@ export function ScreeningWorkflow({
       t={t}
       extraActions={
         <>
-          {initial.origin?.type === 'apheresis' && (
+          {(initial.origin?.type === 'apheresis' || initial.origin?.type === 'followUp') && (
             <Button
               kind="ghost"
               renderIcon={Printer}

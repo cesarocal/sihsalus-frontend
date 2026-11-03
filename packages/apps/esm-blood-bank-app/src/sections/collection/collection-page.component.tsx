@@ -1,5 +1,18 @@
-import { Button, Search, Select, SelectItem, Tab, TabList, TabPanel, TabPanels, Tabs, Tag } from '@carbon/react';
-import { useState } from 'react';
+import {
+  Button,
+  InlineNotification,
+  Search,
+  Select,
+  SelectItem,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tag,
+} from '@carbon/react';
+import { useEffect, useRef, useState } from 'react';
+import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
 import {
   normalizeSearch,
@@ -14,7 +27,7 @@ import { notifySuccess } from '../../shared/notify-success';
 import type { CollectionRecord } from './collection.types';
 import styles from '../applicant-selection/selection.scss';
 
-export function CollectionPage({ api }: { api: CollectionApi }) {
+export function CollectionPage({ api, shortcut }: { api: CollectionApi; shortcut?: DashboardShortcut }) {
   const t = useProcessingTranslation();
   const { data, loading, failed, reload } = useProcessingData(api.listCollections);
   const [search, setSearch] = useState('');
@@ -22,6 +35,24 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
   const [modality, setModality] = useState('');
   const [active, setActive] = useState<CollectionRecord | null>(null);
   const [tab, setTab] = useState(0);
+  const handledCollection = useRef('');
+  const [collectionUnavailable, setCollectionUnavailable] = useState(false);
+  useEffect(() => {
+    const id = shortcut?.collection ?? '';
+    if (!id) {
+      handledCollection.current = '';
+      setCollectionUnavailable(false);
+      return;
+    }
+    if (loading || failed || active || handledCollection.current === id) return;
+    handledCollection.current = id;
+    const record = data?.find((item) => item.id === id && item.status !== 'completed');
+    setCollectionUnavailable(!record);
+    if (record) {
+      setTab(0);
+      setActive(record);
+    }
+  }, [shortcut?.collection, loading, failed, data, active]);
   const records = data ?? [];
   const filtered = records.filter(
     (record) =>
@@ -112,6 +143,9 @@ export function CollectionPage({ api }: { api: CollectionApi }) {
         value: loading || failed ? '—' : records.filter((record) => record.status === value).length,
       }))}
     >
+      {collectionUnavailable && (
+        <InlineNotification hideCloseButton kind="warning" title={t('homeCollectionUnavailable')} />
+      )}
       <Tabs
         selectedIndex={tab}
         onChange={({ selectedIndex }) => {

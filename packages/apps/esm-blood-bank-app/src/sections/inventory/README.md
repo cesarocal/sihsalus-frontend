@@ -8,7 +8,10 @@ login, barra lateral global, privilegios del backend ni tablas de OpenMRS.
 
 - Cabecera estándar con `StockManagementPictogram`, ubicación y hora. Fondo
   blanco, métricas, búsqueda por código/origen/componente/ubicación, filtros
-  combinados de componente, grupo y estado, y paginación Carbon.
+  combinados de componente, grupo y estado, y paginación Carbon. A la derecha
+  de Estado, una escoba pequeña permite limpiar la búsqueda y todos los filtros,
+  incluidos los aplicados desde Inicio. No se muestra el mensaje de filtros de Inicio;
+  se conserva el aviso si una unidad enlazada ya no existe en el inventario.
 - Selección múltiple y Deseleccionar. Seleccionar resultados filtrados aparece
   solo dentro de los popups, no en el listado principal.
   Sello de calidad y Eliminar unidades abren sin selección o precargan las

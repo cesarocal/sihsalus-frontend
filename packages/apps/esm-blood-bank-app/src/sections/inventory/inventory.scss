@@ -19,7 +19,8 @@
 }
 .filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
   gap: layout.$spacing-05;
   padding: 0 layout.$spacing-05 layout.$spacing-05;
 }
@@ -100,5 +101,11 @@
   .form,
   .review dl {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .filters {
+    grid-template-columns: minmax(0, 1fr) auto;
+    > :nth-child(-n + 2) {
+      grid-column: 1 / -1;
+    }
   }
 }

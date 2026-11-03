@@ -1,3 +1,4 @@
+import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import { Button } from '@carbon/react';
 import { CertificateCheck, RecentlyViewed, TrashCan } from '@carbon/react/icons';
 import { useCallback, useState } from 'react';
@@ -11,7 +12,7 @@ import type { InventoryOperation } from './inventory.types';
 import type { InventorySummary } from '../../types/blood-bank.types';
 import shared from '../applicant-selection/selection.scss';
 
-export function InventoryPage({ api }: { api: BloodBankApi }) {
+export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?: DashboardShortcut }) {
   const t = useProcessingTranslation();
   const load = useCallback(() => api.inventory.list(), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
@@ -53,6 +54,7 @@ export function InventoryPage({ api }: { api: BloodBankApi }) {
     >
       <section className={shared.list}>
         <InventorySelector
+          shortcut={shortcut}
           units={units}
           selected={selected}
           onChange={setSelected}

@@ -1,5 +1,7 @@
 import { Button, Checkbox, Search, Select, SelectItem, Tag } from '@carbon/react';
-import { useState, type ReactNode } from 'react';
+import { Clean } from '@carbon/react/icons';
+import { useEffect, useState, type ReactNode } from 'react';
+import { expiresSoon, type DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import { canSeal, inventoryDisplayDate, inventoryStatusKey } from './inventory-rules';
 import type { InventoryOperation, InventoryUnit } from './inventory.types';
@@ -19,6 +21,7 @@ export function InventorySelector({
   showSelectFiltered = true,
   prefix,
   t,
+  shortcut,
 }: {
   units: InventoryUnit[];
   selected: InventorySummary[];
@@ -32,14 +35,40 @@ export function InventorySelector({
   showSelectFiltered?: boolean;
   prefix: string;
   t: ProcessingTranslate;
+  shortcut?: DashboardShortcut;
 }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(shortcut?.unit || shortcut?.q || '');
+  const [exactUnit, setExactUnit] = useState(shortcut?.unit ?? '');
+  const [expiryDays, setExpiryDays] = useState(shortcut?.expires ?? 0);
+  const [sealOnly, setSealOnly] = useState(shortcut?.category === 'seal');
   const [component, setComponent] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(shortcut?.status ?? '');
   const [group, setGroup] = useState('');
+  useEffect(() => {
+    setSearch(shortcut?.unit || shortcut?.q || '');
+    setExactUnit(shortcut?.unit ?? '');
+    setStatus(shortcut?.status ?? '');
+    setExpiryDays(shortcut?.expires ?? 0);
+    setSealOnly(shortcut?.category === 'seal');
+    setComponent('');
+    setGroup('');
+  }, [shortcut?.unit, shortcut?.q, shortcut?.status, shortcut?.expires, shortcut?.category]);
   const unavailable = busy || loading || failed;
+  const hasFilters = !!(search || exactUnit || expiryDays || sealOnly || component || status || group);
+  const clearFilters = () => {
+    setExactUnit('');
+    setExpiryDays(0);
+    setSealOnly(false);
+    setSearch('');
+    setStatus('');
+    setComponent('');
+    setGroup('');
+  };
   const filtered = units.filter(
     (unit) =>
+      (!exactUnit || unit.id === exactUnit) &&
+      (!expiryDays || expiresSoon(unit.expiresAt, expiryDays)) &&
+      (!sealOnly || canSeal(unit)) &&
       (kind !== 'qualitySeal' || unit.screeningResult === 'nonReactive') &&
       (!component || unit.component === component) &&
       (!status || unit.status === status) &&
@@ -59,7 +88,10 @@ export function InventorySelector({
           placeholder={t('inventorySearch')}
           value={search}
           closeButtonLabelText={t('clearSearch')}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setExactUnit('');
+          }}
         />
         {actions}
         {!!selected.length && (
@@ -83,6 +115,11 @@ export function InventorySelector({
           </Button>
         )}
       </div>
+      {exactUnit && !loading && !failed && !units.some((u) => u.id === exactUnit) && (
+        <p className={styles.help} role="status">
+          {t('homeUnitUnavailable')}
+        </p>
+      )}
       <div className={styles.filters}>
         <Select
           id={`${prefix}-component`}
@@ -120,6 +157,16 @@ export function InventorySelector({
             <SelectItem key={value} value={value} text={t(inventoryStatusKey[value])} />
           ))}
         </Select>
+        <Button
+          kind="tertiary"
+          size="md"
+          hasIconOnly
+          renderIcon={Clean}
+          iconDescription={t('inventoryClearFilters')}
+          tooltipAlignment="end"
+          disabled={unavailable || !hasFilters}
+          onClick={clearFilters}
+        />
       </div>
       <p className={styles.help}>
         {t('inventorySelected')}: {selected.length}
@@ -185,7 +232,7 @@ export function InventorySelector({
         failed={failed}
         reload={reload}
         emptyHelp={t(kind === 'qualitySeal' ? 'inventorySealEmpty' : 'inventoryEmpty')}
-        filterKey={`${search}:${component}:${group}:${status}`}
+        filterKey={`${search}:${component}:${group}:${status}:${exactUnit}:${expiryDays}:${sealOnly}`}
         t={t}
       />
     </>

@@ -5,6 +5,7 @@ import { BrowserRouter, useLocation } from 'react-router-dom';
 
 import { ProtectedSection } from '../access/protected-section.component';
 import { RequireAnyPrivilege } from '../access/require-any-privilege.component';
+import { bloodBankPrivileges as p } from '../access/blood-bank-privileges';
 import { basePath, donorsPath, moduleName } from '../constants';
 import { bloodBankNavigation, type NavigationItem } from './blood-bank-navigation';
 
@@ -31,7 +32,21 @@ function BloodBankNavContent() {
   return (
     <>
       {bloodBankNavigation.map((item) =>
-        item.children ? (
+        item.path === '/' ? (
+          <RequireAnyPrivilege
+            key={item.path}
+            privileges={[p.homeSelection, p.homeLaboratory, p.homeInventory, p.homeSupervisor]}
+          >
+            <SideNavLink
+              href={hrefFor('/')}
+              renderIcon={item.icon ? decorativeIcon(item.icon) : undefined}
+              isActive={pathname === hrefFor('/')}
+              onClick={(event) => open(event, hrefFor('/'))}
+            >
+              {t(item.labelKey, item.defaultLabel)}
+            </SideNavLink>
+          </RequireAnyPrivilege>
+        ) : item.children ? (
           <RequireAnyPrivilege key={item.path} privileges={item.children.map((child) => child.privilege)}>
             <SideNavMenu
               title={t(item.labelKey, item.defaultLabel)}

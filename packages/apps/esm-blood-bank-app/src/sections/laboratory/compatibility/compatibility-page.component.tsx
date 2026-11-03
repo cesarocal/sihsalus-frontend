@@ -1,7 +1,8 @@
-import { Button, Search } from '@carbon/react';
+import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
+import { Button, InlineNotification, Search } from '@carbon/react';
 import { RecentlyViewed } from '@carbon/react/icons';
 import { formatDatetime } from '@openmrs/esm-framework';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TransfusionsApi } from '../../../api/transfusions.api';
 import {
   normalizeSearch,
@@ -17,13 +18,30 @@ import { comparePriority, priorityKeys } from '../../transfusions/transfusions-r
 import { useTransfusionsTranslation } from '../../transfusions/use-transfusions-translation';
 import { CompatibilityWorkflow } from './compatibility-workflow.component';
 
-export function CompatibilityPage({ api }: { api: TransfusionsApi }) {
+export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; shortcut?: DashboardShortcut }) {
   const t = useTransfusionsTranslation();
   const load = useCallback(() => api.list(), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
   const [search, setSearch] = useState('');
   const [history, setHistory] = useState(false);
   const [active, setActive] = useState<{ request: TransfusionRequest; round: CompatibilityRound } | null>(null);
+  const handledRound = useRef('');
+  const [shortcutUnavailable, setShortcutUnavailable] = useState(false);
+  useEffect(() => {
+    const id = shortcut?.round;
+    if (!id) {
+      handledRound.current = '';
+      setShortcutUnavailable(false);
+      return;
+    }
+    if (loading || failed || !data || active || history || handledRound.current === id) return;
+    handledRound.current = id;
+    const item = data.requests
+      .flatMap((request) => request.rounds.map((round) => ({ request, round })))
+      .find(({ round }) => round.id === id && !round.completedAt);
+    setShortcutUnavailable(!item);
+    if (item) setActive(item);
+  }, [shortcut?.round, data, loading, failed, active, history]);
   const all = (data?.requests ?? []).flatMap((request) => request.rounds.map((round) => ({ request, round })));
   const queue = all
     .filter(
@@ -57,6 +75,9 @@ export function CompatibilityPage({ api }: { api: TransfusionsApi }) {
       ]}
     >
       <div className={`${shared.surface} ${styles.responsive}`}>
+        {shortcutUnavailable && (
+          <InlineNotification kind="warning" hideCloseButton title={t('txHomeRoundUnavailable')} />
+        )}
         <div className={styles.toolbar}>
           <Search
             id="tx-lab-search"

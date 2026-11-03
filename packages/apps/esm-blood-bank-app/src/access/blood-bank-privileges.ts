@@ -1,6 +1,10 @@
 /** These names must match privileges created and assigned to roles in OpenMRS. */
 export const bloodBankPrivileges = {
   module: 'app:home.bancoSangre',
+  homeSelection: 'app:home.bancoSangre.inicio.seleccionExtraccion',
+  homeLaboratory: 'app:home.bancoSangre.inicio.laboratorio',
+  homeInventory: 'app:home.bancoSangre.inicio.inventario',
+  homeSupervisor: 'app:home.bancoSangre.inicio.responsable',
   donors: 'app:home.bancoSangre.donantes',
   applicantSelection: 'app:home.bancoSangre.seleccionPostulante',
   collection: 'app:home.bancoSangre.extraccionAferesis',

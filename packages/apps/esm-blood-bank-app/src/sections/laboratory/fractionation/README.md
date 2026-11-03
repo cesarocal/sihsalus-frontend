@@ -5,6 +5,12 @@ Ruta: `/blood-bank/laboratory/fractionation`. Requiere
 en el shell. El guard existente impide consultar datos sin el privilegio.
 No se cambia login, menú global, permisos del backend ni otros ESM.
 
+El acceso de Inicio `?category=eligible&unit=<id>` revalida el ID exacto y
+`eligibleSource`, filtra y preselecciona esa unidad. Abrir el enlace no llama a
+`api.start` ni crea un lote o cambia estados. El usuario inicia Fraccionar desde
+la cola. Una referencia no disponible no selecciona unidades parecidas; muestra
+un aviso y permite quitar los filtros. El guard existente sigue siendo necesario.
+
 ## Flujo navegable
 
 - Cola de sangre total extraída y PFC en inventario, con búsqueda, filtros,

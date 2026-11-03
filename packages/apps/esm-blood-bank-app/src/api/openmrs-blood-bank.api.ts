@@ -1,3 +1,4 @@
+import { openmrsFollowUpApi } from './follow-up.api';
 import { openmrsFetch } from '@openmrs/esm-framework';
 
 import type { DashboardData, DonorSummary, InventorySummary } from '../types/blood-bank.types';
@@ -14,6 +15,7 @@ const apiBase = '/ws/rest/v1/bloodbank';
 
 export const openmrsBloodBankApi: BloodBankApi = {
   ...openmrsDonorReadApi,
+  followUp: openmrsFollowUpApi,
   selection: openmrsApplicantSelectionApi,
   collection: openmrsCollectionApi,
   screening: openmrsScreeningApi,

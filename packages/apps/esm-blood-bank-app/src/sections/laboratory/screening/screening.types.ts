@@ -44,6 +44,8 @@ export interface ScreeningRecord {
   sampleType: string;
   sampleContainer: string;
   collectedOn: string;
+  collectedBy?: string;
+  historyNumber?: string;
   receivedOn: string;
   receivedBy: string;
   identityVerified: boolean;

@@ -1,0 +1,142 @@
+@use '@carbon/layout';
+@use '@carbon/type';
+@use '@openmrs/esm-styleguide/src/vars' as *;
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: layout.$spacing-04;
+  align-items: end;
+  padding: layout.$spacing-05;
+  > :first-child {
+    flex: 1 1 20rem;
+    min-width: 0;
+  }
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+  > * {
+    min-width: 0;
+  }
+}
+.panel {
+  background: $ui-02;
+  border: 1px solid $ui-03;
+  padding: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+  h4 {
+    @include type.type-style('heading-compact-02');
+    margin-bottom: layout.$spacing-04;
+  }
+  p {
+    margin-block: layout.$spacing-03;
+    overflow-wrap: anywhere;
+  }
+}
+.table {
+  overflow: auto;
+  margin-block: layout.$spacing-05;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 40rem;
+  }
+  th,
+  td {
+    padding: layout.$spacing-04;
+    border-bottom: 1px solid $ui-03;
+    text-align: left;
+  }
+  th {
+    background: $ui-03;
+  }
+}
+.notice {
+  margin-block: layout.$spacing-05;
+}
+.modal :global(.cds--modal-container) {
+  width: min(90vw, 85rem);
+  max-width: 85rem;
+}
+.footer:global(.cds--modal-footer) {
+  padding: layout.$spacing-05;
+  display: flex;
+  justify-content: space-between;
+  min-height: 0;
+  > div {
+    display: flex;
+    gap: layout.$spacing-03;
+  }
+  :global(.cds--btn) {
+    flex: none;
+    width: auto;
+    min-height: 2rem;
+  }
+}
+.report {
+  max-width: 48rem;
+  margin: layout.$spacing-05 auto;
+  padding: layout.$spacing-05;
+  color: #111;
+  background: white;
+  font-family: Arial, sans-serif;
+  h2 {
+    @include type.type-style('heading-compact-02');
+    margin-bottom: layout.$spacing-06;
+    small {
+      @include type.type-style('label-01');
+    }
+  }
+  p {
+    margin-block: layout.$spacing-04;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-block: layout.$spacing-03;
+  }
+  td,
+  th {
+    border: 1px solid #111;
+    padding: layout.$spacing-02;
+    min-height: layout.$spacing-06;
+    overflow-wrap: anywhere;
+    @include type.type-style('label-01');
+  }
+  :global(.signature) {
+    width: 65%;
+    margin: layout.$spacing-09 0 0 auto;
+    text-align: center;
+    border-top: 1px solid #111;
+  }
+}
+.dateBoxes {
+  border: 1px solid #111;
+  padding-inline: layout.$spacing-02;
+}
+@media (max-width: 42rem) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .toolbar > * {
+    flex: 1 1 100%;
+  }
+  .footer:global(.cds--modal-footer) {
+    flex-wrap: wrap;
+    gap: layout.$spacing-04;
+  }
+}
+
+:global(.cds--modal-container):has(.footer) {
+  width: min(90vw, 85rem);
+  max-width: 85rem;
+  max-height: 88vh;
+  :global(.cds--modal-header__heading) {
+    padding-inline-end: layout.$spacing-08;
+    overflow-wrap: anywhere;
+  }
+}

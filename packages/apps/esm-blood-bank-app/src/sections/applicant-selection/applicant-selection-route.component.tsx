@@ -1,3 +1,4 @@
+import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { BloodBankApi } from '../../api';
@@ -6,7 +7,7 @@ import { ProtectedSection } from '../../access/protected-section.component';
 import { ApplicantSelectionPage } from './applicant-selection-page.component';
 import { donorIdFromNavigationState } from './donor-application';
 
-export function ApplicantSelectionRoute({ api }: { api: BloodBankApi }) {
+export function ApplicantSelectionRoute({ api, shortcut }: { api: BloodBankApi; shortcut?: DashboardShortcut }) {
   const location = useLocation();
   const navigate = useNavigate();
   const consumeDonorRequest = useCallback(() => {
@@ -15,6 +16,7 @@ export function ApplicantSelectionRoute({ api }: { api: BloodBankApi }) {
   const donorId = donorIdFromNavigationState(location.state);
   const page = (
     <ApplicantSelectionPage
+      shortcut={shortcut}
       api={api.selection}
       initialDonorId={donorId}
       loadDonor={api.getDonorDetail}
