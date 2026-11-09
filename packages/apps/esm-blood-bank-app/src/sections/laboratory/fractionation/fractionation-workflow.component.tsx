@@ -7,16 +7,17 @@ import {
   ModalHeader,
   Select,
   SelectItem,
-  TextArea,
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { useState } from 'react';
 import type { FractionationApi } from '../../../api/fractionation.api';
 import { notifySuccess } from '../../../shared/notify-success';
+import { ObservationsTextArea } from '../../../shared/observations-text-area.component';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
+import { validateObservations } from '../../../shared/text-field-contracts';
 import { FractionationLabels, FractionationReview } from './fractionation-documents.component';
 import { FractionationContent } from './fractionation-content.component';
 import { componentDefinitions, finalNodes, splitNode, validateFractionation } from './fractionation-rules';
@@ -63,12 +64,16 @@ export function FractionationWorkflow({
       labelsVerified: update.label || update.estimatedVolume !== undefined ? false : batch.labelsVerified,
       nodes: batch.nodes.map((node) => (node.id === id ? { ...node, ...update } : node)),
     });
-  const save = async (advance = false) => {
-    if (saving) return false;
-    const missing = advance ? validateFractionation(batch, fractionationSteps[step]) : [];
+  const canSave = (advance: boolean) => {
+    const missing = validateObservations(batch.observations);
+    if (missing.length) setStep(0);
+    else if (advance) missing.push(...validateFractionation(batch, fractionationSteps[step]));
     setErrors(missing);
     setFailed('');
-    if (missing.length) return false;
+    return !missing.length;
+  };
+  const save = async (advance = false) => {
+    if (saving || !canSave(advance)) return false;
     if (!dirty && !advance) return true;
     setSaving(true);
     try {
@@ -162,10 +167,7 @@ export function FractionationWorkflow({
             void save(true);
             return;
           }
-          const missing = validateFractionation(batch, 'fractionationReview');
-          setErrors(missing);
-          setFailed('');
-          if (!missing.length) setConfirm(true);
+          if (canSave(true)) setConfirm(true);
         }}
         advanceLabel={t(step === 3 ? 'fractionationFinish' : 'next')}
         t={t}
@@ -258,8 +260,9 @@ export function FractionationWorkflow({
                   change(next);
                 }}
               />
-              <TextArea
+              <ObservationsTextArea
                 id="fractionation-observations"
+                t={t}
                 labelText={t('observations')}
                 value={batch.observations}
                 disabled={saving}

@@ -1,7 +1,7 @@
 import { ageOnDate, calculateReturnDate, isDate, today } from '../applicant-selection/selection-rules';
 import type { SelectionApplication } from '../applicant-selection/selection.types';
 import type { CollectionRecord, CollectionStep } from './collection.types';
-import { bagLotExceedsLimit } from '../../shared/text-field-contracts';
+import { bagLotExceedsLimit, validateObservations } from '../../shared/text-field-contracts';
 
 export function fullName(application: SelectionApplication) {
   return `${application.personal.givenName} ${application.personal.familyName}`.trim();
@@ -46,7 +46,9 @@ export function newCollection(application: SelectionApplication): CollectionReco
 export const validVolume = (value: string) => /^\d{1,6}(\.\d{1,2})?$/.test(value) && Number(value) > 0;
 
 export function validateCollectionText(record: CollectionRecord): string[] {
-  return bagLotExceedsLimit(record.registry.bagLot) ? ['bagLotTooLong'] : [];
+  const errors = bagLotExceedsLimit(record.registry.bagLot) ? ['bagLotTooLong'] : [];
+  if (!record.completedSteps.includes('registry')) errors.push(...validateObservations(record.registry.observations));
+  return errors;
 }
 
 export function validateCollection(record: CollectionRecord, step: CollectionStep): string[] {

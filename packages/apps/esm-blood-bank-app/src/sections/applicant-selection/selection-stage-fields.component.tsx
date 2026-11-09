@@ -1,14 +1,7 @@
-import {
-  Button,
-  InlineNotification,
-  RadioButton,
-  RadioButtonGroup,
-  Select,
-  SelectItem,
-  TextArea,
-  TextInput,
-} from '@carbon/react';
+import { Button, RadioButton, RadioButtonGroup, Select, SelectItem, TextArea, TextInput } from '@carbon/react';
 import { Add, TrashCan } from '@carbon/react/icons';
+import type { ChangeEvent } from 'react';
+import { ObservationsTextArea } from '../../shared/observations-text-area.component';
 import { ageOnDate, calculateReturnDate, contactNumberWarning } from './selection-rules';
 import { interviewQuestions, personalFields, physicalFields, stiQuestions, tripFields } from './selection-fields';
 import type { Answer, ApplicantTrip, SelectionApplication, SelectionStep, SelectionTranslate } from './selection.types';
@@ -91,16 +84,19 @@ export function SelectionStageFields({ application: a, stage, readOnly, update, 
       </Select>
     );
   };
-  const notes = (section: 'physical' | 'interview' | 'qualification', key = 'observations') => (
-    <TextArea
-      id={`selection-${section}-${key}`}
-      labelText={t(key)}
-      rows={3}
-      value={(a[section] as unknown as Record<string, string>)[key]}
-      readOnly={readOnly}
-      onChange={(event) => update({ ...a, [section]: { ...a[section], [key]: event.target.value } })}
-    />
-  );
+  const notes = (section: 'physical' | 'interview' | 'qualification', key = 'observations') => {
+    const value = (a[section] as unknown as Record<string, string>)[key] ?? '';
+    const props = {
+      id: `selection-${section}-${key}`,
+      labelText: t(key),
+      rows: 3,
+      value,
+      readOnly,
+      onChange: (event: ChangeEvent<HTMLTextAreaElement>) =>
+        update({ ...a, [section]: { ...a[section], [key]: event.target.value } }),
+    };
+    return key === 'observations' ? <ObservationsTextArea {...props} t={t} /> : <TextArea {...props} />;
+  };
 
   if (stage === 'admission')
     return (
@@ -423,7 +419,6 @@ export function SelectionStageFields({ application: a, stage, readOnly, update, 
             {a.qualification.result && a.qualification.result !== 'eligible' && notes('qualification', 'reason')}
           </div>
         </div>
-        {a.stoppedAfterPhysical && <InlineNotification hideCloseButton kind="info" title={t('stoppedAfterPhysical')} />}
         <div className={styles.fields}>
           {text('qualification', 'applicantName')}
           {text('qualification', 'interviewerName')}

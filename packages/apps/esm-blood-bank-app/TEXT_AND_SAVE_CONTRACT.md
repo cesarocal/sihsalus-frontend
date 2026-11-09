@@ -27,17 +27,27 @@ sin confirmar el backend. Los borradores permiten campos obligatorios vacíos,
 pero no texto que exceda este límite. El texto pegado permanece visible y
 editable, incluso si no puede guardarse.
 
+## Observaciones de Banco de Sangre
+
+El frontend y los adaptadores mock admiten hasta 500 unidades UTF-16 por campo
+de observaciones en examen físico, entrevista, precalificación, registro de
+donación, resultados de tamizaje, fraccionamiento y detección de seguimientos.
+Se conserva el texto completo al exceder el límite y el formulario pide
+corregirlo antes de guardar. Las observaciones de etapas bloqueadas y registros
+cerrados conservan sus valores originales. El límite deberá confirmarse en el
+backend al implementar los adaptadores reales.
+
 ## Campos sin un máximo backend confirmado
 
 No se añaden máximos genéricos. Quedan pendientes de contrato funcional y
 backend los siguientes grupos de texto libre:
 
-| Grupo           | Campos representativos / destino previsto                                                                             |
-| --------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Postulación     | Nombres, domicilio/contacto, detalles de entrevista, observaciones, motivo y responsables; API de selección propuesta |
-| Extracción      | Textos de etiqueta, receptor, servicio/responsable y observaciones del registro; API de extracción propuesta          |
-| Tamizaje        | Responsables, reactivo, marca, lote de reactivo y observaciones; API de tamizaje propuesta                            |
-| Fraccionamiento | Responsable, servicios, soluciones, temperatura, anticuerpos y observaciones; API de fraccionamiento propuesta        |
+| Grupo           | Campos representativos / destino previsto                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------- |
+| Postulación     | Nombres, domicilio/contacto, detalles de entrevista, motivo y responsables para la API de selección propuesta |
+| Extracción      | Textos de etiqueta, receptor y servicio/responsable para la API de extracción propuesta                       |
+| Tamizaje        | Responsables, reactivo, marca y lote de reactivo para la API de tamizaje propuesta                            |
+| Fraccionamiento | Responsable, servicios, soluciones, temperatura y anticuerpos para la API de fraccionamiento propuesta        |
 
 Antes de limitar esos campos deben verificarse su destino concreto, capacidad,
 necesidad funcional, unidad de conteo y datos históricos. Las validaciones
@@ -62,6 +72,9 @@ no se cambian en este ajuste.
   solamente sus cambios no guardados. El error no muestra trazas ni datos personales.
 - Se reutiliza el snackbar global existente, cerrable y con duración de cinco
   segundos. No se crea un sistema paralelo de notificaciones.
+- Precalificación muestra el aviso de examen detenido una vez por apertura de
+  la postulación. La misma notificación confirma el guardado cuando se acaba de
+  registrar la detención.
 - Tamizaje nunca anuncia liberación de la unidad: sigue en cuarentena.
 - Fraccionamiento identifica inicio, división, etiquetas, volúmenes, avance y
   finalización en sus avisos. El inicio bloquea orígenes en laboratorio;

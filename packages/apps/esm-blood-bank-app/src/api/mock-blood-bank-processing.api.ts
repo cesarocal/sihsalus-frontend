@@ -7,6 +7,7 @@ import {
   validateScreening,
 } from '../sections/laboratory/screening/screening-rules';
 import { screeningSteps } from '../sections/laboratory/screening/screening.types';
+import { observationsExceedLimit } from '../shared/text-field-contracts';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
 import type { ApheresisCandidate } from '../sections/laboratory/screening/screening.types';
@@ -160,6 +161,7 @@ export function createMockProcessingApi(
       const previous = state.screenings.find((record) => record.id === input.id);
       if (!previous || previous.status === 'validated' || previous.revision !== input.revision)
         throw new Error('SCREENING_CONFLICT');
+      if (observationsExceedLimit(input.observations)) throw new Error('SCREENING_OBSERVATIONS_LIMIT');
       if (
         previous.completedSteps.includes('reception') &&
         (input.receivedOn !== previous.receivedOn ||

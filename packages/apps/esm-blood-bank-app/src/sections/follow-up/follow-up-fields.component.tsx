@@ -1,5 +1,6 @@
 import { Button, Checkbox, Select, SelectItem, TextArea, TextInput, Tag } from '@carbon/react';
 import { Renew } from '@carbon/react/icons';
+import { ObservationsTextArea } from '../../shared/observations-text-area.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { followUpSample } from './follow-up-rules';
 import type { FollowUpCase, FollowUpSubject, FollowUpWorkspace } from './follow-up.types';
@@ -123,8 +124,9 @@ export function FollowUpFields({
             )}
           </>
         )}
-        <TextArea
+        <ObservationsTextArea
           id="follow-up-origin-notes"
+          t={t}
           labelText={t('notes')}
           value={detection.notes}
           readOnly={readOnly}

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useState, type ReactNode } from 'react';
+import { StrictMode, useState, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockApplicantSelectionApi } from '../../api/mock-applicant-selection.api';
@@ -292,6 +292,40 @@ describe('applicant selection UI', () => {
     expect(within(screen.getByRole('group', { name: t('understoodInformation') })).getByLabelText('Sí')).toBeEnabled();
   });
 
+  it('shows the physical observation count and blocks saving overflow without truncating it', async () => {
+    const api = createMockApplicantSelectionApi();
+    const application = validApplication();
+    application.completedSteps = ['admission', 'personal'];
+    const saved = await api.saveDraft(application);
+    const onSaved = vi.fn();
+    render(<SelectionWorkflow application={saved} api={api} onClose={vi.fn()} onSaved={onSaved} t={t} />);
+
+    const observations = screen.getByLabelText('Observaciones');
+    expect(observations).toHaveAccessibleDescription('0 / 500 caracteres');
+    const overflow = `${'á'.repeat(499)}🩸`;
+    fireEvent.change(observations, { target: { value: overflow } });
+    expect(observations).toHaveValue(overflow);
+    expect(observations).toHaveAccessibleDescription(/501 \/ 500/);
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar examen físico' }));
+    expect(screen.getByRole('alert', { name: t('checkForm') })).toHaveTextContent(t('observationsTooLong'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salir del proceso' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: t('leaveTitle') })).getByRole('button', { name: 'Salir' }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: t('leaveTitle') })).not.toBeInTheDocument());
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(observations).toHaveValue(overflow);
+    expect((await api.listApplications()).find(({ id }) => id === saved.id)?.revision).toBe(saved.revision);
+
+    const atLimit = `${'á'.repeat(498)}🩸`;
+    fireEvent.change(observations, { target: { value: atLimit } });
+    expect(observations).toHaveAccessibleDescription('500 / 500 caracteres');
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar examen físico' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('readyForInterview'));
+    expect((await api.listApplications()).find(({ id }) => id === saved.id)?.physical.observations).toBe(atLimit);
+  });
+
   it('requires notes to continue after physical warnings or lets the clinician stop', async () => {
     const api = createMockApplicantSelectionApi();
     const application = validApplication();
@@ -305,7 +339,51 @@ describe('applicant selection UI', () => {
     fireEvent.click(within(warning).getByRole('button', { name: 'No continuar; registrar no apto' }));
     await waitFor(() => expect(screen.getByLabelText('Nombre completo del entrevistador')).toBeInTheDocument());
     expect(screen.getByLabelText('Apto')).toBeDisabled();
+    expect(screen.queryByText(t('stoppedAfterPhysical'))).not.toBeInTheDocument();
+    expect(showSnackbar).toHaveBeenCalledExactlyOnceWith({
+      title: t('stoppedAfterPhysical'),
+      subtitle: t('physicalStopped'),
+      kind: 'info',
+      isLowContrast: true,
+      autoClose: true,
+      timeoutInMs: 5000,
+    });
     expect((await api.listApplications()).find((a) => a.id === saved.id)?.status).toBe('awaitingQualification');
+  });
+
+  it('shows one temporary notice when a stopped application resumes in prequalification', async () => {
+    const api = createMockApplicantSelectionApi();
+    const application = validApplication();
+    application.completedSteps = ['admission', 'personal'];
+    application.stoppedAfterPhysical = true;
+    application.qualification.result = 'temporary';
+    const saved = await api.completeStep(application, 'physical');
+    render(
+      <StrictMode>
+        <SelectionWorkflow application={saved} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />
+      </StrictMode>,
+    );
+
+    expect(screen.getByRole('heading', { name: t('qualification') })).toBeInTheDocument();
+    expect(screen.queryByText(t('stoppedAfterPhysical'))).not.toBeInTheDocument();
+    expect(showSnackbar).toHaveBeenCalledExactlyOnceWith({
+      title: t('stoppedAfterPhysical'),
+      subtitle: undefined,
+      kind: 'info',
+      isLowContrast: true,
+      autoClose: true,
+      timeoutInMs: 5000,
+    });
+  });
+
+  it.each(['interview', 'qualification'] as const)('shows the observations limit in %s', (stage) => {
+    render(<Fields initial={validApplication()} stage={stage} />);
+    const observations = screen.getByLabelText('Observaciones');
+    expect(observations).toHaveAccessibleDescription('0 / 500 caracteres');
+    const overflow = 'a'.repeat(501);
+    fireEvent.change(observations, { target: { value: overflow } });
+    expect(observations).toHaveValue(overflow);
+    expect(observations).toHaveAccessibleDescription(/501 \/ 500/);
   });
 
   it('autofills donor data and warns about duration without exposing the reason', async () => {

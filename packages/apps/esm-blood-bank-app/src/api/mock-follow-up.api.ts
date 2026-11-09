@@ -7,6 +7,7 @@ import {
 } from '../sections/follow-up/follow-up-rules';
 import type { FollowUpCase, FollowUpKind } from '../sections/follow-up/follow-up.types';
 import { newScreeningSample } from '../sections/laboratory/screening/screening-rules';
+import { observationsExceedLimit } from '../shared/text-field-contracts';
 import type { FollowUpApi } from './follow-up.api';
 import {
   readProcessingState,
@@ -39,6 +40,8 @@ export function createMockFollowUpApi(getStorage: () => MockStorage = () => glob
       throw new Error('FOLLOW_UP_STAGE_CONFLICT');
     if (input.stage < 0 || input.stage > 4 || (!previous && input.stage !== 0))
       throw new Error('FOLLOW_UP_STAGE_CONFLICT');
+    if (input.stage === 0 && observationsExceedLimit(input.detection.notes))
+      throw new Error('FOLLOW_UP_OBSERVATIONS_LIMIT');
     const record = structuredClone(input);
     record.status = 'open';
     record.closedAt = '';

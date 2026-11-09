@@ -24,12 +24,13 @@ describe('applicant selection mock API', () => {
     expect(restored?.personal.trips).toEqual(a.personal.trips);
   });
 
-  it('preserves a previously recorded trip and can resume a legacy application with locked personal data', async () => {
+  it('preserves a previously recorded trip and observations when resuming a locked legacy examination', async () => {
     const application = validApplication();
     const legacy = {
       ...application,
       id: 'mock-legacy-application',
       completedSteps: ['admission', 'personal', 'physical'],
+      physical: { ...application.physical, observations: 'a'.repeat(501) },
       personal: {
         ...application.personal,
         trips: undefined,
@@ -46,6 +47,25 @@ describe('applicant selection mock API', () => {
     ]);
     const saved = await api.completeStep(restored, 'interview');
     expect(saved.personal.trips).toEqual(restored.personal.trips);
+    expect(saved.physical.observations).toBe(legacy.physical.observations);
+  });
+
+  it.each([
+    'physical',
+    'interview',
+    'qualification',
+  ] as const)('rejects oversized %s observations on drafts and stage saves without changing stored data', async (stage) => {
+    const api = createMockApplicantSelectionApi();
+    const application = validApplication();
+    application.completedSteps = ['admission', 'personal'];
+    application[stage].observations = 'a'.repeat(500);
+    const saved = await api.saveDraft(application);
+    const previousStorage = sessionStorage.getItem(selectionStorageKey);
+    saved[stage].observations += 'a';
+
+    await expect(api.saveDraft(saved)).rejects.toThrow('SELECTION_OBSERVATIONS_LIMIT');
+    await expect(api.completeStep(saved, stage)).rejects.toThrow('SELECTION_OBSERVATIONS_LIMIT');
+    expect(sessionStorage.getItem(selectionStorageKey)).toBe(previousStorage);
   });
 
   it('separates admission, interview queue and final selection; final saves cannot duplicate', async () => {

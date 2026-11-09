@@ -11,9 +11,17 @@ import {
   TextArea,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
+import { showSnackbar } from '@openmrs/esm-framework';
 import { useEffect, useRef, useState } from 'react';
 import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
-import { hasActiveExclusion, isFinal, physicalWarnings, validateFinal, validateStep } from './selection-rules';
+import {
+  hasActiveExclusion,
+  invalidObservationSteps,
+  isFinal,
+  physicalWarnings,
+  validateFinal,
+  validateStep,
+} from './selection-rules';
 import { printSelectionReport, SelectionReport } from './selection-report.component';
 import { SelectionStageFields } from './selection-stage-fields.component';
 import { notifySuccess } from '../../shared/notify-success';
@@ -55,11 +63,13 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
   const [dirty, setDirty] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const stoppedNotice = useRef<'saved' | 'shown'>();
   const currentData = useRef(data);
   currentData.current = data;
   const finalized = isFinal(data);
   const locked = finalized || (step < 3 && data.completedSteps.includes('physical'));
   const stage = selectionSteps[step];
+  const stoppedAtQualification = stage === 'qualification' && data.stoppedAfterPhysical;
 
   const change = (next: SelectionApplication) => {
     const identityChanged = ['documentType', 'documentNumber', 'donorCode'].some(
@@ -144,7 +154,27 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     if (errors.length) errorRef.current?.focus();
   }, [errors]);
 
+  useEffect(() => {
+    if (!stoppedAtQualification || stoppedNotice.current === 'shown') return;
+    const subtitle = stoppedNotice.current === 'saved' ? t('physicalStopped') : undefined;
+    stoppedNotice.current = 'shown';
+    showSnackbar({
+      title: t('stoppedAfterPhysical'),
+      subtitle,
+      kind: 'info',
+      isLowContrast: true,
+      autoClose: true,
+      timeoutInMs: 5000,
+    });
+  }, [stoppedAtQualification, t]);
+
   const persist = async (mode: 'draft' | 'stage' | 'final', next = data) => {
+    const [invalidStep] = invalidObservationSteps(next);
+    if (invalidStep) {
+      setErrors(['observationsTooLong']);
+      setStep(selectionSteps.indexOf(invalidStep));
+      return null;
+    }
     setSaving(true);
     setErrors([]);
     try {
@@ -184,6 +214,10 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
       problems.push('activeExclusionBlocks');
     if (problems.length) {
       setErrors(problems);
+      if (stage === 'review' && problems.includes('observationsTooLong')) {
+        const [invalidStep] = invalidObservationSteps(data);
+        setStep(selectionSteps.indexOf(invalidStep));
+      }
       return;
     }
     if (stage === 'physical' && physicalWarnings(data).length) {
@@ -235,7 +269,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     setWarningsOpen(false);
     if (continueInterview) onSaved('readyForInterview');
     else {
-      notifySuccess(t('physicalStopped'));
+      stoppedNotice.current = 'saved';
       setStep(4);
     }
   };

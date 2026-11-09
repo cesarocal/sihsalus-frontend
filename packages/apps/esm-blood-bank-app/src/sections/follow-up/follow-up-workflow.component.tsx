@@ -6,6 +6,7 @@ import { notifySuccess } from '../../shared/notify-success';
 import { printDocument } from '../../shared/print-document';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
+import { validateObservations } from '../../shared/text-field-contracts';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
 import { FollowUpFields } from './follow-up-fields.component';
 import { FollowUpReport } from './follow-up-report.component';
@@ -62,6 +63,11 @@ export function FollowUpWorkflow({
   };
   const save = async () => {
     if (record.id && JSON.stringify(record) === saved.current) return 'unchanged' as const;
+    const messages = record.stage === 0 ? validateObservations(record.detection.notes) : [];
+    if (messages.length) {
+      setErrors(messages);
+      return 'failed' as const;
+    }
     return (await store(() => api.save(record), 'savedCase')) ? ('saved' as const) : ('failed' as const);
   };
   const advance = () => {
@@ -70,6 +76,7 @@ export function FollowUpWorkflow({
       return;
     }
     const messages = validateFollowUp(record, step, workspace.screenings);
+    if (step === 0) messages.push(...validateObservations(record.detection.notes));
     if (
       step === 1 &&
       workspace.traces

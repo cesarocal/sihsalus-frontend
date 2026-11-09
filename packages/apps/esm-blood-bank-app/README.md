@@ -12,6 +12,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - Selección del postulante incluye listado, filtros, formulario por etapas e impresión. Su avance se conserva en `sessionStorage` de la pestaña, exclusivamente para datos sintéticos.
   Teléfono y celular son opcionales. Si se ingresan, deben tener exactamente 7 y 9 dígitos respectivamente antes de completar Datos personales o Examen físico.
   Los viajes son opcionales y se registran como una lista de lugar, permanencia y fecha. El mock recupera como un viaje los datos guardados con el formato anterior.
+  Las observaciones del examen físico, entrevista y precalificación admiten hasta 500 unidades UTF-16.
 - Extracción incluye cola de seleccionados, etiquetas de unidad/tubo, volumen, registro y constancia imprimible.
 - Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
 - Transferencias separa Recibidas / Pendientes y Solicitadas con pestañas Carbon. Incluye registro manual e historial independiente, generación e impresión FR09 de solicitudes a otras instituciones, selección y reserva de recibidas, constancia FR11, entrega y proyección administrativa del libro FR10. Generar una solicitud no envía correos ni compromete stock local. Las unidades entregadas pasan de Por transferir a Transferido, sin En tránsito. Ver [Transferencias](src/sections/transfers/README.md).
@@ -19,6 +20,8 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - Seguimientos al donante y al receptor incluyen casos abiertos, historial con filtros, detalle por etapas, trazabilidad, notificación documentada, muestras vinculadas a Tamizaje y cierre con impresión FR13/FR14. Ver [Seguimientos](src/sections/follow-up/README.md). Ningún flujo mock guarda información clínica en OpenMRS.
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
+
+El máximo de 500 unidades UTF-16 también se aplica a las observaciones del registro de donación, tamizaje, fraccionamiento y detección de seguimientos al guardar un borrador o completar el flujo.
 
 ## Contratos de integración
 

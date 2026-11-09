@@ -16,6 +16,7 @@ import {
   type FractionationUnit,
 } from '../sections/laboratory/fractionation/fractionation.types';
 import type { InventorySummary } from '../types/blood-bank.types';
+import { observationsExceedLimit } from '../shared/text-field-contracts';
 import type { FractionationApi } from './fractionation.api';
 import { inventoryBlocksFractionation } from './mock-inventory-store';
 import {
@@ -165,6 +166,7 @@ const volumes = (batch: FractionationBatch) => JSON.stringify(batch.nodes.map(({
 
 function prepare(input: FractionationBatch, previous: FractionationBatch): FractionationBatch {
   if (input.revision !== previous.revision) throw new Error('FRACTIONATION_CONFLICT');
+  if (observationsExceedLimit(input.observations)) throw new Error('FRACTIONATION_OBSERVATIONS_LIMIT');
   if (JSON.stringify(input.sources) !== JSON.stringify(previous.sources))
     throw new Error('FRACTIONATION_IDENTITY_CONFLICT');
   const next = {

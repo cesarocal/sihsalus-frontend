@@ -2,6 +2,7 @@ import { applicantProfilesMock, applicationsMock } from '../mocks/applicant-sele
 import {
   calculateReturnDate,
   hasActiveExclusion,
+  invalidObservationSteps,
   isFinal,
   normalizePersonalTrips,
   today,
@@ -106,11 +107,13 @@ export function createMockApplicantSelectionApi(
     if (input.id && !previous) throw new Error('APPLICATION_NOT_FOUND');
     if (previous && (previous.revision !== input.revision || isFinal(previous)))
       throw new Error('APPLICATION_CONFLICT');
-    if (previous?.completedSteps.includes('physical')) {
+    const physicalLocked = previous?.completedSteps.includes('physical') ?? false;
+    if (physicalLocked && previous) {
       for (const section of ['admission', 'personal', 'physical'] as const) {
         if (JSON.stringify(previous[section]) !== JSON.stringify(input[section])) throw new Error('LOCKED_SECTION');
       }
     }
+    if (invalidObservationSteps(input, physicalLocked).length) throw new Error('SELECTION_OBSERVATIONS_LIMIT');
     const found = history(input.admission);
     if (found?.identityConflict || (input.admission.donorCode && !found)) throw new Error('IDENTITY_CONFLICT');
     if (step && validateStep(input, step).length) throw new Error('INCOMPLETE_STAGE');

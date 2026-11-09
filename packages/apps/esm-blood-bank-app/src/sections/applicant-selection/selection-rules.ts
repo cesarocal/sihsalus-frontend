@@ -1,3 +1,4 @@
+import { observationsExceedLimit } from '../../shared/text-field-contracts';
 import { interviewQuestions, physicalFields, stiQuestions } from './selection-fields';
 import type { ApplicantHistory, PersonalData, SelectionApplication, SelectionStep } from './selection.types';
 
@@ -174,9 +175,18 @@ export function physicalWarnings(application: SelectionApplication): string[] {
   return warnings;
 }
 
+export function invalidObservationSteps(
+  application: SelectionApplication,
+  physicalLocked = application.completedSteps.includes('physical'),
+): SelectionStep[] {
+  return (['physical', 'interview', 'qualification'] as const).filter(
+    (step) => !(step === 'physical' && physicalLocked) && observationsExceedLimit(application[step].observations),
+  );
+}
+
 export function validateStep(application: SelectionApplication, step: SelectionStep): string[] {
   const a = application;
-  const errors: string[] = [];
+  const errors = invalidObservationSteps(a).includes(step) ? ['observationsTooLong'] : [];
   if (step === 'admission') {
     if (!isDate(a.admission.date) || a.admission.date > today()) errors.push('validDateRequired');
     const document = a.admission.documentNumber.trim();

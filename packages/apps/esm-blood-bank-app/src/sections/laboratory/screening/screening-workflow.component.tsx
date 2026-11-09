@@ -1,11 +1,13 @@
-import { Button, Checkbox, InlineNotification, Select, SelectItem, TextArea, TextInput } from '@carbon/react';
+import { Button, Checkbox, InlineNotification, Select, SelectItem, TextInput } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
+import { ObservationsTextArea } from '../../../shared/observations-text-area.component';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
 import { notifySuccess } from '../../../shared/notify-success';
+import { validateObservations } from '../../../shared/text-field-contracts';
 import styles from '../../applicant-selection/selection.scss';
 import { ScreeningIdentity, ScreeningReport } from './screening-report.component';
 import { ApheresisTubeLabel } from './apheresis-documents.component';
@@ -48,7 +50,9 @@ export function ScreeningWorkflow({
       setStep((value) => Math.min(value + 1, 2));
       return true;
     }
-    const missing = advance ? validateScreening(record, stage) : [];
+    const missing = validateObservations(record.observations);
+    if (missing.length && record.completedSteps.includes('reception')) setStep(screeningSteps.indexOf('results'));
+    if (advance && !missing.length) missing.push(...validateScreening(record, stage));
     setErrors(missing);
     setFailed('');
     if (missing.length) return false;
@@ -225,8 +229,9 @@ export function ScreeningWorkflow({
               </div>
             </section>
           ))}
-          <TextArea
+          <ObservationsTextArea
             id="screening-notes"
+            t={t}
             labelText={t('observations')}
             value={record.observations}
             readOnly={locked}

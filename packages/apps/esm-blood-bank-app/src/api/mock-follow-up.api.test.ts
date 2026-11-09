@@ -68,6 +68,19 @@ async function validateSamples(record: FollowUpCase, result: ScreeningResult = '
 
 describe('follow-up cases, lab provenance and atomic closure', () => {
   beforeEach(() => sessionStorage.clear());
+  it.each(['donor', 'recipient'] as const)('bounds %s detection notes on drafts and stage saves', async (kind) => {
+    const api = createMockFollowUpApi();
+    const record = (await api.list(kind)).cases[0];
+    const atLimit = 'a'.repeat(500);
+    record.detection.notes = atLimit;
+    const saved = await api.save(record);
+    expect(saved.detection.notes).toBe(atLimit);
+    const before = sessionStorage.getItem(processingStorageKey);
+    saved.detection.notes += 'a';
+    await expect(api.save(saved)).rejects.toThrow('FOLLOW_UP_OBSERVATIONS_LIMIT');
+    await expect(api.save(saved, true)).rejects.toThrow('FOLLOW_UP_OBSERVATIONS_LIMIT');
+    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
+  });
   it.each(['donor', 'recipient'] as const)(
     'persists the complete %s workflow and exposes closed reports without changing inventory',
     async (kind) => {

@@ -6,12 +6,12 @@ import {
   RadioButtonGroup,
   Select,
   SelectItem,
-  TextArea,
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { useState } from 'react';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
+import { ObservationsTextArea } from '../../shared/observations-text-area.component';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { printDocument } from '../../shared/print-document';
@@ -67,7 +67,11 @@ export function CollectionWorkflow({
     const missing = advance ? validateCollection(record, stage) : validateCollectionText(record);
     setErrors(missing);
     setFailed('');
-    if (missing.length) return false;
+    if (missing.length) {
+      if (missing.includes('observationsTooLong') && record.completedSteps.includes('volume'))
+        setStep(collectionSteps.indexOf('registry'));
+      return false;
+    }
     setSaving(true);
     try {
       const result = await api.saveCollection(record, advance ? stage : undefined);
@@ -96,7 +100,9 @@ export function CollectionWorkflow({
     }
   };
   const print = (kind: 'unit' | 'sample' | 'certificate') => {
-    const missing = validateCollection(record, kind === 'certificate' ? 'certificate' : 'label');
+    const missing = validateCollection(record, kind === 'certificate' ? 'certificate' : 'label').filter(
+      (key) => key !== 'observationsTooLong',
+    );
     setErrors(missing);
     setFailed('');
     if (missing.length) return;
@@ -327,8 +333,9 @@ export function CollectionWorkflow({
             <SelectItem value="complete" text={t('complete')} />
             <SelectItem value="incomplete" text={t('incomplete')} />
           </Select>
-          <TextArea
+          <ObservationsTextArea
             id="collection-observations"
+            t={t}
             labelText={t('observations')}
             value={record.registry.observations}
             readOnly={locked}

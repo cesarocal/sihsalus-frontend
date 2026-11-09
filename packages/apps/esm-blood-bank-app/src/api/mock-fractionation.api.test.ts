@@ -50,6 +50,17 @@ describe('atomic synthetic fractionation and inventory', () => {
     expect((await mockBloodBankApi.getInventory()).filter((unit) => unit.status === 'En laboratorio')).toHaveLength(2);
     await expect(instance.start(['PFC-2026-002'])).rejects.toThrow('FRACTIONATION_INVALID_SELECTION');
   });
+  it('rejects oversized fractionation observations before saving or producing units', async () => {
+    const instance = api();
+    const batch = await reviewBatch(instance, await instance.start(['PFC-2026-002']));
+    const atLimit = 'a'.repeat(500);
+    const edited = { ...batch, observations: `${atLimit}a` };
+    const before = sessionStorage.getItem(processingStorageKey);
+    await expect(instance.save(edited)).rejects.toThrow('FRACTIONATION_OBSERVATIONS_LIMIT');
+    await expect(instance.finalize(edited)).rejects.toThrow('FRACTIONATION_OBSERVATIONS_LIMIT');
+    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
+    expect((await instance.finalize({ ...edited, observations: atLimit })).observations).toBe(atLimit);
+  });
   it('keeps separate trees, parent genealogy and final children in quarantine, with idempotent completion', async () => {
     const instance = api();
     const batch = await reviewBatch(instance, await instance.start(['PFC-2026-002', 'PFC-2026-003']));
@@ -115,8 +126,9 @@ describe('atomic synthetic fractionation and inventory', () => {
     const instance = api();
     const initial = await instance.start(['PFC-2026-002']);
     const input = plannedBatch(initial);
-    input.observations = 'Observación DEMO '.repeat(100);
+    input.observations = 'Observación DEMO '.repeat(29);
     const saved = await instance.save(input);
+    expect(saved.observations).toBe(input.observations);
     expect((await api().list()).batches[0]).toEqual(saved);
     const before = sessionStorage.getItem(processingStorageKey);
     expect(await instance.save(saved)).toEqual(saved);
