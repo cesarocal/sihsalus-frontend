@@ -101,7 +101,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
             setData({
               ...current,
               patientUuid: found.patientUuid,
-              personal: structuredClone(found.personal),
+              personal: { ...found.personal, trips: current.personal.trips },
               admission: {
                 ...current.admission,
                 ...(current.admission.documentNumber
@@ -346,7 +346,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
                 change({
                   ...data,
                   patientUuid: history.patientUuid,
-                  personal: structuredClone(history.personal ?? data.personal),
+                  personal: { ...(history.personal ?? data.personal), trips: data.personal.trips },
                 })
               }
             >

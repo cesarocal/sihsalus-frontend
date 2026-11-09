@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ageOnDate, calculateReturnDate } from './selection-rules';
-import { interviewQuestions, personalFields, physicalFields, stiQuestions } from './selection-fields';
+import { interviewQuestions, personalFields, physicalFields, stiQuestions, tripFields } from './selection-fields';
 import type { SelectionApplication, SelectionTranslate } from './selection.types';
 import styles from './selection.scss';
 
@@ -49,6 +49,31 @@ export function SelectionReport({ application: a, t }: { application: SelectionA
         {item('age', ageOnDate(a.personal.birthDate, a.admission.date))}
         {item('maritalStatus', a.personal.maritalStatus ? t(a.personal.maritalStatus) : '')}
       </dl>
+      {a.personal.trips.length > 0 && (
+        <section>
+          <h4>{t('trips')}</h4>
+          <table>
+            <thead>
+              <tr>
+                {tripFields.map(({ label }) => (
+                  <th key={label} scope="col">
+                    {t(label)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {a.personal.trips.map((trip) => (
+                <tr key={trip.id}>
+                  {tripFields.map(({ key }) => (
+                    <td key={key}>{value(trip[key])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
       <h3>{t('physical')}</h3>
       <dl>
         {physicalFields.map(({ key, unit }) => item(key, a.physical[key] ? `${a.physical[key]} ${unit}` : ''))}

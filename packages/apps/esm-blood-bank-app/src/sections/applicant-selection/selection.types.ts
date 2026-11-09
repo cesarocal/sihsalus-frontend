@@ -23,6 +23,13 @@ export interface AdmissionData {
   beneficiaryDocument: string;
 }
 
+export interface ApplicantTrip {
+  id: number;
+  place: string;
+  duration: string;
+  date: string;
+}
+
 export interface PersonalData {
   givenName: string;
   familyName: string;
@@ -40,9 +47,7 @@ export interface PersonalData {
   mobile: string;
   email: string;
   workplace: string;
-  travelPlace: string;
-  travelDuration: string;
-  travelDate: string;
+  trips: ApplicantTrip[];
 }
 
 export interface PhysicalData {

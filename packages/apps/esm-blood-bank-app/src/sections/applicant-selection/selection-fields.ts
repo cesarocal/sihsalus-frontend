@@ -1,6 +1,6 @@
-import type { PersonalData, PhysicalData } from './selection.types';
+import type { ApplicantTrip, PersonalData, PhysicalData } from './selection.types';
 
-export const personalFields: Array<{ key: keyof PersonalData; type?: 'date' | 'email' | 'tel' }> = [
+export const personalFields: Array<{ key: Exclude<keyof PersonalData, 'trips'>; type?: 'date' | 'email' | 'tel' }> = [
   { key: 'familyName' },
   { key: 'givenName' },
   { key: 'birthDate', type: 'date' },
@@ -15,9 +15,12 @@ export const personalFields: Array<{ key: keyof PersonalData; type?: 'date' | 'e
   { key: 'mobile', type: 'tel' },
   { key: 'email', type: 'email' },
   { key: 'workplace' },
-  { key: 'travelPlace' },
-  { key: 'travelDuration' },
-  { key: 'travelDate', type: 'date' },
+];
+
+export const tripFields: Array<{ key: Exclude<keyof ApplicantTrip, 'id'>; label: string; type: 'text' | 'date' }> = [
+  { key: 'place', label: 'travelPlace', type: 'text' },
+  { key: 'duration', label: 'travelDuration', type: 'text' },
+  { key: 'date', label: 'travelDate', type: 'date' },
 ];
 
 /** Capture units, not eligibility limits. Limits are evaluated in selection-rules.ts. */

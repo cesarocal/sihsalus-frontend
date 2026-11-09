@@ -124,6 +124,32 @@ describe('applicant selection UI', () => {
     expect(saved).not.toHaveBeenCalled();
   });
 
+  it('warns about invalid personal contact numbers and requires correction before continuing', async () => {
+    const api = createMockApplicantSelectionApi();
+    const application = await api.completeStep(validApplication(), 'admission');
+    const completeStep = vi.spyOn(api, 'completeStep');
+    render(<SelectionWorkflow application={application} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
+
+    const phone = screen.getByLabelText('Teléfono');
+    const mobile = screen.getByLabelText('Celular');
+    const continueButton = screen.getByRole('button', { name: 'Guardar y continuar' });
+    fireEvent.change(phone, { target: { value: '123456' } });
+    fireEvent.change(mobile, { target: { value: '1234567890' } });
+    expect(phone).toHaveAccessibleDescription('El teléfono debe tener exactamente 7 dígitos.');
+    expect(mobile).toHaveAccessibleDescription('El celular debe tener exactamente 9 dígitos.');
+
+    fireEvent.click(continueButton);
+    expect(screen.getByRole('alert', { name: t('checkForm') })).toBeInTheDocument();
+    expect(completeStep).not.toHaveBeenCalled();
+
+    fireEvent.change(phone, { target: { value: '0123456' } });
+    fireEvent.change(mobile, { target: { value: '900000001' } });
+    expect(phone).not.toHaveAccessibleDescription();
+    expect(mobile).not.toHaveAccessibleDescription();
+    fireEvent.click(continueButton);
+    expect(await screen.findByRole('heading', { name: t('physical') })).toBeInTheDocument();
+  });
+
   it('shows conditional interview details and clears hidden values when changed to no', () => {
     render(<Fields initial={validApplication()} stage="interview" />);
     const question = screen.getByRole('group', { name: t('medication') });
@@ -134,6 +160,38 @@ describe('applicant selection UI', () => {
     expect(screen.queryByLabelText(t('medicationWhich'))).not.toBeInTheDocument();
     fireEvent.click(within(question).getByLabelText('Sí'));
     expect(screen.getByLabelText(t('medicationWhich'))).toHaveValue('');
+  });
+
+  it('starts with zero trips and adds or removes independent travel blocks', async () => {
+    const api = createMockApplicantSelectionApi();
+    const application = await api.completeStep(validApplication(), 'admission');
+    render(<SelectionWorkflow application={application} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
+
+    expect(screen.getByRole('heading', { name: 'Viajes (0)' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Lugar del viaje')).not.toBeInTheDocument();
+    const add = screen.getByRole('button', { name: 'Añadir viaje' });
+    fireEvent.click(add);
+    expect(screen.getByRole('heading', { name: 'Viajes (1)' })).toBeInTheDocument();
+    fireEvent.click(add);
+    expect(screen.getByRole('heading', { name: 'Viajes (2)' })).toBeInTheDocument();
+
+    const second = within(screen.getByRole('region', { name: 'Viaje 2' }));
+    fireEvent.change(second.getByLabelText('Lugar del viaje'), { target: { value: 'Nauta' } });
+    fireEvent.change(second.getByLabelText('Permanencia'), { target: { value: '2 días' } });
+    fireEvent.change(second.getByLabelText('Fecha del viaje'), { target: { value: application.admission.date } });
+    const continueButton = screen.getByRole('button', { name: 'Guardar y continuar' });
+    fireEvent.click(continueButton);
+    expect(screen.getByRole('alert', { name: t('checkForm') })).toHaveTextContent(t('tripDetailsRequired'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar viaje · Viaje 1' }));
+    const remaining = within(screen.getByRole('region', { name: 'Viaje 1' }));
+    expect(remaining.getByLabelText('Lugar del viaje')).toHaveValue('Nauta');
+    expect(remaining.getByLabelText('Permanencia')).toHaveValue('2 días');
+    expect(remaining.getByLabelText('Fecha del viaje')).toHaveValue(application.admission.date);
+    fireEvent.click(remaining.getByRole('button', { name: 'Eliminar viaje · Viaje 1' }));
+    expect(screen.getByRole('heading', { name: 'Viajes (0)' })).toBeInTheDocument();
+    fireEvent.click(continueButton);
+    expect(await screen.findByRole('heading', { name: t('physical') })).toBeInTheDocument();
   });
 
   it('shows the female block only for women', () => {
@@ -291,9 +349,15 @@ describe('applicant selection UI', () => {
   it('escapes printable input and includes blank physical-signature spaces', () => {
     const application = validApplication();
     application.personal.givenName = '<script>alert(1)</script>';
+    application.personal.trips = [
+      { id: 1, place: 'Iquitos', duration: '1 día', date: '2026-01-01' },
+      { id: 2, place: 'Nauta', duration: '2 días', date: '2026-01-02' },
+    ];
     const html = renderToStaticMarkup(<SelectionReport application={application} t={t} />);
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('<td>Iquitos</td><td>1 día</td><td>2026-01-01</td>');
+    expect(html).toContain('<td>Nauta</td><td>2 días</td><td>2026-01-02</td>');
     expect(html).toContain('data-signatures');
     expect(html).toContain('NO VÁLIDO PARA USO CLÍNICO');
   });

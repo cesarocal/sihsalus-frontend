@@ -41,6 +41,22 @@ describe('selection rules', () => {
     );
   });
 
+  it('keeps contact numbers optional and validates entered numbers before personal data is locked', () => {
+    const a = validApplication();
+    a.personal.phone = '';
+    a.personal.mobile = '';
+    expect(validateStep(a, 'personal')).toEqual([]);
+
+    a.personal.phone = '012345X';
+    a.personal.mobile = '900 00001';
+    expect(validateStep(a, 'personal')).toEqual(['phoneDigits', 'mobileDigits']);
+    expect(validateStep(a, 'physical')).toEqual(['phoneDigits', 'mobileDigits']);
+
+    a.completedSteps.push('admission', 'personal', 'physical');
+    expect(validateFinal(a)).not.toContain('phoneDigits');
+    expect(validateFinal(a)).not.toContain('mobileDigits');
+  });
+
   it('accepts valid vitals and rejects zero, exponents and reversed blood pressure', () => {
     const a = validApplication();
     expect(validateStep(a, 'physical')).toEqual([]);

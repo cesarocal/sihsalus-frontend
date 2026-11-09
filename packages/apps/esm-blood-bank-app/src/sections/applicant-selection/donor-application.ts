@@ -15,9 +15,7 @@ export function newApplicationForDonor(donor: DonorDetail) {
     },
     personal: {
       ...(donor.personal ?? application.personal),
-      travelPlace: '',
-      travelDuration: '',
-      travelDate: '',
+      trips: [],
     },
   };
 }

@@ -1,4 +1,5 @@
 import { donorDetailsMock } from '../mocks/donors.mock';
+import { normalizePersonalTrips } from '../sections/applicant-selection/selection-rules';
 import { fullName } from '../sections/collection/collection-rules';
 import type { DonorDetail, DonorDonation } from '../types/blood-bank.types';
 import { readProcessingState, type MockStorage } from './mock-processing-store';
@@ -44,7 +45,7 @@ export function readMockDonorDetails(getStorage: () => MockStorage): DonorDetail
         lastDonationDate: record.registry.date,
         status: 'En evaluación',
       },
-      personal: copy(a.personal),
+      personal: normalizePersonalTrips(copy(a.personal)),
       donations: [...(previous?.donations ?? []), donation],
       adverseReactions: previous?.adverseReactions ?? [],
     });

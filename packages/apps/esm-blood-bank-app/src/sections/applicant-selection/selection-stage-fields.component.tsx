@@ -1,4 +1,5 @@
 import {
+  Button,
   InlineNotification,
   RadioButton,
   RadioButtonGroup,
@@ -7,9 +8,10 @@ import {
   TextArea,
   TextInput,
 } from '@carbon/react';
-import { ageOnDate, calculateReturnDate } from './selection-rules';
-import { interviewQuestions, personalFields, physicalFields, stiQuestions } from './selection-fields';
-import type { Answer, SelectionApplication, SelectionStep, SelectionTranslate } from './selection.types';
+import { Add, TrashCan } from '@carbon/react/icons';
+import { ageOnDate, calculateReturnDate, contactNumberWarning } from './selection-rules';
+import { interviewQuestions, personalFields, physicalFields, stiQuestions, tripFields } from './selection-fields';
+import type { Answer, ApplicantTrip, SelectionApplication, SelectionStep, SelectionTranslate } from './selection.types';
 import styles from './selection.scss';
 
 interface StageFieldsProps {
@@ -52,14 +54,22 @@ export function YesNo({
 export function SelectionStageFields({ application: a, stage, readOnly, update, t }: StageFieldsProps) {
   const text = (section: 'admission' | 'personal' | 'physical' | 'qualification', key: string, type = 'text') => {
     const data = a[section] as unknown as Record<string, string>;
+    const value = data[key] ?? '';
+    const warning =
+      !readOnly && section === 'personal' && (key === 'phone' || key === 'mobile')
+        ? contactNumberWarning(key, value)
+        : undefined;
     return (
       <TextInput
         key={key}
         id={`selection-${key}`}
         labelText={t(key)}
         type={type}
-        value={data[key] ?? ''}
+        inputMode={type === 'tel' ? 'numeric' : undefined}
+        value={value}
         readOnly={readOnly}
+        warn={Boolean(warning)}
+        warnText={warning && t(warning)}
         onChange={(event) => update({ ...a, [section]: { ...a[section], [key]: event.target.value } })}
       />
     );
@@ -129,20 +139,85 @@ export function SelectionStageFields({ application: a, stage, readOnly, update, 
       </div>
     );
 
-  if (stage === 'personal')
+  if (stage === 'personal') {
+    const { trips } = a.personal;
+    const updateTrips = (next: ApplicantTrip[]) => update({ ...a, personal: { ...a.personal, trips: next } });
     return (
-      <div className={styles.fields}>
-        {personalFields.map(({ key, type }) => text('personal', key, type))}
-        {select('personal', 'sex', ['M', 'F'])}
-        <TextInput
-          id="selection-age"
-          labelText={t('age')}
-          value={String(ageOnDate(a.personal.birthDate, a.admission.date) ?? '')}
-          readOnly
-        />
-        {select('personal', 'maritalStatus', ['single', 'married', 'widowed', 'divorced', 'cohabiting'])}
-      </div>
+      <>
+        <div className={styles.fields}>
+          {personalFields.map(({ key, type }) => text('personal', key, type))}
+          {select('personal', 'sex', ['M', 'F'])}
+          <TextInput
+            id="selection-age"
+            labelText={t('age')}
+            value={String(ageOnDate(a.personal.birthDate, a.admission.date) ?? '')}
+            readOnly
+          />
+          {select('personal', 'maritalStatus', ['single', 'married', 'widowed', 'divorced', 'cohabiting'])}
+        </div>
+        <section className={styles.trips} aria-labelledby="selection-trips">
+          <div className={styles.tripHeading}>
+            <h4 id="selection-trips">
+              {t('trips')} ({trips.length})
+            </h4>
+            {!readOnly && (
+              <Button
+                type="button"
+                kind="tertiary"
+                size="sm"
+                renderIcon={Add}
+                onClick={() =>
+                  updateTrips([...trips, { id: (trips.at(-1)?.id ?? 0) + 1, place: '', duration: '', date: '' }])
+                }
+              >
+                {t('addTrip')}
+              </Button>
+            )}
+          </div>
+          {trips.map((trip, index) => {
+            const headingId = `selection-trip-${trip.id}-heading`;
+            const tripLabel = `${t('trip')} ${index + 1}`;
+            return (
+              <section className={styles.trip} key={trip.id} aria-labelledby={headingId}>
+                <div className={styles.tripHeading}>
+                  <h5 id={headingId}>{tripLabel}</h5>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      kind="ghost"
+                      size="sm"
+                      renderIcon={TrashCan}
+                      aria-label={`${t('removeTrip')} · ${tripLabel}`}
+                      onClick={() => updateTrips(trips.filter(({ id }) => id !== trip.id))}
+                    >
+                      {t('removeTrip')}
+                    </Button>
+                  )}
+                </div>
+                <div className={`${styles.fields} ${styles.tripFields}`}>
+                  {tripFields.map(({ key, label, type }) => (
+                    <TextInput
+                      key={key}
+                      id={`selection-trip-${trip.id}-${key}`}
+                      labelText={t(label)}
+                      type={type}
+                      max={type === 'date' ? a.admission.date : undefined}
+                      value={trip[key]}
+                      readOnly={readOnly}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        updateTrips(trips.map((row) => (row.id === trip.id ? { ...row, [key]: value } : row)));
+                      }}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </section>
+      </>
     );
+  }
 
   if (stage === 'physical')
     return (

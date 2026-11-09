@@ -1,5 +1,33 @@
 import { interviewQuestions, physicalFields, stiQuestions } from './selection-fields';
-import type { ApplicantHistory, SelectionApplication, SelectionStep } from './selection.types';
+import type { ApplicantHistory, PersonalData, SelectionApplication, SelectionStep } from './selection.types';
+
+const contactNumberRules = {
+  phone: { pattern: /^\d{7}$/, warning: 'phoneDigits' },
+  mobile: { pattern: /^\d{9}$/, warning: 'mobileDigits' },
+} as const;
+
+export function contactNumberWarning(field: keyof typeof contactNumberRules, value: string) {
+  const { pattern, warning } = contactNumberRules[field];
+  return value && !pattern.test(value) ? warning : undefined;
+}
+
+type StoredPersonalData = Omit<PersonalData, 'trips'> & {
+  trips?: PersonalData['trips'];
+  travelPlace?: string;
+  travelDuration?: string;
+  travelDate?: string;
+};
+
+export function normalizePersonalTrips({
+  trips,
+  travelPlace = '',
+  travelDuration = '',
+  travelDate = '',
+  ...personal
+}: StoredPersonalData): PersonalData {
+  const legacyTrip = { id: 1, place: travelPlace, duration: travelDuration, date: travelDate };
+  return { ...personal, trips: trips ?? (travelPlace || travelDuration || travelDate ? [legacyTrip] : []) };
+}
 
 export function today() {
   const date = new Date();
@@ -80,9 +108,7 @@ export function newApplication(): SelectionApplication {
       mobile: '',
       email: '',
       workplace: '',
-      travelPlace: '',
-      travelDuration: '',
-      travelDate: '',
+      trips: [],
     },
     physical: {
       weight: '',
@@ -182,8 +208,21 @@ export function validateStep(application: SelectionApplication, step: SelectionS
     )
       errors.push('addressRequired');
     if (a.personal.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.personal.email)) errors.push('validEmailRequired');
-    if (a.personal.travelDate && (!isDate(a.personal.travelDate) || a.personal.travelDate > a.admission.date))
-      errors.push('validDateRequired');
+  }
+  // Recheck resumed drafts before the physical exam locks their personal data.
+  if ((step === 'personal' || step === 'physical') && !a.completedSteps.includes('physical')) {
+    for (const field of ['phone', 'mobile'] as const) {
+      const warning = contactNumberWarning(field, a.personal[field]);
+      if (warning) errors.push(warning);
+    }
+    if (a.personal.trips.some(({ place, duration, date }) => !place.trim() || !duration.trim() || !date))
+      errors.push('tripDetailsRequired');
+  }
+  if (
+    (step === 'personal' || step === 'physical') &&
+    a.personal.trips.some(({ date }) => date && (!isDate(date) || date > a.admission.date))
+  ) {
+    errors.push('invalidTripDate');
   }
   if (step === 'physical') {
     if (

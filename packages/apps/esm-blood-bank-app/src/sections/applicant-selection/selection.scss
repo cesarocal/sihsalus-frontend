@@ -228,6 +228,30 @@
   gap: layout.$spacing-05;
   margin-block: layout.$spacing-05;
 }
+.trips {
+  display: grid;
+  gap: layout.$spacing-04;
+  margin-block: layout.$spacing-05;
+}
+.tripHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+  h4,
+  h5 {
+    @include type.type-style("heading-compact-01");
+  }
+}
+.trip {
+  padding: layout.$spacing-04;
+  border: 1px solid $ui-03;
+}
+.tripFields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-block: layout.$spacing-03 0;
+}
 .fullWidth {
   grid-column: 1 / -1;
 }

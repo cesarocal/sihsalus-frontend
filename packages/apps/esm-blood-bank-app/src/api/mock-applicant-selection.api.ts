@@ -3,6 +3,7 @@ import {
   calculateReturnDate,
   hasActiveExclusion,
   isFinal,
+  normalizePersonalTrips,
   today,
   validateFinal,
   validateStep,
@@ -35,7 +36,13 @@ export function createMockApplicantSelectionApi(
     const state: MockState = JSON.parse(text);
     if (state.version !== 1 || !Number.isInteger(state.sequence) || !Array.isArray(state.applications))
       throw new Error('INVALID_MOCK_STORAGE');
-    return state;
+    return {
+      ...state,
+      applications: state.applications.map((application) => ({
+        ...application,
+        personal: normalizePersonalTrips(application.personal),
+      })),
+    };
   };
   const history = (
     identity: Pick<AdmissionData, 'documentType' | 'documentNumber' | 'donorCode'>,

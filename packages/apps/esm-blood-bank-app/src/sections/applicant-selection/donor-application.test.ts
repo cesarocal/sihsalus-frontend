@@ -12,9 +12,7 @@ describe('donor application prefill', () => {
     donor.documentType = documentType;
     donor.patientUuid = 'synthetic-patient-reference';
     if (!donor.personal) throw new Error('Missing synthetic demographics');
-    donor.personal.travelPlace = 'Past trip';
-    donor.personal.travelDuration = '20';
-    donor.personal.travelDate = '2026-01-01';
+    donor.personal.trips = [{ id: 1, place: 'Past trip', duration: '20 días', date: '2026-01-01' }];
     const application = newApplicationForDonor(donor);
     expect(application.admission).toMatchObject({
       donorCode: 'DON-0001',
@@ -26,9 +24,7 @@ describe('donor application prefill', () => {
     expect(application.personal).toMatchObject({
       givenName: 'Ana',
       email: 'donante1@example.invalid',
-      travelPlace: '',
-      travelDuration: '',
-      travelDate: '',
+      trips: [],
     });
     expect(application.patientUuid).toBe('synthetic-patient-reference');
     expect(application.visitUuid).toBeUndefined();

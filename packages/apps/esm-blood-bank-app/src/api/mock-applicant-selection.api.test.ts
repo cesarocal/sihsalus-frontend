@@ -10,15 +10,42 @@ describe('applicant selection mock API', () => {
     const api = createMockApplicantSelectionApi();
     const a = validApplication();
     a.personal.givenName = '';
+    a.personal.trips = [
+      { id: 1, place: 'Iquitos', duration: '1 día', date: a.admission.date },
+      { id: 2, place: 'Nauta', duration: '', date: '' },
+    ];
     const first = await api.saveDraft(a);
     expect(first.number).toBe('000005');
     expect(first.status).toBe('draft');
     const second = await createMockApplicantSelectionApi().saveDraft(validApplication());
     expect(second.number).toBe('000006');
-    expect(
-      (await createMockApplicantSelectionApi().listApplications()).find((row) => row.id === first.id)?.personal
-        .givenName,
-    ).toBe('');
+    const restored = (await createMockApplicantSelectionApi().listApplications()).find((row) => row.id === first.id);
+    expect(restored?.personal.givenName).toBe('');
+    expect(restored?.personal.trips).toEqual(a.personal.trips);
+  });
+
+  it('preserves a previously recorded trip and can resume a legacy application with locked personal data', async () => {
+    const application = validApplication();
+    const legacy = {
+      ...application,
+      id: 'mock-legacy-application',
+      completedSteps: ['admission', 'personal', 'physical'],
+      personal: {
+        ...application.personal,
+        trips: undefined,
+        travelPlace: 'Nauta',
+        travelDuration: '',
+        travelDate: application.admission.date,
+      },
+    };
+    sessionStorage.setItem(selectionStorageKey, JSON.stringify({ version: 1, sequence: 5, applications: [legacy] }));
+    const api = createMockApplicantSelectionApi();
+    const [restored] = await api.listApplications();
+    expect(restored.personal.trips).toEqual([
+      { id: 1, place: 'Nauta', duration: '', date: application.admission.date },
+    ]);
+    const saved = await api.completeStep(restored, 'interview');
+    expect(saved.personal.trips).toEqual(restored.personal.trips);
   });
 
   it('separates admission, interview queue and final selection; final saves cannot duplicate', async () => {
