@@ -1,11 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { StrictMode, useState, type ReactNode } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockApplicantSelectionApi } from '../../api/mock-applicant-selection.api';
 import { ApplicantSelectionPage } from './applicant-selection-page.component';
 import { selectionMessages } from './selection-messages';
-import { SelectionReport } from './selection-report.component';
 import { SelectionStageFields } from './selection-stage-fields.component';
 import { validApplication } from './selection.test-helpers';
 import { SelectionWorkflow } from './selection-workflow.component';
@@ -22,6 +20,12 @@ vi.mock('@openmrs/esm-framework', () => ({
   UserFollowIcon: () => null,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
+// A development server renderer may expect React debug internals absent from the production shell.
+vi.mock('react-dom/server', () => ({
+  renderToStaticMarkup: () => {
+    throw new TypeError('ReactDebugCurrentFrame.getCurrentStack is unavailable');
+  },
+}));
 const t = (key: string) => selectionMessages[key]?.es ?? key;
 
 function Fields({ initial, stage }: { initial: SelectionApplication; stage: SelectionStep }) {
@@ -31,6 +35,11 @@ function Fields({ initial, stage }: { initial: SelectionApplication; stage: Sele
 
 describe('applicant selection UI', () => {
   beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    document.querySelectorAll('iframe').forEach((frame) => {
+      frame.remove();
+    });
+  });
 
   it('lists applications, filters by state and searches by document', async () => {
     render(<ApplicantSelectionPage api={createMockApplicantSelectionApi()} />);
@@ -150,16 +159,65 @@ describe('applicant selection UI', () => {
     expect(await screen.findByRole('heading', { name: t('physical') })).toBeInTheDocument();
   });
 
-  it('shows conditional interview details and clears hidden values when changed to no', () => {
+  it.each([
+    ['medication', 'medicationWhich', 'medicationItem', 'addMedication'],
+    ['vaccinated', 'vaccineWhich', 'vaccineItem', 'addVaccine'],
+    ['chronicCondition', 'conditionWhich', 'conditionItem', 'addCondition'],
+  ])('preserves and edits independent %s entries, then clears them on No', (id, key, item, add) => {
+    const application = validApplication();
+    application.interview.answers[id] = 'yes';
+    application.interview.details[key] = 'Detalle anterior';
+    render(<Fields initial={application} stage="interview" />);
+
+    const first = `${t(item)} 1`;
+    expect(screen.getByLabelText(first)).toHaveValue('Detalle anterior');
+    fireEvent.click(screen.getByRole('button', { name: t(add) }));
+    fireEvent.change(screen.getByLabelText(`${t(item)} 2`), { target: { value: 'Detalle nuevo' } });
+    fireEvent.click(screen.getByRole('button', { name: `Eliminar · ${first}` }));
+    expect(screen.getByLabelText(first)).toHaveValue('Detalle nuevo');
+
+    const question = within(screen.getByRole('group', { name: t(id) }));
+    fireEvent.click(question.getByLabelText('No'));
+    expect(screen.queryByRole('button', { name: t(add) })).not.toBeInTheDocument();
+    fireEvent.click(question.getByLabelText('Sí'));
+    expect(screen.getByRole('heading', { name: `${t(key)} (0)` })).toBeInTheDocument();
+    expect(screen.queryByLabelText(first)).not.toBeInTheDocument();
+  });
+
+  it('scrolls to the next question or to a newly opened detail when answering', async () => {
+    const targets: HTMLElement[] = [];
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (this: HTMLElement) {
+      targets.push(this);
+    });
+    try {
+      render(<Fields initial={validApplication()} stage="interview" />);
+      const health = within(screen.getByRole('group', { name: t('feelsWell') }));
+      fireEvent.click(health.getByLabelText('No'));
+      await waitFor(() => expect(targets.at(-1)?.dataset.interviewQuestion).toBe('strenuousActivity'));
+      const medication = within(screen.getByRole('group', { name: t('medication') }));
+      fireEvent.click(medication.getByLabelText('Sí'));
+      await waitFor(() =>
+        expect(targets.at(-1)).toContainElement(screen.getByRole('button', { name: t('addMedication') })),
+      );
+    } finally {
+      scroll.mockRestore();
+    }
+  });
+
+  it('shows the STI guidance and requested order without an interview observations field', () => {
     render(<Fields initial={validApplication()} stage="interview" />);
-    const question = screen.getByRole('group', { name: t('medication') });
-    expect(screen.queryByLabelText(t('medicationWhich'))).not.toBeInTheDocument();
-    fireEvent.click(within(question).getByLabelText('Sí'));
-    fireEvent.change(screen.getByLabelText(t('medicationWhich')), { target: { value: 'Detalle ficticio' } });
-    fireEvent.click(within(question).getByLabelText('No'));
-    expect(screen.queryByLabelText(t('medicationWhich'))).not.toBeInTheDocument();
-    fireEvent.click(within(question).getByLabelText('Sí'));
-    expect(screen.getByLabelText(t('medicationWhich'))).toHaveValue('');
+    expect(screen.queryByLabelText('Observaciones')).not.toBeInTheDocument();
+    expect(screen.queryByText(t('stiGuidanceTitle'))).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('group', { name: t('sti') })).getByLabelText('Sí'));
+    expect(screen.getByText(t('stiGuidanceTitle'))).toBeInTheDocument();
+    expect(screen.getByText(t('stiGuidance'), { exact: false })).toBeInTheDocument();
+    const stiLabels = [t('syphilis'), t('chancroid'), t('gonorrhea'), t('otherSti')];
+    expect(
+      screen
+        .getAllByRole('group')
+        .map((group) => group.querySelector('legend')?.textContent ?? '')
+        .filter((label) => stiLabels.includes(label)),
+    ).toEqual(stiLabels);
   });
 
   it('starts with zero trips and adds or removes independent travel blocks', async () => {
@@ -200,6 +258,8 @@ describe('applicant selection UI', () => {
     expect(screen.queryByText(t('women'))).not.toBeInTheDocument();
     application.personal.sex = 'F';
     view.rerender(<Fields key="female" initial={application} stage="interview" />);
+    expect(screen.getByRole('heading', { name: t('menstruationAndPregnancy') })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: t('deliveryAndBreastfeeding') })).toBeInTheDocument();
     expect(screen.getByLabelText(t('pregnancies'))).toBeInTheDocument();
     expect(screen.getByRole('group', { name: t('pregnant') })).toBeInTheDocument();
   });
@@ -376,8 +436,8 @@ describe('applicant selection UI', () => {
     });
   });
 
-  it.each(['interview', 'qualification'] as const)('shows the observations limit in %s', (stage) => {
-    render(<Fields initial={validApplication()} stage={stage} />);
+  it('shows the observations limit in qualification', () => {
+    render(<Fields initial={validApplication()} stage="qualification" />);
     const observations = screen.getByLabelText('Observaciones');
     expect(observations).toHaveAccessibleDescription('0 / 500 caracteres');
     const overflow = 'a'.repeat(501);
@@ -424,19 +484,94 @@ describe('applicant selection UI', () => {
     expect(screen.getByRole('alert', { name: t('checkForm') })).toHaveFocus();
   });
 
-  it('escapes printable input and includes blank physical-signature spaces', () => {
+  it.each(['awaitingQualification', 'deferred'] as const)('prints a temporary deferral in %s', (status) => {
     const application = validApplication();
+    application.status = status;
+    application.completedSteps = ['admission', 'personal', 'physical', 'qualification'];
+    application.stoppedAfterPhysical = status === 'awaitingQualification';
+    if (!application.stoppedAfterPhysical) {
+      application.completedSteps.splice(3, 0, 'interview');
+      application.interview.answers.medication = 'yes';
+      application.interview.listDetails = {
+        medicationWhich: [
+          { id: 1, value: 'Medicamento A DEMO' },
+          { id: 2, value: 'Medicamento B DEMO' },
+        ],
+      };
+      application.interview.observations = 'Observación histórica DEMO';
+    }
+    Object.assign(application.qualification, { result: 'temporary', duration: '7', reason: 'Motivo sintético' });
     application.personal.givenName = '<script>alert(1)</script>';
     application.personal.trips = [
       { id: 1, place: 'Iquitos', duration: '1 día', date: '2026-01-01' },
       { id: 2, place: 'Nauta', duration: '2 días', date: '2026-01-02' },
     ];
-    const html = renderToStaticMarkup(<SelectionReport application={application} t={t} />);
+    render(
+      <SelectionWorkflow
+        application={application}
+        api={createMockApplicantSelectionApi()}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        t={t}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: t('printForm') });
+    expect(screen.getByRole('heading', { name: t('review') })).toBeInTheDocument();
+    button.focus();
+    fireEvent.click(button);
+    const frame = document.querySelector('iframe');
+    if (!frame?.contentWindow) throw new Error('TEST_PRINT_FRAME_MISSING');
+    const html = frame.srcdoc;
+    expect(html).toContain('@page { size: A4; margin: 12mm; }');
+    expect(html).toContain(t('temporary'));
+    expect(html).toContain('Motivo sintético');
+    if (application.stoppedAfterPhysical) {
+      expect(html).toContain(t('stoppedAfterPhysical'));
+    } else {
+      expect(html).toContain('<li>Medicamento A DEMO</li><li>Medicamento B DEMO</li>');
+      expect(html).not.toContain('Observación histórica DEMO');
+    }
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
     expect(html).toContain('<td>Iquitos</td><td>1 día</td><td>2026-01-01</td>');
     expect(html).toContain('<td>Nauta</td><td>2 días</td><td>2026-01-02</td>');
     expect(html).toContain('data-signatures');
     expect(html).toContain('NO VÁLIDO PARA USO CLÍNICO');
+    const print = vi.fn();
+    vi.spyOn(frame.contentWindow, 'focus').mockImplementation(() => {});
+    Object.defineProperty(frame.contentWindow, 'print', { configurable: true, value: print });
+    frame.onload?.call(frame, new Event('load'));
+    expect(print).toHaveBeenCalledOnce();
+    frame.contentWindow.dispatchEvent(new Event('afterprint'));
+    expect(frame).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
+  it('shows a safe message if the browser cannot print the selection form', () => {
+    const application = validApplication();
+    application.status = 'deferred';
+    render(
+      <SelectionWorkflow
+        application={application}
+        api={createMockApplicantSelectionApi()}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        t={t}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('printForm') }));
+    const frame = document.querySelector('iframe');
+    if (!frame?.contentWindow) throw new Error('TEST_PRINT_FRAME_MISSING');
+    vi.spyOn(frame.contentWindow, 'focus').mockImplementation(() => {});
+    Object.defineProperty(frame.contentWindow, 'print', {
+      configurable: true,
+      value: () => {
+        throw new Error('PRIVATE_PRINTER_ERROR');
+      },
+    });
+    act(() => frame.onload?.call(frame, new Event('load')));
+    expect(screen.getByText(t('printFailed'))).toBeInTheDocument();
+    expect(screen.queryByText('PRIVATE_PRINTER_ERROR')).not.toBeInTheDocument();
   });
 });

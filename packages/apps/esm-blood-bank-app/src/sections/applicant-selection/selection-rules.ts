@@ -1,5 +1,11 @@
 import { observationsExceedLimit } from '../../shared/text-field-contracts';
-import { interviewQuestions, physicalFields, stiQuestions } from './selection-fields';
+import {
+  interviewListEntries,
+  interviewListFields,
+  interviewQuestions,
+  physicalFields,
+  stiQuestions,
+} from './selection-fields';
 import type { ApplicantHistory, PersonalData, SelectionApplication, SelectionStep } from './selection.types';
 
 const contactNumberRules = {
@@ -129,12 +135,12 @@ export function newApplication(): SelectionApplication {
     interview: {
       answers: {},
       details: {},
+      listDetails: {},
       lastPeriod: '',
       pregnant: '',
       breastfeeding: '',
       lastDelivery: '',
       pregnancies: '',
-      observations: '',
     },
     qualification: {
       result: '',
@@ -179,7 +185,7 @@ export function invalidObservationSteps(
   application: SelectionApplication,
   physicalLocked = application.completedSteps.includes('physical'),
 ): SelectionStep[] {
-  return (['physical', 'interview', 'qualification'] as const).filter(
+  return (['physical', 'qualification'] as const).filter(
     (step) => !(step === 'physical' && physicalLocked) && observationsExceedLimit(application[step].observations),
   );
 }
@@ -249,9 +255,16 @@ export function validateStep(application: SelectionApplication, step: SelectionS
   if (step === 'interview') {
     if (interviewQuestions.some((q) => !a.interview.answers[q.id])) errors.push('answerAllQuestions');
     if (
-      interviewQuestions.some(
-        (q) => q.detail && a.interview.answers[q.id] === 'yes' && !a.interview.details[q.detail]?.trim(),
-      )
+      interviewQuestions.some((q) => {
+        if (a.interview.answers[q.id] !== 'yes') return false;
+        if (q.list) {
+          const entries = interviewListEntries(a.interview, q.list);
+          return (
+            (interviewListFields[q.list].required && !entries.length) || entries.some(({ value }) => !value.trim())
+          );
+        }
+        return q.detail && !a.interview.details[q.detail]?.trim();
+      })
     )
       errors.push('answerDetails');
     if (a.interview.answers.sti === 'yes' && stiQuestions.some((id) => !a.interview.answers[id]))

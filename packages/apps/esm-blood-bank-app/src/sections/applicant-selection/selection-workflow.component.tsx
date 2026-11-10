@@ -14,6 +14,7 @@ import { Printer } from '@carbon/react/icons';
 import { showSnackbar } from '@openmrs/esm-framework';
 import { useEffect, useRef, useState } from 'react';
 import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
+import { printDocument } from '../../shared/print-document';
 import {
   hasActiveExclusion,
   invalidObservationSteps,
@@ -22,7 +23,7 @@ import {
   validateFinal,
   validateStep,
 } from './selection-rules';
-import { printSelectionReport, SelectionReport } from './selection-report.component';
+import { SelectionReport, selectionPrintCss } from './selection-report.component';
 import { SelectionStageFields } from './selection-stage-fields.component';
 import { notifySuccess } from '../../shared/notify-success';
 import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirmation.component';
@@ -56,6 +57,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
   const [history, setHistory] = useState<ApplicantHistory | null>(null);
   const [lookup, setLookup] = useState<'pending' | 'ready' | 'error'>('pending');
   const [saving, setSaving] = useState(false);
+  const [printFailed, setPrintFailed] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [closeRequested, setCloseRequested] = useState(false);
   const [warningsOpen, setWarningsOpen] = useState(false);
@@ -292,6 +294,20 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     else onClose();
   };
 
+  const printForm = () => {
+    setPrintFailed(false);
+    try {
+      printDocument(
+        <SelectionReport application={data} t={t} />,
+        t('reportTitle'),
+        () => setPrintFailed(true),
+        selectionPrintCss,
+      );
+    } catch {
+      setPrintFailed(true);
+    }
+  };
+
   return (
     <>
       <ComposedModal
@@ -350,6 +366,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
               </ul>
             </div>
           )}
+          {printFailed && <InlineNotification hideCloseButton kind="error" title={t('printFailed')} />}
           {!finalized && lookup === 'error' && (
             <InlineNotification hideCloseButton kind="error" title={t('historyFailed')} />
           )}
@@ -404,7 +421,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
               {t('previous')}
             </Button>
             {(stage === 'review' || finalized) && (
-              <Button type="button" kind="tertiary" renderIcon={Printer} onClick={() => printSelectionReport(data, t)}>
+              <Button type="button" kind="tertiary" renderIcon={Printer} onClick={printForm}>
                 {t('printForm')}
               </Button>
             )}

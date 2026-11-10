@@ -13,7 +13,7 @@ export const processingPrintCss = `
   [data-label] { max-width: 110mm; padding: 8mm; border: 1px solid #111; }
   [data-demo] { text-align: center; font-weight: bold; padding: 6pt; border: 1px solid #111; }
 `;
-export function printDocument(content: ReactNode, title: string, onError?: () => void) {
+export function printDocument(content: ReactNode, title: string, onError?: () => void, css = processingPrintCss) {
   // Use the shell's shared client renderer. A dev server renderer can depend on
   // React debug internals that the production shell does not provide.
   // The detached tree contains only our presentational print components.
@@ -60,7 +60,7 @@ export function printDocument(content: ReactNode, title: string, onError?: () =>
     }
   };
   const language = document.documentElement.lang === 'en' ? 'en' : 'es';
-  frame.srcdoc = `<!doctype html><html lang="${language}"><head><meta charset="utf-8"><style>${processingPrintCss}</style></head><body>${markup}</body></html>`;
+  frame.srcdoc = `<!doctype html><html lang="${language}"><head><meta charset="utf-8"><style>${css}</style></head><body>${markup}</body></html>`;
   document.body.appendChild(frame);
   setTimeout(() => frame.remove(), 120000);
 }

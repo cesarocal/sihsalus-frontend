@@ -12,7 +12,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - Selección del postulante incluye listado, filtros, formulario por etapas e impresión. Su avance se conserva en `sessionStorage` de la pestaña, exclusivamente para datos sintéticos.
   Teléfono y celular son opcionales. Si se ingresan, deben tener exactamente 7 y 9 dígitos respectivamente antes de completar Datos personales o Examen físico.
   Los viajes son opcionales y se registran como una lista de lugar, permanencia y fecha. El mock recupera como un viaje los datos guardados con el formato anterior.
-  Las observaciones del examen físico, entrevista y precalificación admiten hasta 500 unidades UTF-16.
+  Las observaciones del examen físico y precalificación admiten hasta 500 unidades UTF-16.
 - Extracción incluye cola de seleccionados, etiquetas de unidad/tubo, volumen, registro y constancia imprimible.
 - Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
 - Transferencias separa Recibidas / Pendientes y Solicitadas con pestañas Carbon. Incluye registro manual e historial independiente, generación e impresión FR09 de solicitudes a otras instituciones, selección y reserva de recibidas, constancia FR11, entrega y proyección administrativa del libro FR10. Generar una solicitud no envía correos ni compromete stock local. Las unidades entregadas pasan de Por transferir a Transferido, sin En tránsito. Ver [Transferencias](src/sections/transfers/README.md).
@@ -95,6 +95,7 @@ El usuario necesita `app:home.bancoSangre` y `app:home.bancoSangre.seleccionPost
 No cambia el login, el navbar compartido, ni añade un standalone.
 
 Incluye Admisión → Datos personales → Examen físico → Entrevista → Precalificación → Revisión.
+La entrevista registra medicamentos, vacunas y enfermedades en listas. Revisión e impresión leen tanto las listas como los detalles de formularios anteriores.
 Al finalizar el examen físico regresa al listado: **Entrevistar** permite revisar las tres primeras etapas sin editarlas.
 La X abre una confirmación con dos acciones: **Seguir editando** y **Salir**. La casilla **Guardar el avance antes de salir** está marcada por defecto en Selección, Extracción y Tamizaje. Desmarcarla descarta solo los cambios no guardados, sin eliminar el registro previo. Durante el guardado no se permite otra salida ni un segundo envío; un fallo mantiene el formulario y su edición. Los documentos finalizados conservan su cierre de consulta sin guardar. La advertencia del examen físico mantiene sus tres decisiones clínicas independientes.
 La revisión incluye el formulario imprimible para firmas físicas.
@@ -187,11 +188,13 @@ para los contratos, límites de impresión y validación clínica pendiente.
 
 Los botones de imprimir acta/sellos usan el estilo azul `ghost` con icono y
 se sitúan en el pie izquierdo de Inventario, también en el detalle histórico.
-El helper de impresión de procesamiento usa el renderer cliente compartido con
+El helper de impresión de Banco de Sangre usa el renderer cliente compartido con
 el shell para preparar un árbol temporal desconectado del DOM y lo desmonta antes
 de imprimir. Evita depender de internals de depuración de React al combinar el
 ESM de desarrollo con el shell de producción. No cambia componentes globales,
 estados de unidades ni las reglas de confirmación del sello.
+El formato de selección usa este helper con su propia hoja de estilos A4 y
+muestra un aviso si falla la impresión.
 
 ## Desarrollo integrado con OpenMRS
 

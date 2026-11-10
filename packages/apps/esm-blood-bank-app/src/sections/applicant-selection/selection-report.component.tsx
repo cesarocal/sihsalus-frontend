@@ -1,6 +1,14 @@
-import { renderToStaticMarkup } from 'react-dom/server';
 import { ageOnDate, calculateReturnDate } from './selection-rules';
-import { interviewQuestions, personalFields, physicalFields, stiQuestions, tripFields } from './selection-fields';
+import {
+  interviewGeneralGroups,
+  interviewListEntries,
+  interviewQuestions,
+  personalFields,
+  physicalFields,
+  stiQuestions,
+  tripFields,
+  type InterviewQuestion,
+} from './selection-fields';
 import type { SelectionApplication, SelectionTranslate } from './selection.types';
 import styles from './selection.scss';
 
@@ -18,6 +26,48 @@ export function SelectionReport({ application: a, t }: { application: SelectionA
       <td>{t(id)}</td>
       <td>{value(a.interview.answers[id] ? t(a.interview.answers[id]) : '')}</td>
     </tr>
+  );
+  const interviewGroup = (group: InterviewQuestion['group']) => (
+    <section key={group}>
+      <h4>{t(group)}</h4>
+      <table>
+        <tbody>
+          {interviewQuestions
+            .filter((q) => q.group === group)
+            .map((q) => {
+              const answer = a.interview.answers[q.id];
+              const entries = q.list && answer === 'yes' ? interviewListEntries(a.interview, q.list) : [];
+              return (
+                <tr key={q.id}>
+                  <td>
+                    {t(q.id)}
+                    {q.detail && answer === 'yes' && (
+                      <p>
+                        {t(q.detail)}: {value(a.interview.details[q.detail])}
+                      </p>
+                    )}
+                    {q.list && answer === 'yes' && (
+                      <div>
+                        <p>
+                          {t(q.list)} ({entries.length})
+                        </p>
+                        {entries.length > 0 && (
+                          <ul>
+                            {entries.map((entry) => (
+                              <li key={entry.id}>{value(entry.value)}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td>{value(answer ? t(answer) : '')}</td>
+                </tr>
+              );
+            })}
+        </tbody>
+      </table>
+    </section>
   );
   return (
     <article className={styles.report} data-selection-report>
@@ -85,40 +135,7 @@ export function SelectionReport({ application: a, t }: { application: SelectionA
       </dl>
       {a.stoppedAfterPhysical && <p>{t('stoppedAfterPhysical')}</p>}
       <h3>{t('interview')}</h3>
-      {['general', 'nextDay', 'lastTwoWeeks', 'lastMonth', 'lastYear', 'lifetime', 'withInterviewer'].map((group) => (
-        <section key={group}>
-          <h4>{t(group)}</h4>
-          <table>
-            <tbody>
-              {interviewQuestions
-                .filter((q) => q.group === group)
-                .map((q) => (
-                  <tr key={q.id}>
-                    <td>
-                      {t(q.id)}
-                      {q.detail && a.interview.answers[q.id] === 'yes' && (
-                        <p>
-                          {t(q.detail)}: {value(a.interview.details[q.detail])}
-                        </p>
-                      )}
-                    </td>
-                    <td>{value(a.interview.answers[q.id] ? t(a.interview.answers[q.id]) : '')}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
-      {a.interview.answers.sti === 'yes' && (
-        <table>
-          <tbody>{stiQuestions.map(question)}</tbody>
-        </table>
-      )}
-      {a.interview.answers.sti === 'yes' && a.interview.answers.otherSti === 'yes' && (
-        <p>
-          {t('otherSti')}: {value(a.interview.details.otherSti)}
-        </p>
-      )}
+      {interviewGeneralGroups.map(interviewGroup)}
       {a.personal.sex === 'F' && (
         <section>
           <h4>{t('women')}</h4>
@@ -131,9 +148,17 @@ export function SelectionReport({ application: a, t }: { application: SelectionA
           </dl>
         </section>
       )}
-      <p>
-        {t('observations')}: {value(a.interview.observations)}
-      </p>
+      {interviewGroup('withInterviewer')}
+      {a.interview.answers.sti === 'yes' && (
+        <table>
+          <tbody>{stiQuestions.map(question)}</tbody>
+        </table>
+      )}
+      {a.interview.answers.sti === 'yes' && a.interview.answers.otherSti === 'yes' && (
+        <p>
+          {t('otherSti')}: {value(a.interview.details.otherSti)}
+        </p>
+      )}
       <h3>{t('qualification')}</h3>
       <dl>
         {item('result', a.qualification.result ? t(a.qualification.result) : '')}
@@ -177,19 +202,3 @@ export const selectionPrintCss = `
   [data-fingerprint] { display: inline-block; border: 1px solid #111; width: 20mm; height: 20mm; vertical-align: middle; }
   footer { margin-top: 15pt; font-size: 9pt; border-top: 1px solid #777; padding-top: 6pt; }
 `;
-
-/** Isolated print document: no global shell CSS, no pop-up, and React escapes every value. */
-export function printSelectionReport(application: SelectionApplication, t: SelectionTranslate) {
-  const frame = document.createElement('iframe');
-  frame.title = t('reportTitle');
-  frame.style.cssText = 'position:fixed;width:0;height:0;border:0;';
-  const remove = () => frame.remove();
-  frame.onload = () => {
-    frame.contentWindow?.addEventListener('afterprint', remove, { once: true });
-    frame.contentWindow?.focus();
-    frame.contentWindow?.print();
-  };
-  frame.srcdoc = `<!doctype html><html lang="${document.documentElement.lang || 'es'}"><head><meta charset="utf-8"><style>${selectionPrintCss}</style></head><body>${renderToStaticMarkup(<SelectionReport application={application} t={t} />)}</body></html>`;
-  document.body.appendChild(frame);
-  setTimeout(remove, 120000);
-}

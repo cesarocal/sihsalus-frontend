@@ -270,6 +270,48 @@
     margin-top: layout.$spacing-04;
   }
 }
+.interviewList {
+  display: grid;
+  gap: layout.$spacing-03;
+  margin-top: layout.$spacing-04;
+}
+.interviewListHeader,
+.interviewEntry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+}
+.interviewListHeader {
+  align-items: center;
+  justify-content: space-between;
+  h4 {
+    @include type.type-style("heading-compact-01");
+  }
+}
+.interviewEntry {
+  align-items: end;
+  :global(.cds--text-input-wrapper) {
+    flex: 1;
+    min-width: 10rem;
+    margin: 0;
+  }
+}
+.womenQuestions {
+  display: grid;
+  align-content: start;
+  gap: layout.$spacing-04;
+  border: 1px solid $ui-03;
+  padding: layout.$spacing-04;
+  h4 {
+    @include type.type-style("heading-compact-01");
+  }
+}
+.stiGuidance {
+  margin-top: layout.$spacing-04;
+  :global(.cds--inline-notification) {
+    max-width: none;
+  }
+}
 .qualification {
   display: grid;
   grid-template-columns: minmax(15rem, 1fr) 2fr;

@@ -30,7 +30,7 @@ editable, incluso si no puede guardarse.
 ## Observaciones de Banco de Sangre
 
 El frontend y los adaptadores mock admiten hasta 500 unidades UTF-16 por campo
-de observaciones en examen físico, entrevista, precalificación, registro de
+de observaciones en examen físico, precalificación, registro de
 donación, resultados de tamizaje, fraccionamiento y detección de seguimientos.
 Se conserva el texto completo al exceder el límite y el formulario pide
 corregirlo antes de guardar. Las observaciones de etapas bloqueadas y registros

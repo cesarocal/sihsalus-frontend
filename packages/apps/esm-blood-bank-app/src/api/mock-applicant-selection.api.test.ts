@@ -14,6 +14,7 @@ describe('applicant selection mock API', () => {
       { id: 1, place: 'Iquitos', duration: '1 día', date: a.admission.date },
       { id: 2, place: 'Nauta', duration: '', date: '' },
     ];
+    a.interview.listDetails = { medicationWhich: [{ id: 1, value: 'Medicamento DEMO' }] };
     const first = await api.saveDraft(a);
     expect(first.number).toBe('000005');
     expect(first.status).toBe('draft');
@@ -22,6 +23,7 @@ describe('applicant selection mock API', () => {
     const restored = (await createMockApplicantSelectionApi().listApplications()).find((row) => row.id === first.id);
     expect(restored?.personal.givenName).toBe('');
     expect(restored?.personal.trips).toEqual(a.personal.trips);
+    expect(restored?.interview.listDetails).toEqual(a.interview.listDetails);
   });
 
   it('preserves a previously recorded trip and observations when resuming a locked legacy examination', async () => {
@@ -52,7 +54,6 @@ describe('applicant selection mock API', () => {
 
   it.each([
     'physical',
-    'interview',
     'qualification',
   ] as const)('rejects oversized %s observations on drafts and stage saves without changing stored data', async (stage) => {
     const api = createMockApplicantSelectionApi();

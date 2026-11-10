@@ -88,6 +88,24 @@ describe('selection rules', () => {
     expect(validateStep(a, 'interview')).toEqual([]);
   });
 
+  it('accepts zero vaccine entries and requires complete entries for affirmative medications and conditions', () => {
+    const a = validApplication();
+    a.interview.answers.vaccinated = 'yes';
+    expect(validateStep(a, 'interview')).toEqual([]);
+    a.interview.answers.medication = 'yes';
+    a.interview.answers.chronicCondition = 'yes';
+    a.interview.listDetails = {
+      medicationWhich: [{ id: 1, value: 'Medicamento DEMO' }],
+      conditionWhich: [
+        { id: 1, value: 'Enfermedad DEMO' },
+        { id: 2, value: '' },
+      ],
+    };
+    expect(validateStep(a, 'interview')).toContain('answerDetails');
+    a.interview.listDetails.conditionWhich?.pop();
+    expect(validateStep(a, 'interview')).toEqual([]);
+  });
+
   it('requires all STI branches and the other-type description', () => {
     const a = validApplication();
     a.interview.answers.sti = 'yes';

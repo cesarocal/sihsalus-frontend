@@ -66,15 +66,24 @@ export interface PhysicalData {
   warningAcknowledgement: string;
 }
 
+export type InterviewListKey = 'medicationWhich' | 'vaccineWhich' | 'conditionWhich';
+
+export interface InterviewListEntry {
+  id: number;
+  value: string;
+}
+
 export interface InterviewData {
   answers: Record<string, Answer>;
   details: Record<string, string>;
+  listDetails?: Partial<Record<InterviewListKey, InterviewListEntry[]>>;
   lastPeriod: string;
   pregnant: Answer;
   breastfeeding: Answer;
   lastDelivery: string;
   pregnancies: string;
-  observations: string;
+  /** Retained in historical records created before the interview field was removed. */
+  observations?: string;
 }
 
 export interface QualificationData {

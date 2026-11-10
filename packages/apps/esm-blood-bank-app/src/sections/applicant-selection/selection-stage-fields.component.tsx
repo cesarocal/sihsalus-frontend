@@ -3,8 +3,9 @@ import { Add, TrashCan } from '@carbon/react/icons';
 import type { ChangeEvent } from 'react';
 import { ObservationsTextArea } from '../../shared/observations-text-area.component';
 import { ageOnDate, calculateReturnDate, contactNumberWarning } from './selection-rules';
-import { interviewQuestions, personalFields, physicalFields, stiQuestions, tripFields } from './selection-fields';
-import type { Answer, ApplicantTrip, SelectionApplication, SelectionStep, SelectionTranslate } from './selection.types';
+import { personalFields, physicalFields, tripFields } from './selection-fields';
+import { SelectionInterview } from './selection-interview.component';
+import type { ApplicantTrip, SelectionApplication, SelectionStep, SelectionTranslate } from './selection.types';
 import styles from './selection.scss';
 
 interface StageFieldsProps {
@@ -13,35 +14,6 @@ interface StageFieldsProps {
   readOnly: boolean;
   update: (application: SelectionApplication) => void;
   t: SelectionTranslate;
-}
-
-export function YesNo({
-  id,
-  label,
-  value,
-  onChange,
-  readOnly,
-  t,
-}: {
-  id: string;
-  label: string;
-  value: Answer;
-  onChange: (answer: Answer) => void;
-  readOnly?: boolean;
-  t: SelectionTranslate;
-}) {
-  return (
-    <RadioButtonGroup
-      legendText={label}
-      name={`selection-${id}`}
-      valueSelected={value}
-      onChange={(value) => onChange(value as Answer)}
-      disabled={readOnly}
-    >
-      <RadioButton id={`selection-${id}-yes`} labelText={t('yes')} value="yes" />
-      <RadioButton id={`selection-${id}-no`} labelText={t('no')} value="no" />
-    </RadioButtonGroup>
-  );
 }
 
 export function SelectionStageFields({ application: a, stage, readOnly, update, t }: StageFieldsProps) {
@@ -84,7 +56,7 @@ export function SelectionStageFields({ application: a, stage, readOnly, update, 
       </Select>
     );
   };
-  const notes = (section: 'physical' | 'interview' | 'qualification', key = 'observations') => {
+  const notes = (section: 'physical' | 'qualification', key = 'observations') => {
     const value = (a[section] as unknown as Record<string, string>)[key] ?? '';
     const props = {
       id: `selection-${section}-${key}`,
@@ -251,124 +223,16 @@ export function SelectionStageFields({ application: a, stage, readOnly, update, 
       </>
     );
 
-  if (stage === 'interview') {
-    const answer = (id: string, value: Answer) => {
-      const question = interviewQuestions.find((q) => q.id === id);
-      const details = { ...a.interview.details };
-      const answers = { ...a.interview.answers, [id]: value };
-      if (question?.detail && value !== 'yes') delete details[question.detail];
-      if (id === 'sti' && value !== 'yes') {
-        for (const item of stiQuestions) delete answers[item];
-        delete details.otherSti;
-      }
-      if (id === 'otherSti' && value !== 'yes') delete details.otherSti;
-      update({ ...a, interview: { ...a.interview, answers, details } });
-    };
-    const detail = (id: string) => (
-      <TextInput
-        id={`selection-detail-${id}`}
-        labelText={t(id)}
-        value={a.interview.details[id] ?? ''}
+  if (stage === 'interview')
+    return (
+      <SelectionInterview
+        interview={a.interview}
+        sex={a.personal.sex}
         readOnly={readOnly}
-        onChange={(event) =>
-          update({ ...a, interview: { ...a.interview, details: { ...a.interview.details, [id]: event.target.value } } })
-        }
+        onChange={(interview) => update({ ...a, interview })}
+        t={t}
       />
     );
-    return (
-      <>
-        {['general', 'nextDay', 'lastTwoWeeks', 'lastMonth', 'lastYear', 'lifetime'].map((group) => (
-          <section className={styles.questionGroup} key={group}>
-            <h3>{t(group)}</h3>
-            {interviewQuestions
-              .filter((q) => q.group === group)
-              .map((q) => (
-                <div className={styles.question} key={q.id}>
-                  <YesNo
-                    id={q.id}
-                    label={t(q.id)}
-                    value={a.interview.answers[q.id] ?? ''}
-                    onChange={(value) => answer(q.id, value)}
-                    readOnly={readOnly}
-                    t={t}
-                  />
-                  {q.detail && a.interview.answers[q.id] === 'yes' && detail(q.detail)}
-                </div>
-              ))}
-          </section>
-        ))}
-        {a.personal.sex === 'F' && (
-          <section className={styles.questionGroup}>
-            <h3>{t('women')}</h3>
-            <div className={styles.fields}>
-              {['lastPeriod', 'lastDelivery', 'pregnancies'].map((key) => (
-                <TextInput
-                  key={key}
-                  id={`selection-${key}`}
-                  labelText={t(key)}
-                  type={key === 'pregnancies' ? 'number' : 'date'}
-                  min={key === 'pregnancies' ? 0 : undefined}
-                  value={a.interview[key as 'lastPeriod' | 'lastDelivery' | 'pregnancies']}
-                  readOnly={readOnly}
-                  onChange={(event) => update({ ...a, interview: { ...a.interview, [key]: event.target.value } })}
-                />
-              ))}
-            </div>
-            <YesNo
-              id="pregnant"
-              label={t('pregnant')}
-              value={a.interview.pregnant}
-              onChange={(value) => update({ ...a, interview: { ...a.interview, pregnant: value } })}
-              readOnly={readOnly}
-              t={t}
-            />
-            <YesNo
-              id="breastfeeding"
-              label={t('breastfeeding')}
-              value={a.interview.breastfeeding}
-              onChange={(value) => update({ ...a, interview: { ...a.interview, breastfeeding: value } })}
-              readOnly={readOnly}
-              t={t}
-            />
-          </section>
-        )}
-        <section className={styles.questionGroup}>
-          <h3>{t('withInterviewer')}</h3>
-          {interviewQuestions
-            .filter((q) => q.group === 'withInterviewer')
-            .map((q) => (
-              <div className={styles.question} key={q.id}>
-                <YesNo
-                  id={q.id}
-                  label={t(q.id)}
-                  value={a.interview.answers[q.id] ?? ''}
-                  onChange={(value) => answer(q.id, value)}
-                  readOnly={readOnly}
-                  t={t}
-                />
-              </div>
-            ))}
-          {a.interview.answers.sti === 'yes' && (
-            <div className={styles.fields}>
-              {stiQuestions.map((id) => (
-                <YesNo
-                  key={id}
-                  id={id}
-                  label={t(id)}
-                  value={a.interview.answers[id] ?? ''}
-                  onChange={(value) => answer(id, value)}
-                  readOnly={readOnly}
-                  t={t}
-                />
-              ))}
-              {a.interview.answers.otherSti === 'yes' && detail('otherSti')}
-            </div>
-          )}
-        </section>
-        {notes('interview')}
-      </>
-    );
-  }
 
   if (stage === 'qualification')
     return (
