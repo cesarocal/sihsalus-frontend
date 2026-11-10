@@ -227,16 +227,12 @@ export function validateFractionation(batch: FractionationBatch, step: Fractiona
     errors.add('fractionationProcessRequired');
   if (leaves.some((node) => node.parentId === null)) errors.add('fractionationFinishBranches');
   // EG05-CC07 E7: the general multi-component flow does not implement low-volume red-cell preparation.
-  if (
-    batch.sources.some(
-      (source) =>
-        source.component === 'wholeBlood' &&
-        Number(source.volume) >= 300 &&
-        Number(source.volume) <= 400 &&
-        Number(source.nominalVolume) === 450,
-    )
-  )
-    errors.add('fractionationLowVolume');
+  for (const source of batch.sources) {
+    const volume = Number(source.volume);
+    if (source.component !== 'wholeBlood' || !(volume >= 300 && volume <= 400)) continue;
+    if (!positiveVolume(source.nominalVolume)) errors.add('fractionationNominalVolumeUnavailable');
+    else if (Number(source.nominalVolume) === 450) errors.add('fractionationLowVolume');
+  }
   if (end >= 1) {
     for (const node of leaves) {
       const label = node.label;

@@ -17,9 +17,9 @@ reabre el formulario al recargar la cola. Se mantienen el permiso de Extracción
 en consulta y la confirmación de salida.
 
 1. Extracción lista solo Seleccionados. **Extraer sangre** abre cuatro etapas: Etiqueta, Cantidad extraída, Registro y Constancia.
-2. Etiqueta captura sangre o componente, volumen aproximado, servicio de recolección, responsable y leucocitos reducidos. Requiere un anticoagulante del catálogo, una solución de conservación en texto o ambos. El agente sedimentario es opcional. Autóloga habilita receptor, documento, servicio e historia.
-3. Completar Etiqueta genera una muestra visible en Tamizaje, sin duplicarla. Puede imprimir vistas de unidad/tubo con marca DEMO, no etiquetas institucionales ni barcodes. Las impresiones son vistas previas; no se auditan contadores.
-4. Volumen exige número positivo decimal (hasta dos decimales, límite técnico DECIMAL(8,2), no recomendación clínica). Continuar ingresa la unidad mock en cuarentena y la muestra en Inventario. Reacción adversa queda deshabilitada y pendiente.
+2. Etiqueta captura sangre o componente, servicio de recolección y leucocitos reducidos. El responsable se obtiene del nombre de la persona autenticada en OpenMRS. El campo es de solo lectura y, al cerrar la etapa, conserva el nombre registrado. Requiere un anticoagulante del catálogo, una solución de conservación en texto o ambos. El agente sedimentario es opcional. Autóloga habilita receptor, documento, servicio e historia.
+3. Solo Etiqueta ofrece las dos impresiones. La de unidad deja un espacio para escribir el volumen en mL. La de tubo usa un recuadro rectangular de 65 mm de ancho. Completar Etiqueta genera una muestra visible en Tamizaje, sin duplicarla.
+4. Cantidad extraída exige un número positivo con hasta dos decimales (límite técnico DECIMAL(8,2)). Continuar ingresa la unidad mock en Inventario en cuarentena. Reacción adversa queda deshabilitada y pendiente.
 5. Registro guarda fecha, lote de bolsa, complicaciones, completa/incompleta, responsable y notas. La donación efectiva actualiza Donantes.
 6. Constancia deriva identidad/edad/grupo/Rh/Hb/Hct, permite decidir correo y fecha de resultados (diez días calendario por defecto). No envía correos. Guardar finaliza y retira la postulación del listado activo; la conserva para antecedentes/autocompletado.
 7. Tamizaje lista muestras, permite buscar y filtrar por estado/resultado. Recepción exige responsable, fecha/hora y confirmación de concordancia de nombre/documento/código entre tubo y registro.
@@ -32,7 +32,7 @@ El [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) documenta 
 
 **La unidad permanece en cuarentena con cualquier resultado. Reactivo no confirma diagnóstico.** Liberación/descarte, confirmaciones/repeticiones, sello de calidad, seguimiento, rechazo/reemplazo de muestras y reacción adversa están pendientes. El riesgo biológico autólogo no se infiere automáticamente de un tamizaje único.
 
-El panel proviene de los documentos entregados; necesita validación del protocolo vigente antes de uso clínico. Las impresiones son adaptaciones DEMO con firma física, no reproducciones oficiales ni PDF archivados en OpenMRS.
+El panel proviene de los documentos entregados y necesita validación del protocolo vigente antes de uso clínico. Las etiquetas muestran los datos del entorno activo. La constancia conserva su marca DEMO y su espacio para firma física.
 
 ## Organización y API futura
 
@@ -54,6 +54,8 @@ En la configuración del microfrontend, `collectionLabelConcepts.bloodBankServic
 Con guardado mock y los tres UUID vacíos, el flujo usa un catálogo de demostración. Al configurar los UUID se consulta OpenMRS y se permite reintentar ante un error. La selección conserva el UUID y el nombre para impresión. Los documentos guardados conservan su etiqueta. En borradores antiguos, el servicio requiere seleccionar un concepto antes de continuar.
 
 La muestra postextracción se genera como **Sangre** en **Tubo** en el mock, conservando los datos de muestras previas. El OMOD deberá asignar los conceptos de tipo y recipiente y acordar dónde persistir el texto de conservación, dado que el DDL propone una referencia a concepto para ese dato.
+
+Los registros históricos conservan el volumen aproximado. Para las nuevas extracciones, Fraccionamiento requiere conocer la capacidad nominal de la bolsa cuando la validación de bajo volumen depende de ese dato. Al integrar el OMOD, el responsable debe identificarse a partir de la sesión autenticada del servidor.
 
 | Datos                   | Mapeo previsto                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------ |

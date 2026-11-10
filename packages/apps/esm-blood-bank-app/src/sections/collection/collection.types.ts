@@ -13,7 +13,8 @@ export interface CollectionLabel {
   anticoagulantConceptUuid?: string;
   preservative: string;
   sedimentingAgent: string;
-  plannedVolume: string;
+  /** Historical label value used by fractionation as the recorded nominal capacity. */
+  plannedVolume?: string;
   service: string;
   serviceConceptUuid?: string;
   collectedBy: string;

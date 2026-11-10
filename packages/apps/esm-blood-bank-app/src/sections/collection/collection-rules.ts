@@ -23,7 +23,6 @@ export function newCollection(application: SelectionApplication): CollectionReco
       anticoagulant: '',
       preservative: '',
       sedimentingAgent: '',
-      plannedVolume: '',
       service: '',
       collectedBy: '',
       leukocytesReduced: false,
@@ -55,12 +54,12 @@ export function validateCollectionText(record: CollectionRecord): string[] {
 export function validateCollection(record: CollectionRecord, step: CollectionStep): string[] {
   const missing = validateCollectionText(record);
   if (step === 'label') {
-    for (const field of ['component', 'collectedBy'] as const) if (!record.label[field].trim()) missing.push(field);
+    if (!record.label.component.trim()) missing.push('component');
+    if (!record.label.collectedBy.trim()) missing.push('collectionOperatorUnavailable');
     const savedLabel = record.completedSteps.includes('label');
     if (!record.label.service.trim() || (!savedLabel && !record.label.serviceConceptUuid)) missing.push('service');
     const hasAnticoagulant = record.label.anticoagulant.trim() && (savedLabel || record.label.anticoagulantConceptUuid);
     if (!hasAnticoagulant && !record.label.preservative.trim()) missing.push('anticoagulantOrPreservative');
-    if (!validVolume(record.label.plannedVolume)) missing.push('plannedVolume');
     if (record.application.admission.donationType === 'autologous')
       for (const field of ['recipientName', 'recipientDocument'] as const)
         if (!record.label[field].trim()) missing.push(field);

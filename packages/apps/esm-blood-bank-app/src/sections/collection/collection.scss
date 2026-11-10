@@ -1,0 +1,7 @@
+@use "@carbon/layout";
+
+.quarantineNotice:global(.cds--inline-notification) {
+  inline-size: 100%;
+  max-inline-size: none;
+  margin-block-start: layout.$spacing-05;
+}

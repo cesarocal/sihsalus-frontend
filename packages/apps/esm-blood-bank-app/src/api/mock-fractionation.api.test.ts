@@ -293,4 +293,13 @@ describe('fractionation tree and quality boundaries', () => {
     batch.sources[0].volume = '350';
     expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationLowVolume');
   });
+  it('requires nominal bag capacity for the existing low-volume check', async () => {
+    const instance = createMockFractionationApi();
+    const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
+    const batch = plannedBatch(await instance.start([unit?.id ?? '']));
+    Object.assign(batch.sources[0], { volume: '350', nominalVolume: '' });
+    expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationNominalVolumeUnavailable');
+    batch.sources[0].volume = '420';
+    expect(validateFractionation(batch, 'fractionationPlan')).not.toContain('fractionationNominalVolumeUnavailable');
+  });
 });

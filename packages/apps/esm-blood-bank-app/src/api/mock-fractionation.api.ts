@@ -73,7 +73,7 @@ export function fractionationStore(state: ProcessingState): FractionationStore {
       originalWholeBloodCode: record.unitCode,
       component: 'wholeBlood',
       volume: record.extractedVolume,
-      nominalVolume: record.label.plannedVolume,
+      nominalVolume: record.label.plannedVolume ?? '',
       collectedAt: record.registry.date,
       location: record.label.service,
       state: 'quarantine',

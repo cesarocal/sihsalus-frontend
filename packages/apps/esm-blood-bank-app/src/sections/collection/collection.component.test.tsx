@@ -15,10 +15,16 @@ import { screeningTests } from '../laboratory/screening/screening.types';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { showSnackbar } from '@openmrs/esm-framework';
 
+const sessionPerson = vi.hoisted(() => ({ display: 'Rosa Torres García' }));
+
 vi.mock('@openmrs/esm-framework', () => ({
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
   PageHeaderContent: ({ title }: { title: string }) => <div>{title}</div>,
-  useSession: () => ({ sessionLocation: { display: 'Hospital de prueba' } }),
+  useSession: () => ({
+    authenticated: true,
+    user: { username: 'operador.demo', person: sessionPerson },
+    sessionLocation: { display: 'Hospital de prueba' },
+  }),
   formatDatetime: () => '03 oct 2026, 13:47',
   showSnackbar: vi.fn(),
   BloodBankPictogram: () => null,
@@ -28,7 +34,10 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fal
 const t = (key: string) => (spanish.processing as Record<string, string>)[key] ?? key;
 const api = () => createMockProcessingApi(createMockApplicantSelectionApi());
 describe('collection and screening screens', () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => {
+    sessionStorage.clear();
+    sessionPerson.display = 'Rosa Torres García';
+  });
   it.each([
     'collection',
     'screening',
@@ -305,7 +314,6 @@ describe('collection and screening screens', () => {
       component: 'Sangre DEMO',
       anticoagulant: 'CPDA DEMO',
       anticoagulantConceptUuid: 'mock-collection-cpda1',
-      plannedVolume: '450',
       service: 'Banco DEMO',
       serviceConceptUuid: 'mock-collection-blood-bank',
       collectedBy: 'Profesional DEMO',
@@ -361,7 +369,7 @@ describe('collection and screening screens', () => {
       'completed',
     );
   });
-  it('selects coded label fields and advances with a preservative only', async () => {
+  it('uses the session operator, prints compact labels and advances with a preservative only', async () => {
     const processing = api();
     render(<CollectionPage api={processing.collection} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
@@ -369,7 +377,11 @@ describe('collection and screening screens', () => {
     const fields = within(modal);
     expect(fields.queryByLabelText(t('sampleType'))).not.toBeInTheDocument();
     expect(fields.queryByLabelText(t('sampleContainer'))).not.toBeInTheDocument();
+    expect(fields.queryByLabelText(/Volumen aproximado/)).not.toBeInTheDocument();
     expect(fields.getByLabelText('Sangre o componente propuesto')).toBeInTheDocument();
+    const operator = fields.getByLabelText(t('collectedBy'));
+    expect(operator).toHaveAttribute('readonly');
+    expect(operator).toHaveValue('Rosa Torres García');
     const campaign = await fields.findByRole('option', { name: 'Campaña de donación' });
     const service = fields.getByRole('combobox', { name: t('service') });
     expect(within(service).getByRole('option', { name: 'UPSS Banco de Sangre' })).toBeInTheDocument();
@@ -378,26 +390,77 @@ describe('collection and screening screens', () => {
       within(fields.getByRole('combobox', { name: t('anticoagulant') })).getByRole('option', { name: 'CPDA-1' }),
     ).toBeInTheDocument();
     fireEvent.change(fields.getByLabelText(t('component')), { target: { value: 'Sangre DEMO' } });
-    fireEvent.change(fields.getByLabelText(t('collectedBy')), { target: { value: 'Recolector DEMO' } });
-    fireEvent.change(fields.getByLabelText(t('plannedVolume')), { target: { value: '450' } });
     fireEvent.click(fields.getByRole('button', { name: t('next') }));
     expect(fields.getByRole('alert', { name: t('requiredFields') })).toHaveTextContent(
       t('anticoagulantOrPreservative'),
     );
     fireEvent.change(fields.getByLabelText(t('preservative')), { target: { value: 'Solución DEMO' } });
+    const labelMarkup = (key: 'printUnit' | 'printSample') => {
+      fireEvent.click(fields.getByRole('button', { name: t(key) }));
+      const frame = document.querySelector('iframe');
+      if (!frame) throw new Error('TEST_PRINT_FRAME_MISSING');
+      const parsed = new DOMParser().parseFromString(frame.srcdoc, 'text/html');
+      frame.remove();
+      expect(parsed.body.textContent).not.toContain(t(key));
+      expect(parsed.body.textContent).not.toContain(t('printPrototype'));
+      return parsed;
+    };
+    const unitLabel = labelMarkup('printUnit');
+    expect(unitLabel.querySelector('[data-label="unit"] h2')?.textContent).toMatch(/^BB-/);
+    expect(unitLabel.querySelector('[data-manual-volume]')?.textContent).toBe('');
+    expect(unitLabel.body.textContent).toContain(t('labelVolume'));
+    const tubeLabel = labelMarkup('printSample');
+    expect(tubeLabel.querySelector('[data-label="tube"] h2')?.textContent).toMatch(/^M-/);
+    expect(tubeLabel.querySelector('style')?.textContent).toContain('width: 65mm');
+    expect(tubeLabel.body.textContent).not.toContain(t('sampleType'));
+    expect(tubeLabel.body.textContent).not.toContain(t('sampleContainer'));
+
     fireEvent.click(fields.getByRole('button', { name: t('next') }));
     await fields.findByLabelText(t('extractedVolume'));
+    expect(fields.queryByRole('button', { name: t('printUnit') })).not.toBeInTheDocument();
+    expect(fields.queryByRole('button', { name: t('printSample') })).not.toBeInTheDocument();
+    expect(fields.getByText(t('volumeHelp')).closest('.cds--inline-notification')).toHaveClass(
+      'cds--inline-notification--warning',
+    );
+    expect(fields.queryByText(t('locked'))).not.toBeInTheDocument();
     const saved = (await processing.collection.listCollections()).find((item) => item.status === 'inProgress');
     expect(saved?.label).toMatchObject({
       service: 'Campaña de donación',
       serviceConceptUuid: 'mock-collection-campaign',
+      collectedBy: 'Rosa Torres García',
       preservative: 'Solución DEMO',
       anticoagulant: '',
       sedimentingAgent: '',
     });
+    expect(saved?.label).not.toHaveProperty('plannedVolume');
+    sessionPerson.display = 'Marco Ruiz Soto';
     fireEvent.click(fields.getByRole('button', { name: t('previous') }));
     expect(fields.getByLabelText(t('service'))).toHaveAttribute('readonly');
+    expect(fields.getByLabelText(t('collectedBy'))).toHaveValue('Rosa Torres García');
     expect(fields.queryByText(t('locked'))).not.toBeInTheDocument();
+  });
+  it('requires a session person name before completing or printing a new label', async () => {
+    sessionPerson.display = '';
+    const processing = api();
+    const record = newCollection(applicationsMock()[2]);
+    Object.assign(record.label, {
+      component: 'Sangre DEMO',
+      collectedBy: 'Nombre histórico DEMO',
+      preservative: 'Solución DEMO',
+      service: 'UPSS Banco de Sangre',
+      serviceConceptUuid: 'mock-collection-blood-bank',
+    });
+    const save = vi.spyOn(processing.collection, 'saveCollection');
+    render(
+      <CollectionWorkflow initial={record} api={processing.collection} onClose={vi.fn()} onSaved={vi.fn()} t={t} />,
+    );
+    await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
+    expect(screen.getByLabelText(t('collectedBy'))).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: t('printUnit') }));
+    expect(document.querySelector('iframe')).toBeNull();
+    expect(screen.getByText(t('collectionOperatorUnavailable'))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    expect(save).not.toHaveBeenCalled();
   });
   it('offers a safe retry when a label catalog fails to load', async () => {
     const processing = api();

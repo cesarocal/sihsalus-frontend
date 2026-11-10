@@ -9,6 +9,7 @@ import {
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
+import { useSession } from '@openmrs/esm-framework';
 import { useCallback, useState } from 'react';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
 import { useApiData } from '../../api/use-api-data';
@@ -23,6 +24,7 @@ import styles from '../applicant-selection/selection.scss';
 import {
   CollectionIdentity,
   CollectionLabelDocument,
+  collectionLabelPrintCss,
   DonationCertificateDocument,
 } from './collection-documents.component';
 import { validateCollection, validateCollectionText, validVolume } from './collection-rules';
@@ -33,6 +35,7 @@ import {
   type CollectionRecord,
   type DonationRegistry,
 } from './collection.types';
+import collectionStyles from './collection.scss';
 
 const conceptUuidFields = {
   anticoagulant: 'anticoagulantConceptUuid',
@@ -58,16 +61,21 @@ export function CollectionWorkflow({
   onSaved: () => void;
   t: ProcessingTranslate;
 }) {
-  const [record, setRecord] = useState(initial);
+  const [storedRecord, setRecord] = useState(initial);
+  const { authenticated, user } = useSession();
+  const operatorName = authenticated ? (user?.person?.display?.trim() ?? '') : '';
   const [step, setStep] = useState(initial.status === 'completed' ? 3 : Math.min(initial.completedSteps.length, 3));
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const stage = collectionSteps[step];
-  const finalized = record.status === 'completed';
-  const locked = finalized || record.completedSteps.includes(stage);
+  const finalized = storedRecord.status === 'completed';
+  const locked = finalized || storedRecord.completedSteps.includes(stage);
   const editingLabel = stage === 'label' && !locked;
+  const record = editingLabel
+    ? { ...storedRecord, label: { ...storedRecord.label, collectedBy: operatorName } }
+    : storedRecord;
   const anticoagulants = useLabelConcepts(api, 'anticoagulant', editingLabel);
   const services = useLabelConcepts(api, 'service', editingLabel);
   const validateLabelCatalogs = (missing: string[]) => {
@@ -139,26 +147,27 @@ export function CollectionWorkflow({
         kind === 'certificate' ? (
           <DonationCertificateDocument record={record} t={t} />
         ) : (
-          <CollectionLabelDocument record={record} t={t} sample={kind === 'sample'} />
+          <CollectionLabelDocument record={record} t={t} sample={kind === 'sample'} print />
         ),
         t(kind === 'certificate' ? 'printCertificate' : kind === 'sample' ? 'printSample' : 'printUnit'),
+        () => setFailed('printFailed'),
+        kind === 'certificate' ? undefined : collectionLabelPrintCss,
       );
     } catch {
       setFailed('printFailed');
     }
   };
   const labelInput = (
-    field: Exclude<keyof CollectionLabel, 'leukocytesReduced' | 'anticoagulantConceptUuid' | 'serviceConceptUuid'>,
-    numeric = false,
+    field: Exclude<
+      keyof CollectionLabel,
+      'leukocytesReduced' | 'anticoagulantConceptUuid' | 'serviceConceptUuid' | 'collectedBy' | 'plannedVolume'
+    >,
   ) => (
     <TextInput
       key={field}
       id={`collection-${field}`}
       labelText={t(field)}
       value={record.label[field]}
-      type={numeric ? 'number' : 'text'}
-      min={numeric ? 0.01 : undefined}
-      step={numeric ? 0.01 : undefined}
       readOnly={locked}
       disabled={saving}
       invalid={errors.includes(field) || (field === 'preservative' && errors.includes('anticoagulantOrPreservative'))}
@@ -271,7 +280,7 @@ export function CollectionWorkflow({
     );
   };
   const extras =
-    step <= 1 ? (
+    step === 0 ? (
       <>
         <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => print('unit')}>
           {t('printUnit')}
@@ -279,12 +288,11 @@ export function CollectionWorkflow({
         <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => print('sample')}>
           {t('printSample')}
         </Button>
-        {step === 1 && (
-          <Button kind="ghost" disabled>
-            {t('adverseReaction')}
-          </Button>
-        )}
       </>
+    ) : step === 1 ? (
+      <Button kind="ghost" disabled>
+        {t('adverseReaction')}
+      </Button>
     ) : step === 3 ? (
       <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => print('certificate')}>
         {t('printCertificate')}
@@ -330,8 +338,12 @@ export function CollectionWorkflow({
             {labelInput('preservative')}
             {labelInput('sedimentingAgent')}
             {labelConcept('service')}
-            {labelInput('collectedBy')}
-            {labelInput('plannedVolume', true)}
+            <TextInput
+              id="collection-collectedBy"
+              labelText={t('collectedBy')}
+              value={record.label.collectedBy}
+              readOnly
+            />
             <Checkbox
               id="collection-leukocytes"
               labelText={t('leukocytesReduced')}
@@ -378,7 +390,14 @@ export function CollectionWorkflow({
               onChange={(event) => change({ ...record, extractedVolume: event.target.value })}
             />
           </div>
-          <InlineNotification hideCloseButton kind="info" title={t('quarantine')} subtitle={t('volumeHelp')} />
+          <InlineNotification
+            className={collectionStyles.quarantineNotice}
+            hideCloseButton
+            kind="warning"
+            lowContrast
+            title={t('quarantine')}
+            subtitle={t('volumeHelp')}
+          />
         </>
       )}
       {step === 2 && (
