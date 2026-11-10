@@ -1,6 +1,6 @@
 import { ageOnDate } from '../applicant-selection/selection-rules';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import { fullName } from './collection-rules';
+import { collectionSampleDefaults, fullName } from './collection-rules';
 import type { CollectionRecord } from './collection.types';
 import styles from '../applicant-selection/selection.scss';
 
@@ -41,8 +41,8 @@ export function CollectionLabelDocument({
         document: `${record.application.admission.documentType} ${record.application.admission.documentNumber}`,
         number: record.application.number,
         collectionDate: record.registry.date,
-        sampleType: record.label.sampleType,
-        sampleContainer: record.label.sampleContainer,
+        sampleType: record.label.sampleType.trim() || collectionSampleDefaults.sampleType,
+        sampleContainer: record.label.sampleContainer.trim() || collectionSampleDefaults.sampleContainer,
       }
     : {
         unitCode: record.unitCode,

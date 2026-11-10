@@ -1,6 +1,6 @@
 import type { CollectionRecord } from '../../collection/collection.types';
 import { isDate } from '../../applicant-selection/selection-rules';
-import { fullName } from '../../collection/collection-rules';
+import { collectionSampleDefaults, fullName } from '../../collection/collection-rules';
 import { normalizeSearch } from '../../../shared/normalize-search';
 import {
   screeningTests,
@@ -24,8 +24,8 @@ export function newScreening(collection: CollectionRecord): ScreeningRecord {
     applicationNumber: collection.application.number,
     applicantName: fullName(collection.application),
     documentNumber: collection.application.admission.documentNumber,
-    sampleType: collection.label.sampleType,
-    sampleContainer: collection.label.sampleContainer,
+    sampleType: collection.label.sampleType.trim() || collectionSampleDefaults.sampleType,
+    sampleContainer: collection.label.sampleContainer.trim() || collectionSampleDefaults.sampleContainer,
   });
 }
 /** Common empty panel; provenance and identity must be supplied by the source adapter. */

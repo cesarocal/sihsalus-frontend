@@ -1,4 +1,9 @@
-import type { CollectionRecord, CollectionStep } from '../sections/collection/collection.types';
+import type {
+  CollectionConcept,
+  CollectionConceptField,
+  CollectionRecord,
+  CollectionStep,
+} from '../sections/collection/collection.types';
 import type {
   ApheresisCandidate,
   ApheresisDraft,
@@ -8,6 +13,7 @@ import type {
 
 export interface CollectionApi {
   listCollections(): Promise<CollectionRecord[]>;
+  listLabelConcepts(field: CollectionConceptField): Promise<CollectionConcept[]>;
   saveCollection(record: CollectionRecord, step?: CollectionStep): Promise<CollectionRecord>;
 }
 export interface ScreeningApi {
@@ -29,7 +35,11 @@ export const processingEndpoints = {
 const unavailable = async (): Promise<never> => {
   throw new Error('BLOOD_BANK_PROCESSING_BACKEND_NOT_IMPLEMENTED');
 };
-export const openmrsCollectionApi: CollectionApi = { listCollections: unavailable, saveCollection: unavailable };
+export const openmrsCollectionApi: CollectionApi = {
+  listCollections: unavailable,
+  listLabelConcepts: unavailable,
+  saveCollection: unavailable,
+};
 export const openmrsScreeningApi: ScreeningApi = {
   listScreenings: unavailable,
   saveScreening: unavailable,

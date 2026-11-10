@@ -2,13 +2,20 @@ import type { SelectionApplication } from '../applicant-selection/selection.type
 
 export const collectionSteps = ['label', 'volume', 'registry', 'certificate'] as const;
 export type CollectionStep = (typeof collectionSteps)[number];
+export type CollectionConceptField = 'anticoagulant' | 'service';
+export interface CollectionConcept {
+  uuid: string;
+  display: string;
+}
 export interface CollectionLabel {
   component: string;
   anticoagulant: string;
+  anticoagulantConceptUuid?: string;
   preservative: string;
   sedimentingAgent: string;
   plannedVolume: string;
   service: string;
+  serviceConceptUuid?: string;
   collectedBy: string;
   leukocytesReduced: boolean;
   recipientName: string;

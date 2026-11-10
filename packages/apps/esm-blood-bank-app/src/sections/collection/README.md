@@ -17,7 +17,7 @@ reabre el formulario al recargar la cola. Se mantienen el permiso de Extracción
 en consulta y la confirmación de salida.
 
 1. Extracción lista solo Seleccionados. **Extraer sangre** abre cuatro etapas: Etiqueta, Cantidad extraída, Registro y Constancia.
-2. Etiqueta captura componente, anticoagulante, conservación/agente opcionales, volumen aproximado, servicio/responsable, muestra/recipiente y leucocitos reducidos. Autóloga habilita receptor, documento, servicio e historia.
+2. Etiqueta captura sangre o componente, volumen aproximado, servicio de recolección, responsable y leucocitos reducidos. Requiere un anticoagulante del catálogo, una solución de conservación en texto o ambos. El agente sedimentario es opcional. Autóloga habilita receptor, documento, servicio e historia.
 3. Completar Etiqueta genera una muestra visible en Tamizaje, sin duplicarla. Puede imprimir vistas de unidad/tubo con marca DEMO, no etiquetas institucionales ni barcodes. Las impresiones son vistas previas; no se auditan contadores.
 4. Volumen exige número positivo decimal (hasta dos decimales, límite técnico DECIMAL(8,2), no recomendación clínica). Continuar ingresa la unidad mock en cuarentena y la muestra en Inventario. Reacción adversa queda deshabilitada y pendiente.
 5. Registro guarda fecha, lote de bolsa, complicaciones, completa/incompleta, responsable y notas. La donación efectiva actualiza Donantes.
@@ -46,6 +46,14 @@ El panel proviene de los documentos entregados; necesita validación del protoco
 - `../../api/mock-{blood-bank-processing.api,processing-store}.ts`: persistencia y fixtures.
 
 `useMockData=false` muestra error seguro: los adaptadores reales están deshabilitados. Hay que acordar payloads, conceptos/UUIDs configurables, encuentros/órdenes, provider/ubicación y autorización por operación antes de implementar el OMOD.
+
+### Catálogos de etiqueta
+
+En la configuración del microfrontend, `collectionLabelConcepts.bloodBankServiceUuid` y `campaignServiceUuid` apuntan a **UPSS Banco de Sangre** y **Campaña de donación**. `collectionLabelConcepts.anticoagulantSetUuid` apunta al conjunto de anticoagulantes permitidos. La consulta usa `GET /ws/rest/v1/concept/{uuid}` con la sesión de OpenMRS y muestra los miembros activos del conjunto.
+
+Con guardado mock y los tres UUID vacíos, el flujo usa un catálogo de demostración. Al configurar los UUID se consulta OpenMRS y se permite reintentar ante un error. La selección conserva el UUID y el nombre para impresión. Los documentos guardados conservan su etiqueta. En borradores antiguos, el servicio requiere seleccionar un concepto antes de continuar.
+
+La muestra postextracción se genera como **Sangre** en **Tubo** en el mock, conservando los datos de muestras previas. El OMOD deberá asignar los conceptos de tipo y recipiente y acordar dónde persistir el texto de conservación, dado que el DDL propone una referencia a concepto para ese dato.
 
 | Datos                   | Mapeo previsto                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------ |

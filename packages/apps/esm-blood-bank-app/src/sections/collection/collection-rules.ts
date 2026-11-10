@@ -3,6 +3,8 @@ import type { SelectionApplication } from '../applicant-selection/selection.type
 import type { CollectionRecord, CollectionStep } from './collection.types';
 import { bagLotExceedsLimit, validateObservations } from '../../shared/text-field-contracts';
 
+export const collectionSampleDefaults = { sampleType: 'Sangre', sampleContainer: 'Tubo' };
+
 export function fullName(application: SelectionApplication) {
   return `${application.personal.givenName} ${application.personal.familyName}`.trim();
 }
@@ -29,8 +31,7 @@ export function newCollection(application: SelectionApplication): CollectionReco
       recipientDocument: application.admission.beneficiaryDocument,
       recipientService: '',
       recipientHistory: '',
-      sampleType: '',
-      sampleContainer: '',
+      ...collectionSampleDefaults,
     },
     extractedVolume: '',
     registry: { date: today(), bagLot: '', complications: '', extractionStatus: '', attendedBy: '', observations: '' },
@@ -54,15 +55,11 @@ export function validateCollectionText(record: CollectionRecord): string[] {
 export function validateCollection(record: CollectionRecord, step: CollectionStep): string[] {
   const missing = validateCollectionText(record);
   if (step === 'label') {
-    for (const field of [
-      'component',
-      'anticoagulant',
-      'service',
-      'collectedBy',
-      'sampleType',
-      'sampleContainer',
-    ] as const)
-      if (!record.label[field].trim()) missing.push(field);
+    for (const field of ['component', 'collectedBy'] as const) if (!record.label[field].trim()) missing.push(field);
+    const savedLabel = record.completedSteps.includes('label');
+    if (!record.label.service.trim() || (!savedLabel && !record.label.serviceConceptUuid)) missing.push('service');
+    const hasAnticoagulant = record.label.anticoagulant.trim() && (savedLabel || record.label.anticoagulantConceptUuid);
+    if (!hasAnticoagulant && !record.label.preservative.trim()) missing.push('anticoagulantOrPreservative');
     if (!validVolume(record.label.plannedVolume)) missing.push('plannedVolume');
     if (record.application.admission.donationType === 'autologous')
       for (const field of ['recipientName', 'recipientDocument'] as const)

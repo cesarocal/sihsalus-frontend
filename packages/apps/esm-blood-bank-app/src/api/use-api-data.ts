@@ -6,14 +6,15 @@ interface ApiDataState<T> {
   isLoading: boolean;
 }
 
-export function useApiData<T>(load: () => Promise<T>): ApiDataState<T> {
+export function useApiData<T>(load: ((attempt: number) => Promise<T>) | null, attempt = 0): ApiDataState<T> {
   const [state, setState] = useState<ApiDataState<T>>({ error: false, isLoading: true });
 
   useEffect(() => {
+    if (!load) return;
     let active = true;
     setState({ error: false, isLoading: true });
 
-    void load()
+    void load(attempt)
       .then((data) => {
         if (active) setState({ data, error: false, isLoading: false });
       })
@@ -24,7 +25,7 @@ export function useApiData<T>(load: () => Promise<T>): ApiDataState<T> {
     return () => {
       active = false;
     };
-  }, [load]);
+  }, [load, attempt]);
 
   return state;
 }

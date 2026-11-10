@@ -36,6 +36,7 @@ describe('Blood Bank navigation icons', () => {
   });
 
   it.each([
+    ['/collection', 'Extracción'],
     ['/laboratory/screening', 'Tamizaje'],
     ['/follow-up/donor', 'Al donante'],
     ['/follow-up/recipient', 'Al receptor'],

@@ -1,6 +1,6 @@
 # SIH Salus Banco de Sangre
 
-Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio, Donantes, Selección del postulante, Extracción y aféresis, Laboratorio, Transferencias, Inventario y Transfusiones.
+Microfrontend base para construir los flujos de Banco de Sangre. Incluye Inicio, Donantes, Selección del postulante, Extracción, Laboratorio, Transferencias, Inventario y Transfusiones.
 
 El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) documenta el límite heredado del lote de bolsa, los mensajes por operación, la persistencia mock por pestaña y lo pendiente de verificar en el backend.
 
@@ -123,7 +123,7 @@ El detalle de archivos, mapeo del modelo y límites clínicos está en [Selecci�
 
 ## Extracción y Tamizaje (prototipo navegable)
 
-- [Extracción y aféresis](http://localhost:8080/openmrs/spa/blood-bank/collection): requiere `app:home.bancoSangre.extraccionAferesis`.
+- [Extracción](http://localhost:8080/openmrs/spa/blood-bank/collection) requiere `app:home.bancoSangre.extraccionAferesis`.
 - [Laboratorio / Tamizaje](http://localhost:8080/openmrs/spa/blood-bank/laboratory/screening): requiere `app:home.bancoSangre.laboratorio.tamizaje`.
 
 También requieren el privilegio de entrada del módulo; mantienen los enlaces y guards existentes, sin cambiar navbar ni login.
@@ -137,6 +137,7 @@ La muestra de aféresis no crea una unidad ni cambia la decisión de selección.
 Ver [Tamizaje por origen](src/sections/laboratory/screening/README.md) para contratos,
 compatibilidad, permisos, escenarios de prueba y limitaciones del backend pendiente.
 Los contratos de API están en `src/api/blood-bank-processing.api.ts`; los adaptadores reales fallan de forma segura hasta implementar el OMOD.
+Los desplegables de Etiqueta pueden consultar conceptos de OpenMRS incluso con el guardado mock. Configurar los UUID en `collectionLabelConcepts` según el [contrato de Extracción](src/sections/collection/README.md).
 No se liberan unidades, diagnostican infecciones, envían correos ni archivan PDF en OpenMRS.
 Ver [Extracción y Tamizaje](src/sections/collection/README.md) para organización, mapeo y evidencia.
 

@@ -22,8 +22,10 @@ async function collectionFixture() {
     ...record.label,
     component: 'Sangre DEMO',
     anticoagulant: 'CPDA DEMO',
+    anticoagulantConceptUuid: 'mock-collection-cpda1',
     plannedVolume: '450',
     service: 'Banco DEMO',
+    serviceConceptUuid: 'mock-collection-blood-bank',
     collectedBy: 'Recolector DEMO',
     sampleType: 'Sangre DEMO',
     sampleContainer: 'Tubo DEMO',
@@ -57,6 +59,33 @@ describe('collection and screening mock contracts', () => {
     const queued = (await api.collection.listCollections()).filter((item) => item.status !== 'completed');
     expect(queued).toHaveLength(1);
     expect(queued.every((item) => item.application.status === 'selected')).toBe(true);
+  });
+  it.each([
+    ['', '', '   ', false],
+    ['CPDA-1', '', '', false],
+    ['CPDA-1', 'mock-collection-cpda1', '', true],
+    ['', '', 'Solución DEMO', true],
+    ['CPDA-1', 'mock-collection-cpda1', 'Solución DEMO', true],
+  ])('requires a coded anticoagulant or a nonblank preservative (%j, %j, %j)', async (anticoagulant, uuid, preservative, allowed) => {
+    const { api, record } = await collectionFixture();
+    Object.assign(record.label, {
+      anticoagulant,
+      anticoagulantConceptUuid: uuid,
+      preservative,
+      sedimentingAgent: '',
+      sampleType: '',
+      sampleContainer: '',
+    });
+    if (!allowed) {
+      expect(validateCollection(record, 'label')).toEqual(['anticoagulantOrPreservative']);
+      await expect(api.collection.saveCollection(record, 'label')).rejects.toThrow('COLLECTION_INCOMPLETE');
+      return;
+    }
+    const saved = await api.collection.saveCollection(record, 'label');
+    expect(saved.completedSteps).toEqual(['label']);
+    expect(await api.screening.listScreenings()).toContainEqual(
+      expect.objectContaining({ collectionId: record.id, sampleType: 'Sangre', sampleContainer: 'Tubo' }),
+    );
   });
   it('preserves drafts across adapter recreation without generating a sample prematurely', async () => {
     const { api, selection, record } = await collectionFixture();

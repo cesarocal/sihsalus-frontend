@@ -45,6 +45,14 @@ export function createMockProcessingApi(
       }));
   };
   const collection: CollectionApi = {
+    async listLabelConcepts(field) {
+      return field === 'service'
+        ? [
+            { uuid: 'mock-collection-blood-bank', display: 'UPSS Banco de Sangre' },
+            { uuid: 'mock-collection-campaign', display: 'Campaña de donación' },
+          ]
+        : [{ uuid: 'mock-collection-cpda1', display: 'CPDA-1' }];
+    },
     async listCollections() {
       const applications = await selection.listApplications();
       const state = readProcessingState(getStorage);

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { mockBloodBankApi, openmrsBloodBankApi } from './api';
+import { createCollectionLabelConceptLoader } from './api/collection-label-concepts.api';
 import { bloodBankPrivileges } from './access/blood-bank-privileges';
 import { BloodBankApp } from './blood-bank-app.component';
 import type { BloodBankConfig } from './config-schema';
@@ -14,10 +15,20 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
   const modulePath = `${globalThis.getOpenmrsSpaBase().slice(0, -1)}${basePath}`;
   const leftNav = useMemo(() => ({ name: 'blood-bank-nav-slot', basePath: modulePath }), [modulePath]);
   useLeftNav(leftNav);
+  const { collectionLabelConcepts, useMockData } = config;
+  const api = useMemo(() => {
+    const source = useMockData ? mockBloodBankApi : openmrsBloodBankApi;
+    const concepts = collectionLabelConcepts ?? {};
+    if (useMockData && !Object.values(concepts).some(Boolean)) return source;
+    return {
+      ...source,
+      collection: { ...source.collection, listLabelConcepts: createCollectionLabelConceptLoader(concepts) },
+    };
+  }, [collectionLabelConcepts, useMockData]);
 
   return (
     <BloodBankApp
-      api={config.useMockData ? mockBloodBankApi : openmrsBloodBankApi}
+      api={api}
       expiryWarningDays={config.dashboardExpiryWarningDays}
       basename={modulePath}
       router="browser"

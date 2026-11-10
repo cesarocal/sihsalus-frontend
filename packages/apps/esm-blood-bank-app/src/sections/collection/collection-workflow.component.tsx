@@ -9,8 +9,9 @@ import {
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
+import { useApiData } from '../../api/use-api-data';
 import { ObservationsTextArea } from '../../shared/observations-text-area.component';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
@@ -27,10 +28,22 @@ import {
 import { validateCollection, validateCollectionText, validVolume } from './collection-rules';
 import {
   collectionSteps,
+  type CollectionConceptField,
   type CollectionLabel,
   type CollectionRecord,
   type DonationRegistry,
 } from './collection.types';
+
+const conceptUuidFields = {
+  anticoagulant: 'anticoagulantConceptUuid',
+  service: 'serviceConceptUuid',
+} as const;
+
+function useLabelConcepts(api: CollectionApi, field: CollectionConceptField, enabled: boolean) {
+  const [attempt, setAttempt] = useState(0);
+  const load = useCallback(() => api.listLabelConcepts(field), [api, field]);
+  return { ...useApiData(enabled ? load : null, attempt), retry: () => setAttempt((current) => current + 1) };
+}
 
 export function CollectionWorkflow({
   initial,
@@ -54,6 +67,19 @@ export function CollectionWorkflow({
   const stage = collectionSteps[step];
   const finalized = record.status === 'completed';
   const locked = finalized || record.completedSteps.includes(stage);
+  const editingLabel = stage === 'label' && !locked;
+  const anticoagulants = useLabelConcepts(api, 'anticoagulant', editingLabel);
+  const services = useLabelConcepts(api, 'service', editingLabel);
+  const validateLabelCatalogs = (missing: string[]) => {
+    if (!editingLabel) return;
+    if (!missing.includes('service') && !services.data?.some(({ uuid }) => uuid === record.label.serviceConceptUuid))
+      missing.push('service');
+    if (
+      record.label.anticoagulantConceptUuid &&
+      !anticoagulants.data?.some(({ uuid }) => uuid === record.label.anticoagulantConceptUuid)
+    )
+      missing.push('anticoagulantUnavailable');
+  };
   const change = (next: CollectionRecord) => {
     setRecord(next);
     setDirty(true);
@@ -65,6 +91,7 @@ export function CollectionWorkflow({
       return true;
     }
     const missing = advance ? validateCollection(record, stage) : validateCollectionText(record);
+    if (advance) validateLabelCatalogs(missing);
     setErrors(missing);
     setFailed('');
     if (missing.length) {
@@ -103,6 +130,7 @@ export function CollectionWorkflow({
     const missing = validateCollection(record, kind === 'certificate' ? 'certificate' : 'label').filter(
       (key) => key !== 'observationsTooLong',
     );
+    if (kind !== 'certificate') validateLabelCatalogs(missing);
     setErrors(missing);
     setFailed('');
     if (missing.length) return;
@@ -119,7 +147,10 @@ export function CollectionWorkflow({
       setFailed('printFailed');
     }
   };
-  const labelInput = (field: Exclude<keyof CollectionLabel, 'leukocytesReduced'>, numeric = false) => (
+  const labelInput = (
+    field: Exclude<keyof CollectionLabel, 'leukocytesReduced' | 'anticoagulantConceptUuid' | 'serviceConceptUuid'>,
+    numeric = false,
+  ) => (
     <TextInput
       key={field}
       id={`collection-${field}`}
@@ -130,11 +161,71 @@ export function CollectionWorkflow({
       step={numeric ? 0.01 : undefined}
       readOnly={locked}
       disabled={saving}
-      invalid={errors.includes(field)}
-      invalidText={t('requiredFields')}
+      invalid={errors.includes(field) || (field === 'preservative' && errors.includes('anticoagulantOrPreservative'))}
+      invalidText={t(field === 'preservative' ? 'anticoagulantOrPreservative' : 'requiredFields')}
       onChange={(event) => change({ ...record, label: { ...record.label, [field]: event.target.value } })}
     />
   );
+  const labelConcept = (field: CollectionConceptField) => {
+    if (locked) return labelInput(field);
+    const catalog = field === 'anticoagulant' ? anticoagulants : services;
+    const uuidField = conceptUuidFields[field];
+    const selected = record.label[uuidField] ?? '';
+    const options = catalog.data ?? [];
+    const unavailable = selected && !options.some(({ uuid }) => uuid === selected);
+    const previousValue =
+      !selected && record.label[field] ? `${t('collectionPreviousValue')} ${record.label[field]}` : '';
+    const validationKey = field === 'service' ? 'service' : 'anticoagulantUnavailable';
+    const status = catalog.isLoading
+      ? 'collectionConceptsLoading'
+      : catalog.error
+        ? 'collectionConceptsFailed'
+        : options.length
+          ? ''
+          : 'collectionConceptsEmpty';
+    return (
+      <div>
+        <Select
+          id={`collection-${field}`}
+          labelText={t(field)}
+          value={selected}
+          disabled={saving || (options.length === 0 && !(field === 'anticoagulant' && selected))}
+          invalid={errors.includes(validationKey)}
+          invalidText={t(status || (field === 'service' ? 'requiredFields' : validationKey))}
+          helperText={
+            status || previousValue ? (
+              <span role="status">
+                {status && t(status)} {previousValue}
+              </span>
+            ) : undefined
+          }
+          onChange={(event) => {
+            const concept = options.find(({ uuid }) => uuid === event.target.value);
+            change({
+              ...record,
+              label: { ...record.label, [field]: concept?.display ?? '', [uuidField]: concept?.uuid ?? '' },
+            });
+            setErrors((current) =>
+              current.filter(
+                (key) => key !== validationKey && (field !== 'anticoagulant' || key !== 'anticoagulantOrPreservative'),
+              ),
+            );
+          }}
+        >
+          <SelectItem value="" text={t('choose')} />
+          {unavailable && <SelectItem disabled value={selected} text={record.label[field]} />}
+          {options.map(({ uuid, display }) => (
+            <SelectItem key={uuid} value={uuid} text={display} />
+          ))}
+        </Select>
+        {!catalog.isLoading && (catalog.error || options.length === 0) && (
+          <Button kind="ghost" size="sm" disabled={saving} onClick={catalog.retry}>
+            {t('retry')}
+          </Button>
+        )}
+      </div>
+    );
+  };
   const registryInput = (
     field: Exclude<keyof DonationRegistry, 'complications' | 'extractionStatus' | 'observations'>,
   ) => {
@@ -230,23 +321,16 @@ export function CollectionWorkflow({
       t={t}
     >
       <CollectionIdentity record={record} t={t} />
-      {locked && <p className={styles.help}>{t('locked')}</p>}
       {step === 0 && (
         <>
           <p>{t('labelHelp')}</p>
           <div className={styles.fields}>
-            {(
-              [
-                'component',
-                'anticoagulant',
-                'preservative',
-                'sedimentingAgent',
-                'service',
-                'collectedBy',
-                'sampleType',
-                'sampleContainer',
-              ] as const
-            ).map((field) => labelInput(field))}
+            {labelInput('component')}
+            {labelConcept('anticoagulant')}
+            {labelInput('preservative')}
+            {labelInput('sedimentingAgent')}
+            {labelConcept('service')}
+            {labelInput('collectedBy')}
             {labelInput('plannedVolume', true)}
             <Checkbox
               id="collection-leukocytes"

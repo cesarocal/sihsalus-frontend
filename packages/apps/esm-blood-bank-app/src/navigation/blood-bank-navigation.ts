@@ -24,7 +24,13 @@ export const bloodBankNavigation: NavigationItem[] = [
   { labelKey: 'home', defaultLabel: 'Inicio', path: '/', privilege: bloodBankPrivileges.module, icon: Home },
   { labelKey: 'donors', defaultLabel: 'Donantes', path: '/donors', privilege: bloodBankPrivileges.donors, icon: GroupIcon },
   { labelKey: 'applicantSelection', defaultLabel: 'Selección del postulante', path: '/applicant-selection', privilege: bloodBankPrivileges.applicantSelection, icon: UserFollowIcon },
-  { labelKey: 'collectionAndApheresis', defaultLabel: 'Extracción y aféresis', path: '/collection', privilege: bloodBankPrivileges.collection, icon: SyringeIcon },
+  {
+    labelKey: 'collectionAndApheresis',
+    defaultLabel: 'Extracción',
+    path: '/collection',
+    privilege: bloodBankPrivileges.collection,
+    icon: SyringeIcon,
+  },
   {
     labelKey: 'laboratory',
     defaultLabel: 'Laboratorio',

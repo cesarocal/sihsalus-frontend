@@ -63,6 +63,7 @@ describe('collection and screening screens', () => {
   it('keeps the original modal open when cancelling X and preserves a saved partial label on reopen', async () => {
     render(<CollectionPage api={api().collection} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
+    await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
     fireEvent.change(screen.getByLabelText(t('component')), { target: { value: 'Componente DEMO' } });
     fireEvent.click(
       within(screen.getByRole('dialog', { name: t('collectionTitle') })).getByRole('button', { name: 'Cerrar' }),
@@ -75,12 +76,14 @@ describe('collection and screening screens', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     fireEvent.click(await screen.findByRole('button', { name: 'Continuar extracción' }));
+    await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
     expect(screen.getByLabelText(t('component'))).toHaveValue('Componente DEMO');
   });
-  it('shows autologous fields only for an autologous applicant', () => {
+  it('shows autologous fields only for an autologous applicant', async () => {
     const record = newCollection(applicationsMock()[2]);
     record.application.admission.donationType = 'autologous';
     render(<CollectionWorkflow initial={record} api={api().collection} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
+    await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
     expect(screen.getByLabelText(t('recipientName'))).toBeInTheDocument();
     expect(screen.getByLabelText(t('recipientDocument'))).toBeInTheDocument();
   });
@@ -119,6 +122,7 @@ describe('collection and screening screens', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(save).toHaveBeenCalledOnce();
     fireEvent.click(await screen.findByRole('button', { name: action }));
+    if (section === 'collection') await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
     expect(screen.getByLabelText(field)).toHaveValue('Valor guardado DEMO');
   });
 
@@ -300,8 +304,10 @@ describe('collection and screening screens', () => {
       ...record.label,
       component: 'Sangre DEMO',
       anticoagulant: 'CPDA DEMO',
+      anticoagulantConceptUuid: 'mock-collection-cpda1',
       plannedVolume: '450',
       service: 'Banco DEMO',
+      serviceConceptUuid: 'mock-collection-blood-bank',
       collectedBy: 'Profesional DEMO',
       sampleType: 'Sangre DEMO',
       sampleContainer: 'Tubo DEMO',
@@ -310,6 +316,7 @@ describe('collection and screening screens', () => {
     render(
       <CollectionWorkflow initial={record} api={processing.collection} onClose={vi.fn()} onSaved={finalized} t={t} />,
     );
+    await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     await screen.findByLabelText(t('extractedVolume'));
     expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('collectionLabelSaved') }));
@@ -324,8 +331,10 @@ describe('collection and screening screens', () => {
       ...record.label,
       component: 'Sangre DEMO',
       anticoagulant: 'CPDA DEMO',
+      anticoagulantConceptUuid: 'mock-collection-cpda1',
       plannedVolume: '450',
       service: 'Banco DEMO',
+      serviceConceptUuid: 'mock-collection-blood-bank',
       collectedBy: 'Profesional DEMO',
       sampleType: 'Sangre DEMO',
       sampleContainer: 'Tubo DEMO',
@@ -351,6 +360,60 @@ describe('collection and screening screens', () => {
     expect((await processing.collection.listCollections()).find((item) => item.id === record.id)?.status).toBe(
       'completed',
     );
+  });
+  it('selects coded label fields and advances with a preservative only', async () => {
+    const processing = api();
+    render(<CollectionPage api={processing.collection} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
+    const modal = screen.getByRole('dialog', { name: 'Extracción' });
+    const fields = within(modal);
+    expect(fields.queryByLabelText(t('sampleType'))).not.toBeInTheDocument();
+    expect(fields.queryByLabelText(t('sampleContainer'))).not.toBeInTheDocument();
+    expect(fields.getByLabelText('Sangre o componente propuesto')).toBeInTheDocument();
+    const campaign = await fields.findByRole('option', { name: 'Campaña de donación' });
+    const service = fields.getByRole('combobox', { name: t('service') });
+    expect(within(service).getByRole('option', { name: 'UPSS Banco de Sangre' })).toBeInTheDocument();
+    fireEvent.change(service, { target: { value: (campaign as HTMLOptionElement).value } });
+    expect(
+      within(fields.getByRole('combobox', { name: t('anticoagulant') })).getByRole('option', { name: 'CPDA-1' }),
+    ).toBeInTheDocument();
+    fireEvent.change(fields.getByLabelText(t('component')), { target: { value: 'Sangre DEMO' } });
+    fireEvent.change(fields.getByLabelText(t('collectedBy')), { target: { value: 'Recolector DEMO' } });
+    fireEvent.change(fields.getByLabelText(t('plannedVolume')), { target: { value: '450' } });
+    fireEvent.click(fields.getByRole('button', { name: t('next') }));
+    expect(fields.getByRole('alert', { name: t('requiredFields') })).toHaveTextContent(
+      t('anticoagulantOrPreservative'),
+    );
+    fireEvent.change(fields.getByLabelText(t('preservative')), { target: { value: 'Solución DEMO' } });
+    fireEvent.click(fields.getByRole('button', { name: t('next') }));
+    await fields.findByLabelText(t('extractedVolume'));
+    const saved = (await processing.collection.listCollections()).find((item) => item.status === 'inProgress');
+    expect(saved?.label).toMatchObject({
+      service: 'Campaña de donación',
+      serviceConceptUuid: 'mock-collection-campaign',
+      preservative: 'Solución DEMO',
+      anticoagulant: '',
+      sedimentingAgent: '',
+    });
+    fireEvent.click(fields.getByRole('button', { name: t('previous') }));
+    expect(fields.getByLabelText(t('service'))).toHaveAttribute('readonly');
+    expect(fields.queryByText(t('locked'))).not.toBeInTheDocument();
+  });
+  it('offers a safe retry when a label catalog fails to load', async () => {
+    const processing = api();
+    const load = processing.collection.listLabelConcepts;
+    vi.spyOn(processing.collection, 'listLabelConcepts').mockImplementation(async (field) => {
+      if (field === 'service') throw new Error('INTERNAL_CONCEPT_ERROR');
+      return load(field);
+    });
+    render(<CollectionPage api={processing.collection} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
+    expect(await screen.findByText(t('collectionConceptsFailed'))).toBeInTheDocument();
+    expect(screen.queryByText('INTERNAL_CONCEPT_ERROR')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: t('service') })).toBeDisabled();
+    vi.mocked(processing.collection.listLabelConcepts).mockImplementation(load);
+    fireEvent.click(screen.getByRole('button', { name: t('retry') }));
+    expect(await screen.findByRole('option', { name: 'Campaña de donación' })).toBeInTheDocument();
   });
   it('announces screening completion only after validation and never says the unit is released', async () => {
     const processing = api();
