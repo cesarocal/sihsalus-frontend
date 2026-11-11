@@ -10,7 +10,8 @@ import {
   localDateTime,
   validateScreening,
 } from '../sections/laboratory/screening/screening-rules';
-import { screeningTests, type ScreeningRecord } from '../sections/laboratory/screening/screening.types';
+import { screeningResultsFixture } from '../sections/laboratory/screening/screening-test-fixtures';
+import type { ScreeningRecord } from '../sections/laboratory/screening/screening.types';
 import { openmrsCollectionApi, openmrsScreeningApi } from './blood-bank-processing.api';
 
 async function collectionFixture() {
@@ -45,12 +46,8 @@ function completeScreening(record: ScreeningRecord) {
   record.identityVerified = true;
   record.receivedOn = localDateTime();
   record.receivedBy = 'Recepción DEMO';
-  record.performedOn = localDateTime();
-  record.performedBy = 'Laboratorio DEMO';
   record.validatedBy = 'Validador DEMO';
-  for (const test of screeningTests)
-    record.tests[test] = { result: 'nonReactive', reagent: 'Reactivo DEMO', brand: 'Marca DEMO', lot: 'Lote DEMO' };
-  return record;
+  return screeningResultsFixture(record);
 }
 describe('collection and screening mock contracts', () => {
   beforeEach(() => sessionStorage.clear());
@@ -113,20 +110,24 @@ describe('collection and screening mock contracts', () => {
     const draft = await api.collection.saveCollection({ ...saved, registry: { ...saved.registry, observations } });
     expect((await api.collection.saveCollection(draft, 'registry')).registry.observations).toBe(observations);
   });
-  it.each(['postExtraction', 'followUp'] as const)('bounds %s screening observations', async (origin) => {
+  it.each([
+    'postExtraction',
+    'followUp',
+  ] as const)('saves %s results without reagent data and requires both optional test fields when used', async (origin) => {
     const { api } = await collectionFixture();
     const record = (await api.screening.listScreenings()).find((sample) => sample.origin?.type === origin);
     if (!record) throw new Error('SYNTHETIC_SCREENING_MISSING');
     const received = await api.screening.saveScreening(completeScreening(record), 'reception');
-    const atLimit = 'a'.repeat(500);
-    const edited = { ...received, observations: `${atLimit}a` };
-    const before = sessionStorage.getItem(processingStorageKey);
-    await expect(api.screening.saveScreening(edited)).rejects.toThrow('SCREENING_OBSERVATIONS_LIMIT');
-    await expect(api.screening.saveScreening(edited, 'results')).rejects.toThrow('SCREENING_OBSERVATIONS_LIMIT');
-    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
-    expect((await api.screening.saveScreening({ ...edited, observations: atLimit }, 'results')).observations).toBe(
-      atLimit,
-    );
+    expect(received.performedOn).toBe('');
+    expect(received.performedBy).toBe('');
+    const edited = screeningResultsFixture(received);
+    await expect(
+      api.screening.saveScreening({ ...edited, additionalTest: { name: 'Prueba DEMO', result: '' } }, 'results'),
+    ).rejects.toThrow('SCREENING_INCOMPLETE');
+    const additionalTest = { name: 'Prueba DEMO', result: 'reactive' } as const;
+    const saved = await api.screening.saveScreening({ ...edited, additionalTest }, 'results');
+    expect(saved).toMatchObject({ performedOn: edited.performedOn, bloodData: edited.bloodData, additionalTest });
+    expect(globalScreeningResult(saved)).toBe('nonReactive');
   });
   it.each([49, 50, 51])('applies the bag-lot bound to registry completion at %i units', async (length) => {
     const { api, record } = await collectionFixture();
@@ -236,27 +237,46 @@ describe('collection and screening mock contracts', () => {
       'Cuarentena',
     );
   });
-  it('requires reception identification and complete results including reagent traceability', async () => {
+  it('requires reception identification and all required test outcomes', async () => {
     const { api } = await collectionFixture();
     const record = (await api.screening.listScreenings())[0];
     await expect(api.screening.saveScreening(record, 'reception')).rejects.toThrow('SCREENING_INCOMPLETE');
-    completeScreening(record);
-    record.tests.chagas.lot = '';
-    expect(validateScreening(record, 'validation')).toContain('chagas');
-    await expect(api.screening.saveScreening(record, 'validation')).rejects.toThrow('SCREENING_STAGE_ORDER');
+    const completed = completeScreening(record);
+    completed.tests.chagas.result = '';
+    expect(validateScreening(completed, 'validation')).toContain('screeningTest_chagas');
+    await expect(api.screening.saveScreening(completed, 'validation')).rejects.toThrow('SCREENING_STAGE_ORDER');
   });
   it('validates reactive results without releasing the unit, confirming diagnosis or allowing edits', async () => {
     const { api } = await collectionFixture();
-    let record = completeScreening((await api.screening.listScreenings())[0]);
+    const received = await api.screening.saveScreening(
+      completeScreening((await api.screening.listScreenings())[0]),
+      'reception',
+    );
+    let record = screeningResultsFixture(received);
     record.tests.hbsag.result = 'reactive';
-    for (const step of ['reception', 'results', 'validation'] as const)
-      record = await api.screening.saveScreening(record, step);
+    for (const step of ['results', 'validation'] as const) record = await api.screening.saveScreening(record, step);
     expect(record.result).toBe('reactive');
     expect(record.validatedAt).not.toBeNull();
     await expect(api.screening.saveScreening(record)).rejects.toThrow('SCREENING_CONFLICT');
     expect((await api.collection.listCollections()).find((item) => item.id === record.collectionId)?.unitStatus).toBe(
       'quarantine',
     );
+  });
+  it('requires a fresh results confirmation after saving changes to a previously completed panel', async () => {
+    const { api } = await collectionFixture();
+    const received = await api.screening.saveScreening(
+      completeScreening((await api.screening.listScreenings())[0]),
+      'reception',
+    );
+    const results = await api.screening.saveScreening(screeningResultsFixture(received), 'results');
+    const edited = { ...results, tests: { ...results.tests, hiv: { result: 'inconclusive' as const } } };
+    await expect(api.screening.saveScreening(edited, 'validation')).rejects.toThrow('SCREENING_RESULTS_NOT_SAVED');
+    const draft = await api.screening.saveScreening(edited);
+    expect(draft.completedSteps).toEqual(['reception']);
+    expect(draft.performedOn).toBe('');
+    expect(draft.performedBy).toBe('');
+    expect(draft.tests.hiv.result).toBe('inconclusive');
+    await expect(api.screening.saveScreening(draft, 'validation')).rejects.toThrow('SCREENING_STAGE_ORDER');
   });
   it('does not compute a final result when a mandatory test is missing', async () => {
     const { api } = await collectionFixture();

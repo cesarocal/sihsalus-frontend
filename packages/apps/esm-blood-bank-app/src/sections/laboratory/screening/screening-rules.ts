@@ -3,10 +3,15 @@ import { isDate } from '../../applicant-selection/selection-rules';
 import { collectionSampleDefaults, fullName } from '../../collection/collection-rules';
 import { normalizeSearch } from '../../../shared/normalize-search';
 import {
+  screeningBloodGroups,
+  screeningResultOptions,
+  screeningRhFactors,
+  screeningSpecialties,
   screeningTests,
   type ApheresisCandidate,
   type ScreeningCategory,
   type ScreeningRecord,
+  type ScreeningResult,
   type ScreeningStep,
 } from './screening.types';
 
@@ -59,10 +64,7 @@ export function newScreeningSample(
     identityVerified: false,
     performedOn: '',
     performedBy: '',
-    tests: Object.fromEntries(
-      screeningTests.map((test) => [test, { result: '', reagent: '', brand: '', lot: '' }]),
-    ) as ScreeningRecord['tests'],
-    observations: '',
+    tests: Object.fromEntries(screeningTests.map((test) => [test, { result: '' }])) as ScreeningRecord['tests'],
     validatedBy: '',
     validatedAt: null,
     result: '',
@@ -108,6 +110,18 @@ export function globalScreeningResult(record: ScreeningRecord) {
   if (results.includes('inconclusive')) return 'inconclusive';
   return 'nonReactive';
 }
+function validMeasurement(value: string, maximum = Infinity) {
+  const normalized = value.trim().replace(',', '.');
+  const measurement = Number(normalized);
+  return (
+    /^\d+(?:\.\d+)?$/.test(normalized) && Number.isFinite(measurement) && measurement > 0 && measurement <= maximum
+  );
+}
+
+function hasTestResult(result: ScreeningResult | undefined) {
+  return screeningResultOptions.some((option) => option === result);
+}
+
 function validTime(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return false;
   if (!isDate(value.slice(0, 10)) || Number(value.slice(11, 13)) > 23 || Number(value.slice(14, 16)) > 59) return false;
@@ -124,16 +138,30 @@ export function validateScreening(record: ScreeningRecord, step: ScreeningStep):
   if (step === 'results') {
     if (!validTime(record.performedOn) || record.performedOn < record.receivedOn) missing.push('performedOn');
     if (!record.performedBy.trim()) missing.push('performedBy');
+    const bloodData = record.bloodData;
+    // Previously validated panels are still checked by Inventory and keep their original contract.
+    const historical = record.status === 'validated' && !bloodData && !record.recommendations && !record.additionalTest;
     for (const test of screeningTests) {
-      const result = record.tests[test];
+      const outcome = record.tests[test];
       if (
-        !result ||
-        !['nonReactive', 'reactive', 'inconclusive'].includes(result.result) ||
-        !result.reagent.trim() ||
-        !result.brand.trim() ||
-        !result.lot.trim()
+        !hasTestResult(outcome?.result) ||
+        (historical && (!outcome?.reagent?.trim() || !outcome.brand?.trim() || !outcome.lot?.trim()))
       )
-        missing.push(test);
+        missing.push(`screeningTest_${test}`);
+    }
+    if (historical) return missing;
+    if (!screeningBloodGroups.some((value) => value === bloodData?.aboGroup)) missing.push('aboGroup');
+    if (!screeningRhFactors.some((value) => value === bloodData?.rhFactor)) missing.push('rhFactor');
+    if (!validMeasurement(bloodData?.hematocrit ?? '', 100)) missing.push('hematocrit');
+    if (!validMeasurement(bloodData?.hemoglobin ?? '')) missing.push('hemoglobin');
+    const additional = record.additionalTest;
+    if (additional?.name.trim() || additional?.result) {
+      if (!additional.name.trim()) missing.push('screeningAdditionalTest');
+      if (!hasTestResult(additional.result)) missing.push('screeningAdditionalResult');
+    }
+    for (const specialty of screeningSpecialties) {
+      const indicated = record.recommendations?.[specialty];
+      if (indicated !== 'yes' && indicated !== 'no') missing.push(specialty);
     }
   }
   if (step === 'validation') {

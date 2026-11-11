@@ -28,6 +28,19 @@
   }
 }
 
+.resultsTable {
+  :global(.cds--radio-button-group) {
+    flex-wrap: wrap;
+    row-gap: layout.$spacing-03;
+  }
+}
+
+.screeningWarning:global(.cds--inline-notification) {
+  inline-size: 100%;
+  max-inline-size: none;
+  margin-block-start: layout.$spacing-05;
+}
+
 @media (max-width: 42rem) {
   .filters {
     grid-template-columns: 1fr;

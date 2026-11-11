@@ -5,7 +5,7 @@ import { processingStorageKey, readProcessingState } from './mock-processing-sto
 import { openmrsScreeningApi } from './blood-bank-processing.api';
 import { applicationsMock } from '../mocks/applicant-selection.mock';
 import { localDateTime, screeningCategory } from '../sections/laboratory/screening/screening-rules';
-import { screeningTests } from '../sections/laboratory/screening/screening.types';
+import { screeningResultsFixture } from '../sections/laboratory/screening/screening-test-fixtures';
 
 function fixture() {
   const applications = applicationsMock();
@@ -116,14 +116,12 @@ describe('sample provenance and apheresis registration', () => {
     sample.identityVerified = true;
     sample.receivedOn = localDateTime();
     sample.receivedBy = 'DEMO';
-    sample.performedOn = localDateTime();
-    sample.performedBy = 'DEMO';
     sample.validatedBy = 'DEMO';
-    for (const test of screeningTests)
-      sample.tests[test] = { result: 'nonReactive', reagent: 'DEMO', brand: 'DEMO', lot: 'DEMO' };
     const origin = sample.origin;
-    for (const step of ['reception', 'results', 'validation'] as const)
-      sample = await api.saveScreening({ ...sample, origin: { type: 'apheresis', applicationId: 'FORGED' } }, step);
+    for (const step of ['reception', 'results', 'validation'] as const) {
+      const input = step === 'results' ? screeningResultsFixture(sample) : sample;
+      sample = await api.saveScreening({ ...input, origin: { type: 'apheresis', applicationId: 'FORGED' } }, step);
+    }
     expect(sample.origin).toEqual(origin);
     expect(screeningCategory(sample)).toBe('followUps');
     expect(sample.unitCode).toBe('');

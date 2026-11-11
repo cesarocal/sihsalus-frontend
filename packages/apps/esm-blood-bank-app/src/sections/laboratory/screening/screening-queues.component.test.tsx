@@ -7,7 +7,8 @@ import { createMockApplicantSelectionApi } from '../../../api/mock-applicant-sel
 import { createMockProcessingApi } from '../../../api/mock-blood-bank-processing.api';
 import { ScreeningPage } from './screening-page.component';
 import { localDateTime, screeningCategory } from './screening-rules';
-import { screeningTests, type ScreeningCategory } from './screening.types';
+import { screeningResultsFixture } from './screening-test-fixtures';
+import type { ScreeningCategory } from './screening.types';
 import { printDocument } from '../../../shared/print-document';
 
 vi.mock('@openmrs/esm-framework', () => ({
@@ -29,14 +30,10 @@ async function validate(apiInstance: ReturnType<typeof api>, category: Screening
   record.identityVerified = true;
   record.receivedOn = localDateTime();
   record.receivedBy = 'DEMO';
-  record.performedOn = localDateTime();
-  record.performedBy = 'DEMO';
   record.validatedBy = 'DEMO';
-  for (const test of screeningTests)
-    record.tests[test] = { result: 'nonReactive', reagent: 'DEMO', brand: 'DEMO', lot: 'DEMO' };
-  for (const step of ['reception', 'results', 'validation'] as const)
-    record = await apiInstance.saveScreening(record, step);
-  return record;
+  record = await apiInstance.saveScreening(record, 'reception');
+  record = await apiInstance.saveScreening(screeningResultsFixture(record), 'results');
+  return apiInstance.saveScreening(record, 'validation');
 }
 describe('independent screening queues and histories', () => {
   beforeEach(() => sessionStorage.clear());

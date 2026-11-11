@@ -2,13 +2,30 @@ export const screeningSteps = ['reception', 'results', 'validation'] as const;
 export type ScreeningStep = (typeof screeningSteps)[number];
 export const screeningTests = ['hbsag', 'antiHbc', 'antiHcv', 'hiv', 'htlv', 'chagas', 'syphilis'] as const;
 export type ScreeningTest = (typeof screeningTests)[number];
-export type ScreeningResult = '' | 'nonReactive' | 'reactive' | 'inconclusive';
+export const screeningTableTests = [
+  'hiv',
+  'hbsag',
+  'antiHcv',
+  'antiHbc',
+  'htlv',
+  'syphilis',
+  'chagas',
+] as const satisfies readonly ScreeningTest[];
+export const screeningResultOptions = ['reactive', 'nonReactive', 'inconclusive'] as const;
+export type ScreeningResult = '' | (typeof screeningResultOptions)[number];
 export interface ScreeningTestResult {
   result: ScreeningResult;
-  reagent: string;
-  brand: string;
-  lot: string;
+  // Kept for records created before reagent details were removed from the form.
+  reagent?: string;
+  brand?: string;
+  lot?: string;
 }
+export const screeningBloodGroups = ['O', 'A', 'B', 'AB'] as const;
+export const screeningRhFactors = ['+', '-'] as const;
+export const screeningBloodFields = ['aboGroup', 'rhFactor', 'hematocrit', 'hemoglobin'] as const;
+export type ScreeningBloodData = Record<(typeof screeningBloodFields)[number], string>;
+export const screeningSpecialties = ['gastroenterology', 'infectiousDiseases', 'procets'] as const;
+export type ScreeningRecommendations = Record<(typeof screeningSpecialties)[number], '' | 'yes' | 'no'>;
 export type ScreeningOrigin =
   | { type: 'postExtraction'; collectionId: string }
   | { type: 'apheresis'; applicationId: string }
@@ -52,7 +69,10 @@ export interface ScreeningRecord {
   performedOn: string;
   performedBy: string;
   tests: Record<ScreeningTest, ScreeningTestResult>;
-  observations: string;
+  bloodData?: ScreeningBloodData;
+  additionalTest?: { name: string; result: ScreeningResult };
+  recommendations?: ScreeningRecommendations;
+  observations?: string;
   validatedBy: string;
   validatedAt: string | null;
   result: ScreeningResult;

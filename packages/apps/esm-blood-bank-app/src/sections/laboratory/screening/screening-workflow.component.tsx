@@ -1,28 +1,18 @@
-import {
-  Accordion,
-  AccordionItem,
-  Button,
-  Checkbox,
-  InlineNotification,
-  Select,
-  SelectItem,
-  TextInput,
-} from '@carbon/react';
+import { Accordion, AccordionItem, Button, Checkbox, InlineNotification, TextInput } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { formatDatetime, useSession } from '@openmrs/esm-framework';
 import { useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
-import { ObservationsTextArea } from '../../../shared/observations-text-area.component';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
 import { notifySuccess } from '../../../shared/notify-success';
-import { validateObservations } from '../../../shared/text-field-contracts';
 import styles from '../../applicant-selection/selection.scss';
 import { ScreeningIdentity, ScreeningReport } from './screening-report.component';
+import { ScreeningResultsFields } from './screening-results-fields.component';
 import { ApheresisTubeLabel } from './apheresis-documents.component';
-import { localDateTime, validateScreening } from './screening-rules';
-import { screeningSteps, screeningTests, type ScreeningRecord, type ScreeningResult } from './screening.types';
+import { formatScreeningCollectionTime, localDateTime, validateScreening } from './screening-rules';
+import { screeningSteps, type ScreeningRecord } from './screening.types';
 import screeningStyles from './screening.scss';
 
 export function ScreeningWorkflow({
@@ -41,15 +31,18 @@ export function ScreeningWorkflow({
   const [storedRecord, setRecord] = useState(() => ({
     ...initial,
     receivedOn: initial.receivedOn || localDateTime(),
-    performedOn: initial.performedOn || localDateTime(),
   }));
   const { authenticated, user } = useSession();
   const operatorName = authenticated ? (user?.person?.display?.trim() ?? '') : '';
-  const [step, setStep] = useState(initial.status === 'validated' ? 2 : Math.min(initial.completedSteps.length, 2));
+  const [step, setStep] = useState(() => {
+    if (initial.status === 'validated') return 2;
+    if (!initial.completedSteps.includes('reception')) return 0;
+    return initial.completedSteps.includes('results') && initial.bloodData && initial.recommendations ? 2 : 1;
+  });
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(!initial.receivedOn || !initial.performedOn);
+  const [dirty, setDirty] = useState(!initial.receivedOn);
   const [resultsExpanded, setResultsExpanded] = useState(true);
   const finalized = storedRecord.status === 'validated';
   const receptionSaved = storedRecord.completedSteps.includes('reception');
@@ -67,18 +60,18 @@ export function ScreeningWorkflow({
       setStep((value) => Math.min(value + 1, 2));
       return true;
     }
-    const missing = validateObservations(record.observations);
-    if (missing.length && record.completedSteps.includes('reception')) setStep(screeningSteps.indexOf('results'));
-    if (advance && !missing.length) missing.push(...validateScreening(record, stage));
+    const snapshot =
+      advance && stage === 'results' ? { ...record, performedOn: localDateTime(), performedBy: operatorName } : record;
+    const missing = advance ? validateScreening(snapshot, stage) : [];
     setErrors(missing);
     setFailed('');
     if (missing.length) {
-      if (stage === 'results' || missing.includes('observationsTooLong')) setResultsExpanded(true);
+      if (stage === 'results') setResultsExpanded(true);
       return false;
     }
     setSaving(true);
     try {
-      const result = await api.saveScreening(record, advance ? stage : undefined);
+      const result = await api.saveScreening(snapshot, advance ? stage : undefined);
       setRecord(result);
       setDirty(false);
       if (advance && stage === 'validation') onSaved();
@@ -101,7 +94,7 @@ export function ScreeningWorkflow({
       setSaving(false);
     }
   };
-  const input = (field: 'receivedOn' | 'receivedBy' | 'performedOn' | 'performedBy' | 'validatedBy') => (
+  const input = (field: 'receivedOn' | 'receivedBy' | 'validatedBy') => (
     <TextInput
       key={field}
       id={`screening-${field}`}
@@ -122,7 +115,7 @@ export function ScreeningWorkflow({
     />
   );
   const print = () => {
-    const missing = validateScreening(record, 'validation');
+    const missing = finalized ? [] : validateScreening(record, 'validation');
     setErrors(missing);
     setFailed('');
     if (missing.length) return;
@@ -223,71 +216,31 @@ export function ScreeningWorkflow({
             onHeadingClick={({ isOpen }) => setResultsExpanded(isOpen)}
           >
             <div className={styles.fields}>
-              {input('performedOn')}
-              {input('performedBy')}
+              <TextInput
+                id="screening-performedOn"
+                labelText={t('performedOn')}
+                value={formatScreeningCollectionTime(record.performedOn)}
+                helperText={locked ? undefined : t('screeningPerformedOnHelp')}
+                invalid={errors.includes('performedOn')}
+                invalidText={t('requiredFields')}
+                readOnly
+              />
+              <TextInput
+                id="screening-performedBy"
+                labelText={t('performedBy')}
+                value={locked ? record.performedBy : operatorName}
+                invalid={errors.includes('performedBy')}
+                invalidText={t('screeningReceiverUnavailable')}
+                readOnly
+              />
             </div>
-            {screeningTests.map((test) => (
-              <section className={styles.questionGroup} key={test} aria-label={t(test)}>
-                <h3>{t(test)}</h3>
-                <div className={styles.fields}>
-                  {locked ? (
-                    <TextInput
-                      id={`screening-${test}-result`}
-                      labelText={t('result')}
-                      value={record.tests[test].result ? t(record.tests[test].result) : '—'}
-                      readOnly
-                    />
-                  ) : (
-                    <Select
-                      id={`screening-${test}-result`}
-                      labelText={t('result')}
-                      value={record.tests[test].result}
-                      disabled={saving}
-                      invalid={errors.includes(test)}
-                      invalidText={t('requiredFields')}
-                      onChange={(event) =>
-                        change({
-                          ...record,
-                          tests: {
-                            ...record.tests,
-                            [test]: { ...record.tests[test], result: event.target.value as ScreeningResult },
-                          },
-                        })
-                      }
-                    >
-                      <SelectItem value="" text={t('choose')} />
-                      {['nonReactive', 'reactive', 'inconclusive'].map((value) => (
-                        <SelectItem key={value} value={value} text={t(value)} />
-                      ))}
-                    </Select>
-                  )}
-                  {(['reagent', 'brand', 'lot'] as const).map((field) => (
-                    <TextInput
-                      key={field}
-                      id={`screening-${test}-${field}`}
-                      labelText={t(field)}
-                      value={record.tests[test][field]}
-                      readOnly={locked}
-                      disabled={saving && !locked}
-                      onChange={(event) =>
-                        change({
-                          ...record,
-                          tests: { ...record.tests, [test]: { ...record.tests[test], [field]: event.target.value } },
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-            <ObservationsTextArea
-              id="screening-notes"
-              t={t}
-              labelText={t('observations')}
-              value={record.observations}
+            <ScreeningResultsFields
+              record={record}
               readOnly={locked}
-              disabled={saving && !locked}
-              onChange={(event) => change({ ...record, observations: event.target.value })}
+              saving={saving}
+              errors={errors}
+              onChange={change}
+              t={t}
             />
           </AccordionItem>
         </Accordion>
@@ -295,10 +248,12 @@ export function ScreeningWorkflow({
       {step === 2 && (
         <>
           <div className={styles.fields}>{input('validatedBy')}</div>
-          <ScreeningReport record={record} t={t} />
+          <ScreeningReport record={record} t={t} showWarning={false} />
           <InlineNotification
+            className={screeningStyles.screeningWarning}
             hideCloseButton
             kind="warning"
+            lowContrast
             title={t(record.unitCode ? 'quarantine' : 'results')}
             subtitle={t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}
           />

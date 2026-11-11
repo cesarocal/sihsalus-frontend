@@ -7,12 +7,15 @@ import {
   validateScreening,
 } from '../sections/laboratory/screening/screening-rules';
 import { screeningSteps } from '../sections/laboratory/screening/screening.types';
-import { observationsExceedLimit } from '../shared/text-field-contracts';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
-import type { ApheresisCandidate } from '../sections/laboratory/screening/screening.types';
+import type { ApheresisCandidate, ScreeningRecord } from '../sections/laboratory/screening/screening.types';
 import { fullName } from '../sections/collection/collection-rules';
 import { readProcessingState, writeProcessingState, type MockStorage } from './mock-processing-store';
+
+function screeningResultData({ tests, bloodData, additionalTest, recommendations }: ScreeningRecord) {
+  return JSON.stringify([tests, bloodData, additionalTest, recommendations]);
+}
 
 export function createMockProcessingApi(
   selection: ApplicantSelectionApi,
@@ -171,7 +174,6 @@ export function createMockProcessingApi(
       const previous = state.screenings.find((record) => record.id === input.id);
       if (!previous || previous.status === 'validated' || previous.revision !== input.revision)
         throw new Error('SCREENING_CONFLICT');
-      if (observationsExceedLimit(input.observations)) throw new Error('SCREENING_OBSERVATIONS_LIMIT');
       if (
         previous.completedSteps.includes('reception') &&
         (input.receivedOn !== previous.receivedOn ||
@@ -179,15 +181,24 @@ export function createMockProcessingApi(
           input.identityVerified !== previous.identityVerified)
       )
         throw new Error('SCREENING_RECEPTION_LOCKED');
+      const resultsChanged = screeningResultData(previous) !== screeningResultData(input);
+      if (step === 'validation' && previous.completedSteps.includes('results') && resultsChanged)
+        throw new Error('SCREENING_RESULTS_NOT_SAVED');
+      const reopenResults = !step && resultsChanged && previous.completedSteps.includes('results');
       const record = structuredClone({
         ...previous,
         receivedOn: input.receivedOn,
         receivedBy: input.receivedBy,
         identityVerified: input.identityVerified,
-        performedOn: input.performedOn,
-        performedBy: input.performedBy,
+        completedSteps: reopenResults
+          ? previous.completedSteps.filter((completed) => completed !== 'results')
+          : previous.completedSteps,
+        performedOn: step === 'results' ? input.performedOn : reopenResults ? '' : previous.performedOn,
+        performedBy: step === 'results' ? input.performedBy : reopenResults ? '' : previous.performedBy,
         tests: input.tests,
-        observations: input.observations,
+        bloodData: input.bloodData,
+        additionalTest: input.additionalTest,
+        recommendations: input.recommendations,
         validatedBy: input.validatedBy,
       });
       if (step) {

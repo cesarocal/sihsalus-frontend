@@ -23,12 +23,12 @@ en consulta y la confirmación de salida.
 5. Registro propone la fecha de hoy y admite fechas desde la admisión hasta hoy. Guarda el lote de bolsa, las complicaciones y la elección explícita de Completa o Incompleta. Toma el nombre del responsable de la sesión de OpenMRS y lo conserva al completar el paso. La donación efectiva actualiza Donantes.
 6. Constancia deriva identidad/edad/grupo/Rh/Hb/Hct, permite decidir correo y fecha de resultados (diez días calendario por defecto). Incluye el tipo de donación, el paciente beneficiario cuando es por reposición y la firma física del donante. Guardar finaliza y retira la postulación del listado activo y la conserva para antecedentes/autocompletado.
 7. Tamizaje lista muestras, permite buscar y filtrar por estado/resultado. Recepción muestra el número de postulante cuando corresponde, toma el responsable de la sesión de OpenMRS y exige fecha/hora y confirmación de concordancia de nombre/documento/código entre tubo y registro. Al completar la etapa, conserva el nombre registrado. Los valores de etapas cerradas se pueden seleccionar y copiar en campos de solo lectura.
-8. Captura siete pruebas: HBsAg, Anti-HBc, Anti-HCV, Anti-VIH 1/2, Anti-HTLV I/II, Chagas y Sífilis. Cada una requiere resultado y reactivo/marca/lote. Fecha y profesional comunes se aplican a todas las pruebas de esta captura.
+8. Resultados registra ABO, Rh, hematocrito, hemoglobina, los resultados de las siete pruebas infecciosas requeridas, una prueba adicional opcional y las sugerencias de evaluación por Gastroenterología, Infectología y PROCETS. Al elegir Guardar y continuar se registran la fecha, la hora y el nombre del usuario de la sesión. Si se guardan cambios de resultados como borrador tras haber completado la etapa, se requiere volver a confirmarla.
 9. Revisión exige validador y todas las pruebas completas. Resultado global: Reactivo si alguna es reactiva, luego Indeterminado si corresponde, sino No reactivo. Validar bloquea edición; permite imprimir el resumen.
 
 La X utiliza la confirmación compartida `../../shared/exit-confirmation.component.tsx`, con **Seguir editando / Salir** y la casilla **Guardar el avance antes de salir** marcada por defecto, también en Tamizaje. Guardar conserva incluso una etapa incompleta, respetando el límite heredado del lote; desmarcar descarta solo cambios no guardados, nunca el registro previo. Un formulario guardado sin nueva edición se cierra sin otra escritura ni aviso de éxito. Un fallo devuelve al formulario sin perder su edición. Durante el envío se bloquea la salida y el guardado duplicado. Etiqueta/volumen/registro cerrados son de consulta; un documento finalizado se cierra sin esta confirmación. Revisiones antiguas no sobrescriben registros actualizados.
 
-El [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) documenta el contador de lote, el conteo UTF-16, la compatibilidad histórica, los mensajes específicos y los límites backend aún pendientes. No se imponen máximos genéricos a las observaciones ni al lote de reactivo.
+El [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) documenta el contador de lote, el conteo UTF-16, la compatibilidad histórica, los mensajes específicos y los límites backend aún pendientes.
 
 **La unidad permanece en cuarentena con cualquier resultado. Reactivo no confirma diagnóstico.** Liberación/descarte, confirmaciones/repeticiones, sello de calidad, seguimiento, rechazo/reemplazo de muestras y reacción adversa están pendientes. El riesgo biológico autólogo no se infiere automáticamente de un tamizaje único.
 
@@ -46,6 +46,8 @@ El panel proviene de los documentos entregados y necesita validación del protoc
 - `../../api/mock-{blood-bank-processing.api,processing-store}.ts`: persistencia y fixtures.
 
 `useMockData=false` muestra error seguro: los adaptadores reales están deshabilitados. Hay que acordar payloads, conceptos/UUIDs configurables, encuentros/órdenes, provider/ubicación y autorización por operación antes de implementar el OMOD.
+
+En Tamizaje, el DDL de referencia aún requiere reactivo, marca y lote por prueba. La integración deberá definir el origen de esos datos. El formulario mock conserva esos valores y las observaciones de registros históricos en el almacenamiento local.
 
 ### Catálogos de etiqueta
 

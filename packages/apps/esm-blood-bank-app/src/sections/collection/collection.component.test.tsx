@@ -11,7 +11,8 @@ import { newCollection } from './collection-rules';
 import { applicationsMock } from '../../mocks/applicant-selection.mock';
 import { CollectionWorkflow } from './collection-workflow.component';
 import { ScreeningPage } from '../laboratory/screening/screening-page.component';
-import { screeningTests } from '../laboratory/screening/screening.types';
+import { screeningResultsFixture } from '../laboratory/screening/screening-test-fixtures';
+import { screeningSpecialties, screeningTests } from '../laboratory/screening/screening.types';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { showSnackbar } from '@openmrs/esm-framework';
 import { calculateReturnDate, today } from '../applicant-selection/selection-rules';
@@ -518,13 +519,9 @@ describe('collection and screening screens', () => {
     record.identityVerified = true;
     record.receivedOn = localDateTime();
     record.receivedBy = 'Recepción DEMO';
-    record.performedOn = localDateTime();
-    record.performedBy = 'Laboratorio DEMO';
     record.validatedBy = 'Validador DEMO';
-    for (const test of screeningTests)
-      record.tests[test] = { result: 'nonReactive', reagent: 'Reactivo DEMO', brand: 'Marca DEMO', lot: 'Lote DEMO' };
     record = await processing.screening.saveScreening(record, 'reception');
-    record = await processing.screening.saveScreening(record, 'results');
+    record = await processing.screening.saveScreening(screeningResultsFixture(record), 'results');
     render(<ScreeningPage api={processing.screening} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
     expect(showSnackbar).not.toHaveBeenCalled();
@@ -562,17 +559,17 @@ describe('collection and screening screens', () => {
     expect(screen.getByLabelText(t('receivedBy'))).toHaveValue('Mario Pérez Salas');
     fireEvent.click(screen.getByRole('checkbox', { name: t('identityVerified') }));
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
-    const performedBy = await screen.findByLabelText(t('performedBy'));
+    expect(await screen.findByLabelText(t('performedBy'))).toHaveValue('Mario Pérez Salas');
     expect(screen.queryByText(t('sampleType'), { selector: 'dt' })).not.toBeInTheDocument();
     expect(screen.queryByText(t('sampleContainer'), { selector: 'dt' })).not.toBeInTheDocument();
     const results = screen.getByRole('button', { name: t('results') });
     expect(results).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.change(performedBy, { target: { value: 'Tecnólogo de prueba' } });
+    fireEvent.change(screen.getByLabelText(t('hemoglobin')), { target: { value: '14.2' } });
     fireEvent.click(results);
     expect(results).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     expect(results).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByLabelText(t('performedBy'))).toHaveValue('Tecnólogo de prueba');
+    expect(screen.getByLabelText(t('hemoglobin'))).toHaveValue('14.2');
     sessionPerson.display = 'Otra persona';
     fireEvent.click(screen.getByRole('button', { name: t('previous') }));
     expect(screen.getByLabelText(t('receivedBy'))).toHaveValue('Mario Pérez Salas');
@@ -580,6 +577,64 @@ describe('collection and screening screens', () => {
     expect(confirmation).toHaveValue(t('yes'));
     expect(confirmation).toBeEnabled();
     expect(confirmation).toHaveAttribute('readonly');
+  });
+  it('captures the results operator and timestamp only on confirmation and reviews the complete panel', async () => {
+    const processing = api();
+    const sample = (await processing.screening.listScreenings())[0];
+    await processing.screening.saveScreening(
+      { ...sample, receivedBy: 'Recepción DEMO', receivedOn: localDateTime(), identityVerified: true },
+      'reception',
+    );
+    sessionPerson.display = 'Tecnóloga de prueba';
+    render(<ScreeningPage api={processing.screening} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
+    expect(screen.getByLabelText(t('performedBy'))).toHaveValue('Tecnóloga de prueba');
+    expect(screen.getByLabelText(t('performedBy'))).toHaveAttribute('readonly');
+    expect(screen.getByLabelText(t('performedOn'))).toHaveValue('');
+    expect(screen.queryByLabelText(t('observations'))).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(t('reagent'))).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(t('aboGroup')), { target: { value: 'AB' } });
+    fireEvent.change(screen.getByLabelText(t('rhFactor')), { target: { value: '-' } });
+    fireEvent.change(screen.getByLabelText(t('hematocrit')), { target: { value: '42,5' } });
+    fireEvent.change(screen.getByLabelText(t('hemoglobin')), { target: { value: '14' } });
+    for (const test of screeningTests) {
+      const row = within(screen.getByRole('group', { name: t(`screeningTest_${test}`) }));
+      fireEvent.click(row.getByRole('radio', { name: t('nonReactive') }));
+    }
+    fireEvent.change(screen.getByLabelText(t('screeningAdditionalTest')), {
+      target: { value: 'Prueba adicional DEMO' },
+    });
+    fireEvent.click(
+      within(screen.getByRole('group', { name: t('screeningAdditionalResult') })).getByRole('radio', {
+        name: t('inconclusive'),
+      }),
+    );
+    for (const specialty of screeningSpecialties) {
+      const group = within(screen.getByRole('group', { name: t(specialty) }));
+      fireEvent.click(group.getByRole('radio', { name: t(specialty === 'infectiousDiseases' ? 'yes' : 'no') }));
+    }
+    fireEvent.click(screen.getByRole('button', { name: t('saveDraft') }));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('screeningDraftUpdated') })),
+    );
+    const draft = (await processing.screening.listScreenings()).find((record) => record.id === sample.id);
+    expect(draft?.performedBy).toBe('');
+    expect(draft?.performedOn).toBe('');
+    const confirmedAt = localDateTime();
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    await screen.findByRole('button', { name: t('validateResults') });
+    const saved = (await processing.screening.listScreenings()).find((record) => record.id === sample.id);
+    expect(saved).toMatchObject({
+      performedBy: 'Tecnóloga de prueba',
+      bloodData: { aboGroup: 'AB', rhFactor: '-', hematocrit: '42,5', hemoglobin: '14' },
+      additionalTest: { name: 'Prueba adicional DEMO', result: 'inconclusive' },
+      recommendations: { gastroenterology: 'no', infectiousDiseases: 'yes', procets: 'no' },
+    });
+    if (!saved) throw new Error('SCREENING_RESULT_NOT_SAVED');
+    expect(saved.performedOn >= confirmedAt && saved.performedOn <= localDateTime()).toBe(true);
+    expect(screen.getByRole('row', { name: 'Prueba adicional DEMO Indeterminado' })).toBeInTheDocument();
+    expect(screen.getByText('42,5')).toBeInTheDocument();
+    expect(screen.getAllByText(t('screeningWarning'))).toHaveLength(1);
   });
   it('escapes names in printed documents and includes the completed replacement donation details', () => {
     const record = newCollection(applicationsMock()[2]);

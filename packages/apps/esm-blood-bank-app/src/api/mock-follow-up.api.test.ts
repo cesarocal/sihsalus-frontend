@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { localDateTime } from '../sections/laboratory/screening/screening-rules';
-import { screeningTests, type ScreeningResult } from '../sections/laboratory/screening/screening.types';
+import { screeningResultsFixture } from '../sections/laboratory/screening/screening-test-fixtures';
+import type { ScreeningResult } from '../sections/laboratory/screening/screening.types';
 import type { FollowUpCase, FollowUpKind } from '../sections/follow-up/follow-up.types';
 import { newFollowUp } from '../sections/follow-up/follow-up-rules';
 import { createMockFollowUpApi } from './mock-follow-up.api';
@@ -51,17 +52,7 @@ async function validateSamples(record: FollowUpCase, result: ScreeningResult = '
       },
       'reception',
     );
-    sample.performedBy = 'Laboratorio DEMO';
-    sample.performedOn = localDateTime();
-    screeningTests.forEach((key) => {
-      sample.tests[key] = {
-        result,
-        reagent: 'Reactivo DEMO',
-        brand: 'Marca DEMO',
-        lot: 'L-DEMO',
-      };
-    });
-    sample = await screening.saveScreening(sample, 'results');
+    sample = await screening.saveScreening(screeningResultsFixture(sample, result), 'results');
     await screening.saveScreening({ ...sample, validatedBy: 'Validador DEMO' }, 'validation');
   }
 }

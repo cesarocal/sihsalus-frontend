@@ -1,6 +1,11 @@
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { formatScreeningCollectionTime, globalScreeningResult, screeningOriginLabel } from './screening-rules';
-import { screeningTests, type ScreeningRecord } from './screening.types';
+import {
+  screeningBloodFields,
+  screeningSpecialties,
+  screeningTableTests,
+  type ScreeningRecord,
+} from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 
 export function ScreeningIdentity({
@@ -36,7 +41,15 @@ export function ScreeningIdentity({
     </dl>
   );
 }
-export function ScreeningReport({ record, t }: { record: ScreeningRecord; t: ProcessingTranslate }) {
+export function ScreeningReport({
+  record,
+  t,
+  showWarning = true,
+}: {
+  record: ScreeningRecord;
+  t: ProcessingTranslate;
+  showWarning?: boolean;
+}) {
   return (
     <article className={styles.report}>
       <p data-demo>{t('printPrototype')}</p>
@@ -47,39 +60,71 @@ export function ScreeningReport({ record, t }: { record: ScreeningRecord; t: Pro
           (key) => (
             <div key={key}>
               <dt>{t(key)}</dt>
-              <dd>{record[key] || '—'}</dd>
+              <dd>
+                {(key === 'performedOn' || key === 'receivedOn'
+                  ? formatScreeningCollectionTime(record[key])
+                  : record[key]) || '—'}
+              </dd>
             </div>
           ),
         )}
       </dl>
+      {record.bloodData && (
+        <>
+          <h3>{t('screeningBloodData')}</h3>
+          <dl>
+            {screeningBloodFields.map((field) => (
+              <div key={field}>
+                <dt>{t(field)}</dt>
+                <dd>{record.bloodData?.[field] || '—'}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
       <table>
         <thead>
           <tr>
-            {['test', 'result', 'reagent', 'brand', 'lot'].map((key) => (
-              <th key={key}>{t(key)}</th>
-            ))}
+            <th scope="col">{t('screeningTestPerformed')}</th>
+            <th scope="col">{t('result')}</th>
           </tr>
         </thead>
         <tbody>
-          {screeningTests.map((test) => (
+          {screeningTableTests.map((test) => (
             <tr key={test}>
-              <td>{t(test)}</td>
-              <td>{record.tests[test].result ? t(record.tests[test].result) : '—'}</td>
-              <td>{record.tests[test].reagent || '—'}</td>
-              <td>{record.tests[test].brand || '—'}</td>
-              <td>{record.tests[test].lot || '—'}</td>
+              <td>{t(`screeningTest_${test}`)}</td>
+              <td>{record.tests[test]?.result ? t(record.tests[test].result) : '—'}</td>
             </tr>
           ))}
+          {record.additionalTest?.name.trim() && (
+            <tr>
+              <td>{record.additionalTest.name}</td>
+              <td>{record.additionalTest.result ? t(record.additionalTest.result) : '—'}</td>
+            </tr>
+          )}
         </tbody>
       </table>
       <p>
         {t('globalResult')}: {t(globalScreeningResult(record) || 'pendingResult')}
       </p>
-      <p>
-        {t('observations')}: {record.observations || '—'}
-      </p>
+      {record.recommendations && (
+        <>
+          <h3>{t('screeningRecommendations')}</h3>
+          <dl>
+            {screeningSpecialties.map((specialty) => {
+              const indicated = record.recommendations?.[specialty];
+              return (
+                <div key={specialty}>
+                  <dt>{t(specialty)}</dt>
+                  <dd>{indicated ? t(indicated) : '—'}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        </>
+      )}
       <footer>
-        <p>{t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}</p>
+        {showWarning && <p>{t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}</p>}
         <p>{t('signature')}: __________________________</p>
       </footer>
     </article>
