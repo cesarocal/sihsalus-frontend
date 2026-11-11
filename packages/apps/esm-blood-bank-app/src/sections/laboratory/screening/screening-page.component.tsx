@@ -25,7 +25,12 @@ import { notifySuccess } from '../../../shared/notify-success';
 import { ScreeningWorkflow } from './screening-workflow.component';
 import { ScreeningHistory } from './screening-history.component';
 import { ApheresisSampleWorkflow } from './apheresis-sample-workflow.component';
-import { matchesScreeningSearch, screeningCategory, screeningOriginLabel } from './screening-rules';
+import {
+  formatScreeningCollectionTime,
+  matchesScreeningSearch,
+  screeningCategory,
+  screeningOriginLabel,
+} from './screening-rules';
 import type { ScreeningCategory, ScreeningRecord } from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 import screeningStyles from './screening.scss';
@@ -148,7 +153,7 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
               (record.origin?.type === 'followUp' ? record.origin.followUpId : '—'),
             record.applicantName,
             record.documentNumber,
-            record.collectedOn,
+            formatScreeningCollectionTime(record.collectedOn),
             <Tag key="status" type={record.status === 'inProgress' ? 'blue' : 'gray'}>
               {t(record.status)}
             </Tag>,

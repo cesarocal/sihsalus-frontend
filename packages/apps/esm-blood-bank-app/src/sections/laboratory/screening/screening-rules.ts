@@ -14,6 +14,12 @@ export function localDateTime() {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
+
+export function formatScreeningCollectionTime(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(value);
+  return match ? `${match[3]}-${match[2]}-${match[1]} ${match[4]}` : value;
+}
+
 export function newScreening(collection: CollectionRecord): ScreeningRecord {
   return newScreeningSample({
     id: `mock-screening-${collection.id}`,

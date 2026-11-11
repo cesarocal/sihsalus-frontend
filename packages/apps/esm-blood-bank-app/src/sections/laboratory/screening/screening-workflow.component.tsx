@@ -1,6 +1,15 @@
-import { Button, Checkbox, InlineNotification, Select, SelectItem, TextInput } from '@carbon/react';
+import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Checkbox,
+  InlineNotification,
+  Select,
+  SelectItem,
+  TextInput,
+} from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
-import { formatDatetime } from '@openmrs/esm-framework';
+import { formatDatetime, useSession } from '@openmrs/esm-framework';
 import { useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
 import { ObservationsTextArea } from '../../../shared/observations-text-area.component';
@@ -14,6 +23,7 @@ import { ScreeningIdentity, ScreeningReport } from './screening-report.component
 import { ApheresisTubeLabel } from './apheresis-documents.component';
 import { localDateTime, validateScreening } from './screening-rules';
 import { screeningSteps, screeningTests, type ScreeningRecord, type ScreeningResult } from './screening.types';
+import screeningStyles from './screening.scss';
 
 export function ScreeningWorkflow({
   initial,
@@ -28,18 +38,23 @@ export function ScreeningWorkflow({
   onSaved: () => void;
   t: ProcessingTranslate;
 }) {
-  const [record, setRecord] = useState(() => ({
+  const [storedRecord, setRecord] = useState(() => ({
     ...initial,
     receivedOn: initial.receivedOn || localDateTime(),
     performedOn: initial.performedOn || localDateTime(),
   }));
+  const { authenticated, user } = useSession();
+  const operatorName = authenticated ? (user?.person?.display?.trim() ?? '') : '';
   const [step, setStep] = useState(initial.status === 'validated' ? 2 : Math.min(initial.completedSteps.length, 2));
   const [errors, setErrors] = useState<string[]>([]);
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(!initial.receivedOn || !initial.performedOn);
-  const finalized = record.status === 'validated';
-  const locked = finalized || (step === 0 && record.completedSteps.includes('reception'));
+  const [resultsExpanded, setResultsExpanded] = useState(true);
+  const finalized = storedRecord.status === 'validated';
+  const receptionSaved = storedRecord.completedSteps.includes('reception');
+  const record = receptionSaved || finalized ? storedRecord : { ...storedRecord, receivedBy: operatorName };
+  const locked = finalized || (step === 0 && receptionSaved);
   const stage = screeningSteps[step];
   const change = (next: ScreeningRecord) => {
     setRecord(next);
@@ -48,6 +63,7 @@ export function ScreeningWorkflow({
   const save = async (advance = false) => {
     if (saving) return false;
     if (advance && locked) {
+      if (stage === 'reception') setResultsExpanded(true);
       setStep((value) => Math.min(value + 1, 2));
       return true;
     }
@@ -56,7 +72,10 @@ export function ScreeningWorkflow({
     if (advance && !missing.length) missing.push(...validateScreening(record, stage));
     setErrors(missing);
     setFailed('');
-    if (missing.length) return false;
+    if (missing.length) {
+      if (stage === 'results' || missing.includes('observationsTooLong')) setResultsExpanded(true);
+      return false;
+    }
     setSaving(true);
     try {
       const result = await api.saveScreening(record, advance ? stage : undefined);
@@ -93,11 +112,13 @@ export function ScreeningWorkflow({
           : record[field]
       }
       type={!locked && field.endsWith('On') ? 'datetime-local' : 'text'}
-      readOnly={locked}
-      disabled={saving && !locked}
+      readOnly={locked || field === 'receivedBy'}
+      disabled={saving && !locked && field !== 'receivedBy'}
       invalid={errors.includes(field)}
-      invalidText={t('requiredFields')}
-      onChange={(event) => change({ ...record, [field]: event.target.value })}
+      invalidText={t(field === 'receivedBy' ? 'screeningReceiverUnavailable' : 'requiredFields')}
+      onChange={(event) => {
+        if (!locked && field !== 'receivedBy') change({ ...record, [field]: event.target.value });
+      }}
     />
   );
   const print = () => {
@@ -132,13 +153,14 @@ export function ScreeningWorkflow({
         void save(true);
       }}
       onPrevious={() => {
+        if (step === 2) setResultsExpanded(true);
         setStep((value) => value - 1);
         setErrors([]);
         setFailed('');
       }}
       advanceLabel={t(step === 2 ? 'validateResults' : 'next')}
       compactHeader={step === 0}
-      hideStepHeading={step === 0}
+      hideStepHeading={step < 2}
       t={t}
       extraActions={
         <>
@@ -191,79 +213,84 @@ export function ScreeningWorkflow({
               onChange={(_event, { checked }) => change({ ...record, identityVerified: checked })}
             />
           )}
-          <p className={styles.help}>{t('identityHelp')}</p>
         </>
       )}
       {step === 1 && (
-        <>
-          <div className={styles.fields}>
-            {input('performedOn')}
-            {input('performedBy')}
-          </div>
-          {screeningTests.map((test) => (
-            <section className={styles.questionGroup} key={test} aria-label={t(test)}>
-              <h3>{t(test)}</h3>
-              <div className={styles.fields}>
-                {locked ? (
-                  <TextInput
-                    id={`screening-${test}-result`}
-                    labelText={t('result')}
-                    value={record.tests[test].result ? t(record.tests[test].result) : '—'}
-                    readOnly
-                  />
-                ) : (
-                  <Select
-                    id={`screening-${test}-result`}
-                    labelText={t('result')}
-                    value={record.tests[test].result}
-                    disabled={saving}
-                    invalid={errors.includes(test)}
-                    invalidText={t('requiredFields')}
-                    onChange={(event) =>
-                      change({
-                        ...record,
-                        tests: {
-                          ...record.tests,
-                          [test]: { ...record.tests[test], result: event.target.value as ScreeningResult },
-                        },
-                      })
-                    }
-                  >
-                    <SelectItem value="" text={t('choose')} />
-                    {['nonReactive', 'reactive', 'inconclusive'].map((value) => (
-                      <SelectItem key={value} value={value} text={t(value)} />
-                    ))}
-                  </Select>
-                )}
-                {(['reagent', 'brand', 'lot'] as const).map((field) => (
-                  <TextInput
-                    key={field}
-                    id={`screening-${test}-${field}`}
-                    labelText={t(field)}
-                    value={record.tests[test][field]}
-                    readOnly={locked}
-                    disabled={saving && !locked}
-                    onChange={(event) =>
-                      change({
-                        ...record,
-                        tests: { ...record.tests, [test]: { ...record.tests[test], [field]: event.target.value } },
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-          <ObservationsTextArea
-            id="screening-notes"
-            t={t}
-            labelText={t('observations')}
-            value={record.observations}
-            readOnly={locked}
-            disabled={saving && !locked}
-            onChange={(event) => change({ ...record, observations: event.target.value })}
-          />
-        </>
+        <Accordion className={screeningStyles.resultsAccordion}>
+          <AccordionItem
+            title={t('results')}
+            open={resultsExpanded}
+            onHeadingClick={({ isOpen }) => setResultsExpanded(isOpen)}
+          >
+            <div className={styles.fields}>
+              {input('performedOn')}
+              {input('performedBy')}
+            </div>
+            {screeningTests.map((test) => (
+              <section className={styles.questionGroup} key={test} aria-label={t(test)}>
+                <h3>{t(test)}</h3>
+                <div className={styles.fields}>
+                  {locked ? (
+                    <TextInput
+                      id={`screening-${test}-result`}
+                      labelText={t('result')}
+                      value={record.tests[test].result ? t(record.tests[test].result) : '—'}
+                      readOnly
+                    />
+                  ) : (
+                    <Select
+                      id={`screening-${test}-result`}
+                      labelText={t('result')}
+                      value={record.tests[test].result}
+                      disabled={saving}
+                      invalid={errors.includes(test)}
+                      invalidText={t('requiredFields')}
+                      onChange={(event) =>
+                        change({
+                          ...record,
+                          tests: {
+                            ...record.tests,
+                            [test]: { ...record.tests[test], result: event.target.value as ScreeningResult },
+                          },
+                        })
+                      }
+                    >
+                      <SelectItem value="" text={t('choose')} />
+                      {['nonReactive', 'reactive', 'inconclusive'].map((value) => (
+                        <SelectItem key={value} value={value} text={t(value)} />
+                      ))}
+                    </Select>
+                  )}
+                  {(['reagent', 'brand', 'lot'] as const).map((field) => (
+                    <TextInput
+                      key={field}
+                      id={`screening-${test}-${field}`}
+                      labelText={t(field)}
+                      value={record.tests[test][field]}
+                      readOnly={locked}
+                      disabled={saving && !locked}
+                      onChange={(event) =>
+                        change({
+                          ...record,
+                          tests: { ...record.tests, [test]: { ...record.tests[test], [field]: event.target.value } },
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+            <ObservationsTextArea
+              id="screening-notes"
+              t={t}
+              labelText={t('observations')}
+              value={record.observations}
+              readOnly={locked}
+              disabled={saving && !locked}
+              onChange={(event) => change({ ...record, observations: event.target.value })}
+            />
+          </AccordionItem>
+        </Accordion>
       )}
       {step === 2 && (
         <>

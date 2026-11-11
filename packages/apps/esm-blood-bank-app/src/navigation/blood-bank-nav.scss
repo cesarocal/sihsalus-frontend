@@ -1,0 +1,4 @@
+// Hide the decorative dot added by Billing's global submenu styles.
+.subsectionLabel::before {
+  display: none;
+}

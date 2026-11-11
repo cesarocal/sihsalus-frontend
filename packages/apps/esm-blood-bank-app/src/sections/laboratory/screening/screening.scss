@@ -20,6 +20,14 @@
   padding: 0 layout.$spacing-05 layout.$spacing-05;
 }
 
+.resultsAccordion {
+  margin-block-start: layout.$spacing-05;
+
+  :global(.cds--accordion__content) {
+    padding-inline: 0;
+  }
+}
+
 @media (max-width: 42rem) {
   .filters {
     grid-template-columns: 1fr;

@@ -120,11 +120,13 @@ describe('collection and screening screens', () => {
     );
     const action = section === 'collection' ? /^(Extraer sangre|Continuar extracción)$/ : /^Registrar tamizaje$/;
     fireEvent.click(await screen.findByRole('button', { name: action }));
-    const field = t(section === 'collection' ? 'component' : 'receivedBy');
-    fireEvent.change(screen.getByLabelText(field), { target: { value: 'Valor guardado DEMO' } });
+    const field = t(section === 'collection' ? 'component' : 'receivedOn');
+    const savedValue = section === 'collection' ? 'Valor guardado DEMO' : '2025-01-02T13:30';
+    const unsavedValue = section === 'collection' ? 'Cambio no guardado DEMO' : '2025-01-02T13:40';
+    fireEvent.change(screen.getByLabelText(field), { target: { value: savedValue } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar avance' }));
     await waitFor(() => expect(showSnackbar).toHaveBeenCalled());
-    fireEvent.change(screen.getByLabelText(field), { target: { value: 'Cambio no guardado DEMO' } });
+    fireEvent.change(screen.getByLabelText(field), { target: { value: unsavedValue } });
     fireEvent.click(
       within(
         screen.getByRole('dialog', { name: t(section === 'collection' ? 'collectionTitle' : 'screeningTitle') }),
@@ -137,7 +139,7 @@ describe('collection and screening screens', () => {
     expect(save).toHaveBeenCalledOnce();
     fireEvent.click(await screen.findByRole('button', { name: action }));
     if (section === 'collection') await screen.findByRole('option', { name: 'UPSS Banco de Sangre' });
-    expect(screen.getByLabelText(field)).toHaveValue('Valor guardado DEMO');
+    expect(screen.getByLabelText(field)).toHaveValue(savedValue);
   });
 
   it.each([
@@ -159,13 +161,14 @@ describe('collection and screening screens', () => {
       await screen.findByRole('button', { name: section === 'collection' ? 'Extraer sangre' : 'Registrar tamizaje' }),
     );
     const title = t(section === 'collection' ? 'collectionTitle' : 'screeningTitle');
-    const field = t(section === 'collection' ? 'component' : 'receivedBy');
-    fireEvent.change(screen.getByLabelText(field), { target: { value: 'Avance pendiente DEMO' } });
+    const field = t(section === 'collection' ? 'component' : 'receivedOn');
+    const pendingValue = section === 'collection' ? 'Avance pendiente DEMO' : '2025-01-02T13:30';
+    fireEvent.change(screen.getByLabelText(field), { target: { value: pendingValue } });
     fireEvent.click(within(screen.getByRole('dialog', { name: title })).getByRole('button', { name: 'Cerrar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: t('exitTitle') })).not.toBeInTheDocument());
     expect(screen.getByRole('dialog', { name: title }).closest('.cds--modal')).toHaveClass('is-visible');
-    expect(screen.getByLabelText(field)).toHaveValue('Avance pendiente DEMO');
+    expect(screen.getByLabelText(field)).toHaveValue(pendingValue);
     expect(
       screen.getByText(t(section === 'collection' ? 'collectionSaveFailed' : 'screeningSaveFailed')),
     ).toBeInTheDocument();
@@ -536,23 +539,43 @@ describe('collection and screening screens', () => {
       (await processing.collection.listCollections()).find((item) => item.id === record.collectionId)?.unitStatus,
     ).toBe('quarantine');
   });
-  it('opens laboratory reception, requires identity confirmation and saves only a draft on exit', async () => {
-    render(<ScreeningPage api={api().screening} />);
+  it('records the signed-in receiver and keeps screening results editable when expanding the panel', async () => {
+    const processing = api();
+    render(<ScreeningPage api={processing.screening} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
+    const modal = within(screen.getByRole('dialog', { name: t('screeningTitle') }));
     expect(screen.getByText(t('applicantNumber'), { selector: 'dt' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: t('reception') })).not.toBeInTheDocument();
+    expect(modal.queryByText(t('sampleType'))).not.toBeInTheDocument();
+    expect(modal.queryByText(t('sampleContainer'))).not.toBeInTheDocument();
+    expect(modal.queryByText(/Ante una discrepancia/)).not.toBeInTheDocument();
+    expect(modal.getByText(/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(modal.getByLabelText(t('receivedBy'))).toHaveValue('Rosa Torres García');
+    expect(modal.getByLabelText(t('receivedBy'))).toHaveAttribute('readonly');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar' }));
     expect(screen.getByRole('alert', { name: t('requiredFields') })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(t('receivedBy')), { target: { value: 'Recepción DEMO' } });
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Tamizaje' })).getByRole('button', { name: 'Cerrar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    sessionPerson.display = 'Mario Pérez Salas';
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
-    expect(screen.getByLabelText(t('receivedBy'))).toHaveValue('Recepción DEMO');
+    expect(screen.getByLabelText(t('receivedBy'))).toHaveValue('Mario Pérez Salas');
     fireEvent.click(screen.getByRole('checkbox', { name: t('identityVerified') }));
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
-    await screen.findByLabelText(t('performedBy'));
+    const performedBy = await screen.findByLabelText(t('performedBy'));
+    expect(screen.queryByText(t('sampleType'), { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText(t('sampleContainer'), { selector: 'dt' })).not.toBeInTheDocument();
+    const results = screen.getByRole('button', { name: t('results') });
+    expect(results).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.change(performedBy, { target: { value: 'Tecnólogo de prueba' } });
+    fireEvent.click(results);
+    expect(results).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    expect(results).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText(t('performedBy'))).toHaveValue('Tecnólogo de prueba');
+    sessionPerson.display = 'Otra persona';
     fireEvent.click(screen.getByRole('button', { name: t('previous') }));
+    expect(screen.getByLabelText(t('receivedBy'))).toHaveValue('Mario Pérez Salas');
     const confirmation = screen.getByRole('textbox', { name: t('identityVerified') });
     expect(confirmation).toHaveValue(t('yes'));
     expect(confirmation).toBeEnabled();

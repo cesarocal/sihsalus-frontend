@@ -1,9 +1,17 @@
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
-import { globalScreeningResult, screeningOriginLabel } from './screening-rules';
+import { formatScreeningCollectionTime, globalScreeningResult, screeningOriginLabel } from './screening-rules';
 import { screeningTests, type ScreeningRecord } from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 
-export function ScreeningIdentity({ record, t }: { record: ScreeningRecord; t: ProcessingTranslate }) {
+export function ScreeningIdentity({
+  record,
+  t,
+  showSampleDetails = false,
+}: {
+  record: ScreeningRecord;
+  t: ProcessingTranslate;
+  showSampleDetails?: boolean;
+}) {
   const values = {
     sampleCode: record.sampleCode,
     sampleOrigin: t(screeningOriginLabel(record)),
@@ -14,9 +22,8 @@ export function ScreeningIdentity({ record, t }: { record: ScreeningRecord; t: P
     ...(record.collectedBy ? { collectedBy: record.collectedBy } : {}),
     ...(record.applicationNumber ? { applicantNumber: record.applicationNumber } : {}),
     ...(record.origin?.type === 'followUp' ? { followUpReference: record.origin.followUpId } : {}),
-    collectedOn: record.collectedOn,
-    sampleType: record.sampleType,
-    sampleContainer: record.sampleContainer,
+    collectedOn: formatScreeningCollectionTime(record.collectedOn),
+    ...(showSampleDetails ? { sampleType: record.sampleType, sampleContainer: record.sampleContainer } : {}),
   };
   return (
     <dl className={styles.fields}>
@@ -34,7 +41,7 @@ export function ScreeningReport({ record, t }: { record: ScreeningRecord; t: Pro
     <article className={styles.report}>
       <p data-demo>{t('printPrototype')}</p>
       <h2>{t('results')}</h2>
-      <ScreeningIdentity record={record} t={t} />
+      <ScreeningIdentity record={record} t={t} showSampleDetails />
       <dl>
         {(['receivedOn', 'receivedBy', 'performedOn', 'performedBy', 'validatedBy', 'validatedAt'] as const).map(
           (key) => (

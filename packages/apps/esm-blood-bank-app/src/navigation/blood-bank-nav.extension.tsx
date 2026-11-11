@@ -8,6 +8,7 @@ import { RequireAnyPrivilege } from '../access/require-any-privilege.component';
 import { bloodBankPrivileges as p } from '../access/blood-bank-privileges';
 import { basePath, donorsPath, moduleName } from '../constants';
 import { bloodBankNavigation, type NavigationItem } from './blood-bank-navigation';
+import styles from './blood-bank-nav.scss';
 
 function decorativeIcon(Icon: NonNullable<NavigationItem['icon']>) {
   return function DecorativeIcon() {
@@ -65,7 +66,9 @@ function BloodBankNavContent() {
                             <ChildIcon className="sihsalus-side-nav__icon" size={20} />
                           </span>
                         )}
-                        <span className="sihsalus-side-nav__text">{t(child.labelKey, child.defaultLabel)}</span>
+                        <span className={`sihsalus-side-nav__text ${styles.subsectionLabel}`}>
+                          {t(child.labelKey, child.defaultLabel)}
+                        </span>
                       </span>
                     </SideNavMenuItem>
                   </ProtectedSection>
