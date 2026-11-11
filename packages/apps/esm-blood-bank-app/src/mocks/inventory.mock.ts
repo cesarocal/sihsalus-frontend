@@ -3,6 +3,7 @@ import { newCollection } from '../sections/collection/collection-rules';
 import { inventoryExpiry } from '../sections/inventory/inventory-rules';
 import type { ComponentType, FractionationUnit } from '../sections/laboratory/fractionation/fractionation.types';
 import { screeningTests } from '../sections/laboratory/screening/screening.types';
+import { pendingScreeningRepeatTests } from '../sections/laboratory/screening/screening-repeat-rules';
 import {
   globalScreeningResult,
   localDateTime,
@@ -202,6 +203,7 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
           !Number.isFinite(Date.parse(panel.validatedAt)) ||
           Date.parse(panel.validatedAt) > Date.now() ||
           Date.parse(panel.validatedAt) < Date.parse(panel.performedOn) ||
+          pendingScreeningRepeatTests(panel).length > 0 ||
           panel.result !== 'nonReactive' ||
           globalScreeningResult(panel) !== 'nonReactive' ||
           validateScreening(panel, 'validation').length,

@@ -1,10 +1,11 @@
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { formatScreeningCollectionTime, globalScreeningResult, screeningOriginLabel } from './screening-rules';
+import { consolidatedScreening, screeningReportCode, screeningReportedTests } from './screening-repeat-rules';
 import {
   screeningBloodFields,
   screeningSpecialties,
-  screeningTableTests,
   type ScreeningRecord,
+  type ScreeningRepeatRound,
 } from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 
@@ -44,32 +45,59 @@ export function ScreeningIdentity({
 export function ScreeningReport({
   record,
   t,
-  showWarning = true,
+  review = false,
+  round,
+  current = false,
 }: {
   record: ScreeningRecord;
   t: ProcessingTranslate;
-  showWarning?: boolean;
+  review?: boolean;
+  round?: ScreeningRepeatRound;
+  current?: boolean;
 }) {
+  const reportData = current ? consolidatedScreening(record) : record;
+  const audit = round ?? reportData;
+  const result = round ? consolidatedScreening(record, round.number).result : globalScreeningResult(reportData);
+  const metadata = [
+    'performedOn',
+    'performedBy',
+    ...(!review && audit.status === 'validated' ? (['validatedBy', 'validatedAt'] as const) : []),
+  ] as const;
   return (
     <article className={styles.report}>
-      <p data-demo>{t('printPrototype')}</p>
-      <h2>{t('results')}</h2>
+      <h2>
+        {round
+          ? t('screeningRepeatNumber', { number: String(round.number - 1) })
+          : t(current ? 'screeningCurrentResults' : 'results')}
+      </h2>
       <ScreeningIdentity record={record} t={t} showSampleDetails />
       <dl>
-        {(['receivedOn', 'receivedBy', 'performedOn', 'performedBy', 'validatedBy', 'validatedAt'] as const).map(
-          (key) => (
-            <div key={key}>
-              <dt>{t(key)}</dt>
-              <dd>
-                {(key === 'performedOn' || key === 'receivedOn'
-                  ? formatScreeningCollectionTime(record[key])
-                  : record[key]) || '—'}
-              </dd>
-            </div>
-          ),
+        {!current && (
+          <div>
+            <dt>{t('screeningReportNumber')}</dt>
+            <dd>{screeningReportCode(record, round?.number)}</dd>
+          </div>
         )}
+        {round && (
+          <div>
+            <dt>{t('screeningPreviousReport')}</dt>
+            <dd>{screeningReportCode(record, round.number - 1)}</dd>
+          </div>
+        )}
+        {(['receivedOn', 'receivedBy'] as const).map((field) => (
+          <div key={field}>
+            <dt>{t(field)}</dt>
+            <dd>{(field === 'receivedOn' ? formatScreeningCollectionTime(record[field]) : record[field]) || '—'}</dd>
+          </div>
+        ))}
+        {metadata.map((key) => (
+          <div key={key}>
+            <dt>{t(key)}</dt>
+            <dd>{(key === 'performedOn' ? formatScreeningCollectionTime(audit[key]) : audit[key]) || '—'}</dd>
+          </div>
+        ))}
       </dl>
-      {record.bloodData && (
+      {!round && record.bloodData && (
         <>
           <h3>{t('screeningBloodData')}</h3>
           <dl>
@@ -90,24 +118,20 @@ export function ScreeningReport({
           </tr>
         </thead>
         <tbody>
-          {screeningTableTests.map((test) => (
+          {screeningReportedTests(reportData, round).map(({ test, labelKey, name, result }) => (
             <tr key={test}>
-              <td>{t(`screeningTest_${test}`)}</td>
-              <td>{record.tests[test]?.result ? t(record.tests[test].result) : '—'}</td>
+              <td>{name || t(labelKey)}</td>
+              <td>{result ? t(result) : '—'}</td>
             </tr>
           ))}
-          {record.additionalTest?.name.trim() && (
-            <tr>
-              <td>{record.additionalTest.name}</td>
-              <td>{record.additionalTest.result ? t(record.additionalTest.result) : '—'}</td>
-            </tr>
-          )}
         </tbody>
       </table>
-      <p>
-        {t('globalResult')}: {t(globalScreeningResult(record) || 'pendingResult')}
-      </p>
-      {record.recommendations && (
+      {(!round || round.status === 'validated') && (
+        <p>
+          {t('globalResult')}: {t(result || 'pendingResult')}
+        </p>
+      )}
+      {!round && record.recommendations && (
         <>
           <h3>{t('screeningRecommendations')}</h3>
           <dl>
@@ -124,8 +148,8 @@ export function ScreeningReport({
         </>
       )}
       <footer>
-        {showWarning && <p>{t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}</p>}
-        <p>{t('signature')}: __________________________</p>
+        {!review && <p>{t(record.unitCode ? 'screeningWarning' : 'sampleScreeningWarning')}</p>}
+        {!current && <p>{t('signature')}: __________________________</p>}
       </footer>
     </article>
   );

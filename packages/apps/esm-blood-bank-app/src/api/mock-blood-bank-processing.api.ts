@@ -2,11 +2,17 @@ import { newCollection, validateCollection, validateCollectionDraft } from '../s
 import { collectionSteps } from '../sections/collection/collection.types';
 import {
   globalScreeningResult,
+  localDateTime,
   newApheresisScreening,
   newScreening,
   validateScreening,
 } from '../sections/laboratory/screening/screening-rules';
-import { screeningSteps } from '../sections/laboratory/screening/screening.types';
+import { screeningRepeatDraft, screeningRepeatTests } from '../sections/laboratory/screening/screening-repeat-rules';
+import {
+  screeningResultOptions,
+  screeningSteps,
+  type ScreeningRepeatRound,
+} from '../sections/laboratory/screening/screening.types';
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import type { CollectionApi, ScreeningApi } from './blood-bank-processing.api';
 import type { ApheresisCandidate, ScreeningRecord } from '../sections/laboratory/screening/screening.types';
@@ -168,6 +174,49 @@ export function createMockProcessingApi(
     },
     async listScreenings() {
       return structuredClone(readProcessingState(getStorage).screenings);
+    },
+    async saveScreeningRepeat(screeningId, input, step) {
+      const state = readProcessingState(getStorage);
+      const record = state.screenings.find((item) => item.id === screeningId);
+      const previous = record && screeningRepeatDraft(record);
+      if (!record || !previous || previous.id !== input.roundId || previous.revision !== input.revision)
+        throw new Error('SCREENING_REPEAT_CONFLICT');
+      if (validateScreening(record, 'validation').length) throw new Error('SCREENING_REPEAT_INVALID_SOURCE');
+      const tests = screeningRepeatTests(previous);
+      if (
+        Object.keys(input.results).length !== tests.length ||
+        tests.some((test) => {
+          const outcome = input.results[test];
+          return outcome !== '' && !screeningResultOptions.some((option) => option === outcome);
+        })
+      )
+        throw new Error('SCREENING_REPEAT_INVALID_TESTS');
+      const changed = tests.some((test) => previous.results[test] !== input.results[test]);
+      const operator = input.operatorName.trim();
+      if (step && (!operator || tests.some((test) => !input.results[test])))
+        throw new Error('SCREENING_REPEAT_INCOMPLETE');
+      if (step === 'validation' && (previous.status !== 'readyForValidation' || changed))
+        throw new Error('SCREENING_REPEAT_NOT_SAVED');
+
+      const next: ScreeningRepeatRound = { ...previous, results: input.results, revision: previous.revision + 1 };
+      if (step === 'results') {
+        next.status = 'readyForValidation';
+        next.performedOn = localDateTime();
+        next.performedBy = operator;
+      } else if (step === 'validation') {
+        next.status = 'validated';
+        next.validatedBy = operator;
+        next.validatedAt = new Date().toISOString();
+      } else if (changed) {
+        next.status = 'draft';
+        next.performedOn = '';
+        next.performedBy = '';
+      }
+
+      const rounds = record.repeatRounds ?? [];
+      record.repeatRounds = rounds.at(-1)?.id === next.id ? [...rounds.slice(0, -1), next] : [...rounds, next];
+      writeProcessingState(getStorage, state);
+      return structuredClone(next);
     },
     async saveScreening(input, step) {
       const state = readProcessingState(getStorage);

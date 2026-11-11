@@ -1,5 +1,6 @@
 import { isDate } from '../applicant-selection/selection-rules';
 import { localDateTime } from '../laboratory/screening/screening-rules';
+import { consolidatedScreening } from '../laboratory/screening/screening-repeat-rules';
 import type { ScreeningRecord } from '../laboratory/screening/screening.types';
 import type { FollowUpCase, FollowUpKind, FollowUpPerson, FollowUpSubject, FollowUpTrace } from './follow-up.types';
 
@@ -80,7 +81,8 @@ export function subjectsForTraces(record: FollowUpCase, traces: FollowUpTrace[])
   }));
 }
 export function followUpSample(subject: FollowUpSubject, samples: ScreeningRecord[]) {
-  return samples.find((sample) => sample.id === subject.sampleId);
+  const sample = samples.find((candidate) => candidate.id === subject.sampleId);
+  return sample ? consolidatedScreening(sample) : undefined;
 }
 export function validFollowUpTime(value: string) {
   return (

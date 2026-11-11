@@ -1,5 +1,6 @@
 import { withInventoryFixtures } from '../mocks/inventory.mock';
 import { screeningTests } from '../sections/laboratory/screening/screening.types';
+import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
 import type {
   TransferBookEntry,
   TransferRequest,
@@ -31,6 +32,7 @@ export function transferUnits(state: ProcessingState): TransferUnit[] {
     const collection = state.collections.find((item) => item.unitCode === unit.originalCode);
     const panel = state.screenings
       .filter((item) => item.unitCode === unit.originalCode && item.collectionId === collection?.id)
+      .map((item) => consolidatedScreening(item))
       .sort((a, b) => (b.validatedAt ?? '').localeCompare(a.validatedAt ?? ''))[0];
     return {
       ...unit,

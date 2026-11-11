@@ -24,6 +24,43 @@ import {
 } from './screening.types';
 import screeningStyles from './screening.scss';
 
+export function ScreeningOutcomeField({
+  name,
+  label,
+  value,
+  readOnly = false,
+  disabled,
+  invalid,
+  onChange,
+  t,
+}: {
+  name: string;
+  label: string;
+  value: ScreeningResult;
+  readOnly?: boolean;
+  disabled: boolean;
+  invalid: boolean;
+  onChange: (value: ScreeningResult) => void;
+  t: ProcessingTranslate;
+}) {
+  if (readOnly) return <TextInput id={name} labelText={label} hideLabel value={value ? t(value) : '—'} readOnly />;
+  return (
+    <RadioButtonGroup
+      name={name}
+      aria-label={label}
+      valueSelected={value}
+      disabled={disabled}
+      invalid={invalid}
+      invalidText={t('requiredFields')}
+      onChange={(result) => onChange(result as ScreeningResult)}
+    >
+      {screeningResultOptions.map((result) => (
+        <RadioButton key={result} id={`${name}-${result}`} value={result} labelText={t(result)} />
+      ))}
+    </RadioButtonGroup>
+  );
+}
+
 export function ScreeningResultsFields({
   record,
   readOnly,
@@ -48,24 +85,18 @@ export function ScreeningResultsFields({
     value: ScreeningResult,
     errorKey: string,
     select: (value: ScreeningResult) => void,
-  ) =>
-    readOnly ? (
-      <TextInput id={name} labelText={label} hideLabel value={value ? t(value) : '—'} readOnly />
-    ) : (
-      <RadioButtonGroup
-        name={name}
-        aria-label={label}
-        valueSelected={value}
-        disabled={saving}
-        invalid={errors.includes(errorKey)}
-        invalidText={t('requiredFields')}
-        onChange={(result) => select(result as ScreeningResult)}
-      >
-        {screeningResultOptions.map((result) => (
-          <RadioButton key={result} id={`${name}-${result}`} value={result} labelText={t(result)} />
-        ))}
-      </RadioButtonGroup>
-    );
+  ) => (
+    <ScreeningOutcomeField
+      name={name}
+      label={label}
+      value={value}
+      readOnly={readOnly}
+      disabled={saving}
+      invalid={errors.includes(errorKey)}
+      onChange={select}
+      t={t}
+    />
+  );
   return (
     <>
       <section className={styles.questionGroup}>

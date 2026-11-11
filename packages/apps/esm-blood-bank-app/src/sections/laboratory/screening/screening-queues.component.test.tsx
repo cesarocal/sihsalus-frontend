@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { showSnackbar } from '@openmrs/esm-framework';
 import spanish from '../../../../translations/es.json';
@@ -8,11 +9,15 @@ import { createMockProcessingApi } from '../../../api/mock-blood-bank-processing
 import { ScreeningPage } from './screening-page.component';
 import { localDateTime, screeningCategory } from './screening-rules';
 import { screeningResultsFixture } from './screening-test-fixtures';
-import type { ScreeningCategory } from './screening.types';
+import type { ScreeningCategory, ScreeningTest } from './screening.types';
 import { printDocument } from '../../../shared/print-document';
 
 vi.mock('@openmrs/esm-framework', () => ({
-  useSession: () => ({ sessionLocation: { display: 'Hospital de prueba' } }),
+  useSession: () => ({
+    authenticated: true,
+    user: { person: { display: 'Profesional de prueba' } },
+    sessionLocation: { display: 'Hospital de prueba' },
+  }),
   formatDatetime: () => '05 oct 2026, 13:47',
   showSnackbar: vi.fn(),
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
@@ -20,11 +25,23 @@ vi.mock('@openmrs/esm-framework', () => ({
   BloodBankPictogram: () => null,
   LaboratoryPictogram: () => null,
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
-vi.mock('../../../shared/print-document', () => ({ printDocument: vi.fn() }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback: string, values?: Record<string, string>) =>
+      fallback.replace(/\{\{(\w+)\}\}/g, (match, name) => values?.[name] ?? match),
+  }),
+}));
+vi.mock(import('../../../shared/print-document'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  printDocument: vi.fn(),
+}));
 const t = (key: string) => (spanish.processing as Record<string, string>)[key] ?? key;
 const api = () => createMockProcessingApi(createMockApplicantSelectionApi()).screening;
-async function validate(apiInstance: ReturnType<typeof api>, category: ScreeningCategory) {
+async function validate(
+  apiInstance: ReturnType<typeof api>,
+  category: ScreeningCategory,
+  indeterminate?: ScreeningTest,
+) {
   let record = (await apiInstance.listScreenings()).find((item) => screeningCategory(item) === category);
   if (!record) throw new Error('SYNTHETIC_SAMPLE_MISSING');
   record.identityVerified = true;
@@ -32,11 +49,70 @@ async function validate(apiInstance: ReturnType<typeof api>, category: Screening
   record.receivedBy = 'DEMO';
   record.validatedBy = 'DEMO';
   record = await apiInstance.saveScreening(record, 'reception');
-  record = await apiInstance.saveScreening(screeningResultsFixture(record), 'results');
+  const results = screeningResultsFixture(record);
+  if (indeterminate) results.tests[indeterminate].result = 'inconclusive';
+  record = await apiInstance.saveScreening(results, 'results');
   return apiInstance.saveScreening(record, 'validation');
 }
 describe('independent screening queues and histories', () => {
   beforeEach(() => sessionStorage.clear());
+  it.each([
+    'donors',
+    'followUps',
+  ] as const)('resumes a %s repetition and reprints both original and repeat reports', async (category) => {
+    const instance = api();
+    const initial = await validate(instance, category, 'hiv');
+    render(<ScreeningPage api={instance} />);
+    if (category === 'followUps') fireEvent.click(screen.getByRole('tab', { name: t('followUpSamples') }));
+    fireEvent.click(await screen.findByRole('button', { name: t('screeningRepeatRegister') }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Repetición 1' }));
+    expect(dialog.getByText(t('screeningTest_hiv'))).toBeInTheDocument();
+    expect(dialog.queryByText(t('screeningTest_hbsag'))).not.toBeInTheDocument();
+    expect(dialog.getByLabelText(t('performedBy'))).toHaveValue('Profesional de prueba');
+    fireEvent.click(dialog.getByRole('radio', { name: t('nonReactive') }));
+    fireEvent.click(dialog.getByRole('button', { name: t('saveDraft') }));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('screeningRepeatDraftSaved') })),
+    );
+    fireEvent.click(dialog.getByRole('button', { name: t('close') }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: t('exitTitle') })).getByRole('button', { name: t('leave') }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(await screen.findByRole('button', { name: t('screeningRepeatResume') }));
+    expect(screen.getByRole('radio', { name: t('nonReactive') })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    fireEvent.click(await screen.findByRole('button', { name: t('screeningValidateRepeat') }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: t('screeningRepeatResume') })).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: t('reportHistory') }));
+    const history = within(screen.getByRole('dialog'));
+    const originalRow = (await history.findByText(`${initial.sampleCode}-R01`, { exact: false })).closest('tr');
+    const repeatRow = (await history.findByText(`${initial.sampleCode}-R02`, { exact: false })).closest('tr');
+    if (!originalRow || !repeatRow) throw new Error('TEST_REPORT_ROW_MISSING');
+    fireEvent.click(within(originalRow).getByRole('button', { name: t('viewResults') }));
+    expect(history.getByRole('row', { name: `${t('screeningTest_hiv')} ${t('inconclusive')}` })).toBeInTheDocument();
+    fireEvent.click(history.getByRole('button', { name: t('printResults') }));
+    fireEvent.click(history.getByRole('button', { name: t('backToHistory') }));
+    fireEvent.click(
+      within(history.getByRole('row', { name: /Repetición 1/ })).getByRole('button', { name: t('viewResults') }),
+    );
+    expect(history.queryByText(t('screeningTest_hbsag'))).not.toBeInTheDocument();
+    fireEvent.click(history.getByRole('button', { name: t('printResults') }));
+    const [originalPrint, repeatPrint] = vi.mocked(printDocument).mock.calls;
+    expect(renderToStaticMarkup(originalPrint[0])).toContain(t('inconclusive'));
+    const repeatedMarkup = renderToStaticMarkup(repeatPrint[0]);
+    expect(repeatedMarkup).toContain(`${initial.sampleCode}-R01`);
+    expect(repeatedMarkup).toContain(`${initial.sampleCode}-R02`);
+    expect(repeatedMarkup).not.toContain(t('screeningTest_hbsag'));
+    fireEvent.click(history.getByRole('button', { name: t('screeningViewCurrent') }));
+    expect(history.getByRole('heading', { name: t('screeningCurrentResults') })).toBeInTheDocument();
+    expect(history.getByRole('row', { name: `${t('screeningTest_hiv')} ${t('nonReactive')}` })).toBeInTheDocument();
+    expect(history.getByRole('row', { name: `${t('screeningTest_hbsag')} ${t('nonReactive')}` })).toBeInTheDocument();
+  });
   it('keeps named actions with decorative icons in both queues and apheresis registration only in donors', async () => {
     render(<ScreeningPage api={api()} />);
     await screen.findByText('M-DEMO-001');
@@ -89,6 +165,12 @@ describe('independent screening queues and histories', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: t('printResults') }));
     expect(printDocument).toHaveBeenCalledOnce();
+    expect(printDocument).toHaveBeenCalledWith(
+      expect.anything(),
+      t('screeningAnalysisTitle'),
+      expect.any(Function),
+      expect.stringContaining('@bottom-left { content: ""; }'),
+    );
     fireEvent.click(screen.getByRole('button', { name: t('backToHistory') }));
     expect(screen.getByLabelText(t('searchReports'))).toHaveValue('90000020');
     fireEvent.click(within(history).getByRole('button', { name: t('close') }));

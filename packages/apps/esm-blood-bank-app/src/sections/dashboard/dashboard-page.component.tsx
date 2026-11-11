@@ -23,6 +23,7 @@ import type { InventoryUnit } from '../inventory/inventory.types';
 import { canSeal, inventoryDisplayDate } from '../inventory/inventory-rules';
 import { eligibleSource } from '../laboratory/fractionation/fractionation-rules';
 import { screeningCategory } from '../laboratory/screening/screening-rules';
+import { screeningQueueStatus } from '../laboratory/screening/screening-repeat-rules';
 import { transferDirection } from '../transfers/transfers-rules';
 import { dashboardLink, expiresSoon } from './dashboard-shortcuts';
 import styles from './dashboard.scss';
@@ -368,7 +369,9 @@ export function DashboardPage({ api, expiryWarningDays = 7 }: { api: BloodBankAp
                                       description={t('donorSamplesHelp')}
                                       count={
                                         rows.filter(
-                                          (r) => screeningCategory(r) === 'donors' && r.status !== 'validated',
+                                          (r) =>
+                                            screeningCategory(r) === 'donors' &&
+                                            screeningQueueStatus(r) !== 'validated',
                                         ).length
                                       }
                                       to={dashboardLink('/laboratory/screening', { category: 'donors' })}
@@ -379,7 +382,9 @@ export function DashboardPage({ api, expiryWarningDays = 7 }: { api: BloodBankAp
                                       description={t('followUpSamplesHelp')}
                                       count={
                                         rows.filter(
-                                          (r) => screeningCategory(r) === 'followUps' && r.status !== 'validated',
+                                          (r) =>
+                                            screeningCategory(r) === 'followUps' &&
+                                            screeningQueueStatus(r) !== 'validated',
                                         ).length
                                       }
                                       to={dashboardLink('/laboratory/screening', { category: 'followUps' })}

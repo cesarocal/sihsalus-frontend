@@ -8,6 +8,9 @@ import type {
   ApheresisCandidate,
   ApheresisDraft,
   ScreeningRecord,
+  ScreeningRepeatInput,
+  ScreeningRepeatRound,
+  ScreeningRepeatStep,
   ScreeningStep,
 } from '../sections/laboratory/screening/screening.types';
 
@@ -19,6 +22,11 @@ export interface CollectionApi {
 export interface ScreeningApi {
   listScreenings(): Promise<ScreeningRecord[]>;
   saveScreening(record: ScreeningRecord, step?: ScreeningStep): Promise<ScreeningRecord>;
+  saveScreeningRepeat(
+    screeningId: string,
+    input: ScreeningRepeatInput,
+    step?: ScreeningRepeatStep,
+  ): Promise<ScreeningRepeatRound>;
   listApheresisCandidates(): Promise<ApheresisCandidate[]>;
   getApheresisDraft(): Promise<ApheresisDraft | null>;
   saveApheresisDraft(candidate: ApheresisCandidate, revision: number): Promise<ApheresisDraft>;
@@ -28,6 +36,8 @@ export interface ScreeningApi {
 export const processingEndpoints = {
   collections: '/ws/rest/v1/bloodbank/collections',
   screenings: '/ws/rest/v1/bloodbank/screenings',
+  screeningRepeats: (screeningId: string) =>
+    `/ws/rest/v1/bloodbank/screenings/${encodeURIComponent(screeningId)}/repeats`,
   apheresisCandidates: '/ws/rest/v1/bloodbank/screenings/apheresis/candidates',
   apheresisDraft: '/ws/rest/v1/bloodbank/screenings/apheresis/draft',
   apheresisSamples: '/ws/rest/v1/bloodbank/screenings/apheresis/samples',
@@ -43,6 +53,7 @@ export const openmrsCollectionApi: CollectionApi = {
 export const openmrsScreeningApi: ScreeningApi = {
   listScreenings: unavailable,
   saveScreening: unavailable,
+  saveScreeningRepeat: unavailable,
   listApheresisCandidates: unavailable,
   getApheresisDraft: unavailable,
   saveApheresisDraft: unavailable,

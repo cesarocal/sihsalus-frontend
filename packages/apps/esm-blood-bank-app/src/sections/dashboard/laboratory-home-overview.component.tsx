@@ -17,6 +17,7 @@ import type { BloodBankApi } from '../../api';
 import { useProcessingTranslation } from '../../shared/processing-page.component';
 import { componentDefinitions, eligibleSource } from '../laboratory/fractionation/fractionation-rules';
 import { screeningCategory, screeningOriginLabel } from '../laboratory/screening/screening-rules';
+import { screeningQueueStatus } from '../laboratory/screening/screening-repeat-rules';
 import { comparePriority } from '../transfusions/transfusions-rules';
 import { dashboardLink } from './dashboard-shortcuts';
 import { AuthorizedHomeSource, HomeSummary, type HomeSourceState } from './home-overview.component';
@@ -44,7 +45,9 @@ export function LaboratoryHomeOverview({ api, t }: { api: BloodBankApi; t: (key:
             <AuthorizedHomeSource privilege={p.fractionation} load={api.fractionation.list}>
               {(fractionation) => {
                 const samples = (ready(screenings) ?? [])
-                  .filter((record) => record.status !== 'validated' && screeningCategory(record) !== null)
+                  .filter(
+                    (record) => screeningQueueStatus(record) !== 'validated' && screeningCategory(record) !== null,
+                  )
                   .sort((a, b) => a.collectedOn.localeCompare(b.collectedOn));
                 const donors = samples.filter((record) => screeningCategory(record) === 'donors');
                 const followUps = samples.filter((record) => screeningCategory(record) === 'followUps');
@@ -71,7 +74,10 @@ export function LaboratoryHomeOverview({ api, t }: { api: BloodBankApi; t: (key:
                     code: record.sampleCode,
                     origin: processingT(screeningOriginLabel(record)),
                     category: 'screening' as const,
-                    action: t('screeningAction'),
+                    action:
+                      screeningQueueStatus(record) === 'screeningRepeatPending'
+                        ? processingT('screeningRepeatRegister')
+                        : t('screeningAction'),
                     to: dashboardLink('/laboratory/screening', {
                       category: screeningCategory(record) ?? 'donors',
                       screening: record.id,

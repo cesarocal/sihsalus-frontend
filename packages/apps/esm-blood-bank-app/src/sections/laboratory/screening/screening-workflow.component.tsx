@@ -8,6 +8,7 @@ import type { ProcessingTranslate } from '../../../shared/processing-page.compon
 import { printDocument } from '../../../shared/print-document';
 import { notifySuccess } from '../../../shared/notify-success';
 import styles from '../../applicant-selection/selection.scss';
+import { printScreeningAnalysis } from './screening-analysis-document.component';
 import { ScreeningIdentity, ScreeningReport } from './screening-report.component';
 import { ScreeningResultsFields } from './screening-results-fields.component';
 import { ApheresisTubeLabel } from './apheresis-documents.component';
@@ -25,7 +26,7 @@ export function ScreeningWorkflow({
   initial: ScreeningRecord;
   api: ScreeningApi;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (record: ScreeningRecord) => void;
   t: ProcessingTranslate;
 }) {
   const [storedRecord, setRecord] = useState(() => ({
@@ -60,10 +61,14 @@ export function ScreeningWorkflow({
       setStep((value) => Math.min(value + 1, 2));
       return true;
     }
-    const snapshot =
-      advance && stage === 'results' ? { ...record, performedOn: localDateTime(), performedBy: operatorName } : record;
+    let snapshot = record;
+    if (advance && stage === 'results') {
+      snapshot = { ...record, performedOn: localDateTime(), performedBy: operatorName };
+    } else if (advance && stage === 'validation') {
+      snapshot = { ...record, validatedBy: operatorName };
+    }
     const missing = advance ? validateScreening(snapshot, stage) : [];
-    setErrors(missing);
+    setErrors(missing.map((field) => (field === 'validatedBy' ? 'screeningValidatorUnavailable' : field)));
     setFailed('');
     if (missing.length) {
       if (stage === 'results') setResultsExpanded(true);
@@ -74,7 +79,7 @@ export function ScreeningWorkflow({
       const result = await api.saveScreening(snapshot, advance ? stage : undefined);
       setRecord(result);
       setDirty(false);
-      if (advance && stage === 'validation') onSaved();
+      if (advance && stage === 'validation') onSaved(result);
       else {
         const message = !advance
           ? 'screeningDraftUpdated'
@@ -94,7 +99,7 @@ export function ScreeningWorkflow({
       setSaving(false);
     }
   };
-  const input = (field: 'receivedOn' | 'receivedBy' | 'validatedBy') => (
+  const input = (field: 'receivedOn' | 'receivedBy') => (
     <TextInput
       key={field}
       id={`screening-${field}`}
@@ -115,12 +120,14 @@ export function ScreeningWorkflow({
     />
   );
   const print = () => {
-    const missing = finalized ? [] : validateScreening(record, 'validation');
+    const missing = finalized
+      ? []
+      : [...validateScreening(record, 'reception'), ...validateScreening(record, 'results')];
     setErrors(missing);
     setFailed('');
     if (missing.length) return;
     try {
-      printDocument(<ScreeningReport record={record} t={t} />, t('printResults'));
+      printScreeningAnalysis(record, t, () => setFailed('printFailed'));
     } catch {
       setFailed('printFailed');
     }
@@ -247,8 +254,7 @@ export function ScreeningWorkflow({
       )}
       {step === 2 && (
         <>
-          <div className={styles.fields}>{input('validatedBy')}</div>
-          <ScreeningReport record={record} t={t} showWarning={false} />
+          <ScreeningReport record={record} t={t} review />
           <InlineNotification
             className={screeningStyles.screeningWarning}
             hideCloseButton

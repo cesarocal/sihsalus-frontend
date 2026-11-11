@@ -13,6 +13,27 @@ export const screeningTableTests = [
 ] as const satisfies readonly ScreeningTest[];
 export const screeningResultOptions = ['reactive', 'nonReactive', 'inconclusive'] as const;
 export type ScreeningResult = '' | (typeof screeningResultOptions)[number];
+export type ScreeningRepeatTest = ScreeningTest | 'additional';
+export type ScreeningRepeatResults = Partial<Record<ScreeningRepeatTest, ScreeningResult>>;
+export type ScreeningRepeatStep = 'results' | 'validation';
+export interface ScreeningRepeatRound {
+  id: string;
+  number: number;
+  previousReportId: string;
+  revision: number;
+  status: 'draft' | 'readyForValidation' | 'validated';
+  results: ScreeningRepeatResults;
+  performedOn: string;
+  performedBy: string;
+  validatedAt: string | null;
+  validatedBy: string;
+}
+export interface ScreeningRepeatInput {
+  roundId: string;
+  revision: number;
+  results: ScreeningRepeatResults;
+  operatorName: string;
+}
 export interface ScreeningTestResult {
   result: ScreeningResult;
   // Kept for records created before reagent details were removed from the form.
@@ -78,4 +99,6 @@ export interface ScreeningRecord {
   result: ScreeningResult;
   completedSteps: ScreeningStep[];
   status: 'pending' | 'inProgress' | 'validated';
+  /** Repetitions are stored separately from the original report data. */
+  repeatRounds?: ScreeningRepeatRound[];
 }

@@ -23,6 +23,8 @@ import {
 } from '../../../shared/processing-page.component';
 import { notifySuccess } from '../../../shared/notify-success';
 import { ScreeningWorkflow } from './screening-workflow.component';
+import { ScreeningRepeatWorkflow } from './screening-repeat-workflow.component';
+import { screeningQueueStatus, screeningRepeatDraft } from './screening-repeat-rules';
 import { ScreeningHistory } from './screening-history.component';
 import { ApheresisSampleWorkflow } from './apheresis-sample-workflow.component';
 import {
@@ -59,7 +61,7 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
     }
     if (loading || failed || !data || active || history || apheresis || handledScreening.current === id) return;
     handledScreening.current = id;
-    const record = data.find((item) => item.id === id && item.status !== 'validated');
+    const record = data.find((item) => item.id === id && screeningQueueStatus(item) !== 'validated');
     const recordCategory = record ? screeningCategory(record) : null;
     setShortcutUnavailable(!record || !recordCategory);
     if (record && recordCategory) {
@@ -72,15 +74,21 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
   const update = (key: keyof typeof filter, value: string) =>
     setFilters((previous) => ({ ...previous, [category]: { ...previous[category], [key]: value } }));
   const records = (data ?? []).filter((record) => screeningCategory(record) === category);
-  const filtered = records
+  const entries = records.map((record) => ({ record, status: screeningQueueStatus(record) }));
+  const activeRepeat = active ? screeningRepeatDraft(active) : undefined;
+  const closeWorkflow = () => {
+    setActive(null);
+    reload();
+  };
+  const filtered = entries
     .filter(
-      (record) =>
-        record.status !== 'validated' &&
-        (!filter.status || record.status === filter.status) &&
+      ({ record, status }) =>
+        status !== 'validated' &&
+        (!filter.status || status === filter.status) &&
         (!filter.origin || screeningOriginLabel(record) === filter.origin) &&
         matchesScreeningSearch(record, filter.search),
     )
-    .sort((left, right) => left.collectedOn.localeCompare(right.collectedOn));
+    .sort((left, right) => left.record.collectedOn.localeCompare(right.record.collectedOn));
   const queue = (
     <div className={styles.surface}>
       {shortcutUnavailable && (
@@ -112,7 +120,7 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
           onChange={(event) => update('status', event.target.value)}
         >
           <SelectItem value="" text={t('allStatuses')} />
-          {['pending', 'inProgress'].map((value) => (
+          {['pending', 'inProgress', 'screeningRepeatPending'].map((value) => (
             <SelectItem key={value} value={value} text={t(value)} />
           ))}
         </Select>
@@ -143,7 +151,7 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
           'status',
           'actions',
         ]}
-        rows={filtered.map((record) => ({
+        rows={filtered.map(({ record, status }) => ({
           id: record.id,
           cells: [
             record.sampleCode,
@@ -154,11 +162,17 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
             record.applicantName,
             record.documentNumber,
             formatScreeningCollectionTime(record.collectedOn),
-            <Tag key="status" type={record.status === 'inProgress' ? 'blue' : 'gray'}>
-              {t(record.status)}
+            <Tag key="status" type={status === 'pending' ? 'gray' : 'blue'}>
+              {t(status)}
             </Tag>,
             <Button key="action" kind="ghost" size="sm" onClick={() => setActive(record)}>
-              {t('registerResults')}
+              {t(
+                status === 'screeningRepeatPending'
+                  ? screeningRepeatDraft(record)?.revision
+                    ? 'screeningRepeatResume'
+                    : 'screeningRepeatRegister'
+                  : 'registerResults',
+              )}
             </Button>,
           ],
         }))}
@@ -178,7 +192,11 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
       counts={['pending', 'inProgress', 'validated'].map((value) => ({
         label: t(value),
         description: t('samplesUnit'),
-        value: loading || failed ? '—' : records.filter((record) => record.status === value).length,
+        value:
+          loading || failed
+            ? '—'
+            : entries.filter(({ status }) => (status === 'screeningRepeatPending' ? 'inProgress' : status) === value)
+                .length,
       }))}
     >
       <Tabs selectedIndex={tab} onChange={({ selectedIndex }) => setTab(selectedIndex)}>
@@ -191,19 +209,41 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
           <TabPanel>{tab === 1 && queue}</TabPanel>
         </TabPanels>
       </Tabs>
-      {active && (
+      {active && activeRepeat && (
+        <ScreeningRepeatWorkflow
+          key={activeRepeat.id}
+          record={active}
+          initial={activeRepeat}
+          api={api}
+          t={t}
+          onClose={closeWorkflow}
+          onSaved={(round) => {
+            closeWorkflow();
+            notifySuccess(
+              t(
+                Object.values(round.results).includes('inconclusive')
+                  ? 'screeningRepeatStillPending'
+                  : 'screeningRepeatFinished',
+              ),
+            );
+          }}
+        />
+      )}
+      {active && !activeRepeat && (
         <ScreeningWorkflow
           initial={active}
           api={api}
           t={t}
-          onClose={() => {
-            setActive(null);
-            reload();
-          }}
-          onSaved={() => {
-            setActive(null);
-            notifySuccess(t(active.unitCode ? 'screeningFinished' : 'sampleScreeningFinished'));
-            reload();
+          onClose={closeWorkflow}
+          onSaved={(record) => {
+            closeWorkflow();
+            const message =
+              screeningQueueStatus(record) === 'screeningRepeatPending'
+                ? 'screeningInitialRepeatPending'
+                : active.unitCode
+                  ? 'screeningFinished'
+                  : 'sampleScreeningFinished';
+            notifySuccess(t(message));
           }}
         />
       )}

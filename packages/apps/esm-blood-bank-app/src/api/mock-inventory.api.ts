@@ -7,6 +7,10 @@ import {
   localDateTime,
   validateScreening,
 } from '../sections/laboratory/screening/screening-rules';
+import {
+  consolidatedScreening,
+  pendingScreeningRepeatTests,
+} from '../sections/laboratory/screening/screening-repeat-rules';
 import type { InventorySummary } from '../types/blood-bank.types';
 import type { InventoryApi } from './inventory.api';
 import { fractionationInventory, fractionationStore } from './mock-fractionation.api';
@@ -75,7 +79,7 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
       );
       const fixtureSealId = state.fixtureQualitySeals?.[unit.id];
       const originalCode = fractions.find((item) => item.code === unit.id)?.originalWholeBloodCode ?? unit.id;
-      const panels = state.screenings.filter(
+      const originalPanels = state.screenings.filter(
         (panel) =>
           panel.unitCode === originalCode &&
           panel.collectionId &&
@@ -85,10 +89,12 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
             (collection) => collection.id === panel.collectionId && collection.unitCode === originalCode,
           ),
       );
+      const repeatPending = originalPanels.some((panel) => pendingScreeningRepeatTests(panel).length > 0);
+      const panels = originalPanels.map((panel) => consolidatedScreening(panel));
       const qualityIssues: string[] = [];
       if (
-        !panels.length ||
-        panels.some(
+        !originalPanels.length ||
+        originalPanels.some(
           (panel) =>
             panel.status !== 'validated' ||
             !panel.validatedAt ||
@@ -99,13 +105,17 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
         )
       )
         qualityIssues.push('inventoryScreeningPending');
-      if (panels.some((panel) => panel.result !== 'nonReactive' || globalScreeningResult(panel) !== 'nonReactive'))
+      if (
+        repeatPending ||
+        panels.some((panel) => panel.result !== 'nonReactive' || globalScreeningResult(panel) !== 'nonReactive')
+      )
         qualityIssues.push('inventoryScreeningUnsafe');
       const screeningResult = qualityIssues.includes('inventoryScreeningPending')
         ? 'pending'
         : panels.some((panel) => panel.result === 'reactive' || globalScreeningResult(panel) === 'reactive')
           ? 'reactive'
-          : panels.some((panel) => panel.result === 'inconclusive' || globalScreeningResult(panel) === 'inconclusive')
+          : repeatPending ||
+              panels.some((panel) => panel.result === 'inconclusive' || globalScreeningResult(panel) === 'inconclusive')
             ? 'inconclusive'
             : qualityIssues.includes('inventoryScreeningUnsafe')
               ? 'pending'
@@ -128,9 +138,11 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
               ? 'Reservados para transfusión'
               : transferUnitState(state, unit.id) === 'prepared'
                 ? 'Por transferir'
-                : (seal?.stage === 'completed' || !!fixtureSealId) && unit.status !== 'En laboratorio'
-                  ? 'APTO'
-                  : unit.status,
+                : repeatPending && unit.status !== 'En laboratorio'
+                  ? 'Cuarentena'
+                  : (seal?.stage === 'completed' || !!fixtureSealId) && unit.status !== 'En laboratorio'
+                    ? 'APTO'
+                    : unit.status,
         originalCode,
         screeningResult,
         qualityIssues,

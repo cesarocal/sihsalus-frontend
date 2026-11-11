@@ -513,7 +513,7 @@ describe('collection and screening screens', () => {
     fireEvent.click(screen.getByRole('button', { name: t('retry') }));
     expect(await screen.findByRole('option', { name: 'Campaña de donación' })).toBeInTheDocument();
   });
-  it('announces screening completion only after validation and never says the unit is released', async () => {
+  it('announces pending repetition only after initial validation and keeps the unit in quarantine', async () => {
     const processing = api();
     let record = (await processing.screening.listScreenings())[0];
     record.identityVerified = true;
@@ -521,17 +521,35 @@ describe('collection and screening screens', () => {
     record.receivedBy = 'Recepción DEMO';
     record.validatedBy = 'Validador DEMO';
     record = await processing.screening.saveScreening(record, 'reception');
-    record = await processing.screening.saveScreening(screeningResultsFixture(record), 'results');
+    const results = screeningResultsFixture(record);
+    results.tests.hiv.result = 'inconclusive';
+    results.tests.hbsag.result = 'reactive';
+    record = await processing.screening.saveScreening(results, 'results');
     render(<ScreeningPage api={processing.screening} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
+    expect(screen.queryByText(t('validatedBy'))).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(t('validatedBy'))).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('printResults') }));
+    const frame = document.querySelector('iframe');
+    expect(frame?.srcdoc).toContain('@bottom-left { content: ""; }');
+    const printed = new DOMParser().parseFromString(frame?.srcdoc ?? '', 'text/html');
+    expect(printed.querySelector('h1')?.textContent).toBe(t('screeningAnalysisTitle'));
+    expect(printed.querySelector('tbody tr:first-child td[colspan="2"]')?.textContent).toBe(t('inconclusive'));
+    expect(printed.querySelector('tbody tr:nth-child(2) td:nth-child(2)')?.textContent).toBe('X');
+    expect(printed.querySelector('tbody tr:nth-child(3) td:nth-child(3)')?.textContent).toBe('X');
+    expect(printed.querySelector('footer')?.textContent).toContain(t('screeningAnalysisSignature'));
+    expect(printed.body.textContent).not.toContain('Validador DEMO');
+    expect(printed.querySelector('[data-demo]')).toBeNull();
+    frame?.remove();
     expect(showSnackbar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: t('validateResults') }));
     await waitFor(() =>
-      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('screeningFinished') })),
+      expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('screeningInitialRepeatPending') })),
     );
-    expect((await processing.screening.listScreenings()).find((item) => item.id === record.id)?.status).toBe(
-      'validated',
-    );
+    expect((await processing.screening.listScreenings()).find((item) => item.id === record.id)).toMatchObject({
+      status: 'validated',
+      validatedBy: sessionPerson.display,
+    });
     expect(
       (await processing.collection.listCollections()).find((item) => item.id === record.collectionId)?.unitStatus,
     ).toBe('quarantine');
