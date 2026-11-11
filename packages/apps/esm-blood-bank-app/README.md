@@ -21,7 +21,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
 
-El máximo de 500 unidades UTF-16 también se aplica a las observaciones del registro de donación, tamizaje, fraccionamiento y detección de seguimientos al guardar un borrador o completar el flujo.
+El máximo de 500 unidades UTF-16 también se aplica a las observaciones de tamizaje, fraccionamiento y detección de seguimientos al guardar un borrador o completar el flujo.
 
 ## Contratos de integración
 

@@ -1,9 +1,11 @@
-import { ageOnDate } from '../applicant-selection/selection-rules';
+import { ageOnDate, isDate } from '../applicant-selection/selection-rules';
 import { processingPrintCss } from '../../shared/print-document';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { fullName } from './collection-rules';
 import type { CollectionRecord } from './collection.types';
 import styles from '../applicant-selection/selection.scss';
+import { formatDonorDate } from '../donors/donor-utils';
+import collectionStyles from './collection.scss';
 
 export const collectionLabelPrintCss = `${processingPrintCss}
   [data-label] { box-sizing: border-box; break-inside: avoid; }
@@ -16,6 +18,17 @@ export const collectionLabelPrintCss = `${processingPrintCss}
   [data-label="tube"] dl { gap: 1mm 2mm; margin: 1.5mm 0 0; }
   [data-label="tube"] dd { margin: 0; }
   [data-label="tube"] [data-label-field="applicant"] { grid-column: 1 / -1; }
+`;
+
+export const donationCertificatePrintCss = `${processingPrintCss}
+  @page { @bottom-left { content: ""; } }
+  [data-certificate-header] { display: flex; align-items: start; justify-content: space-between; gap: 12pt; }
+  [data-certificate-header] h2 { margin-top: 0; text-align: left; }
+  [data-applicant-number] { border: 1px solid #184e77; color: #184e77; padding: 6pt 9pt; text-align: center; }
+  [data-applicant-number] strong { display: block; overflow-wrap: anywhere; }
+  [data-donation-types] { display: flex; flex-wrap: wrap; gap: 6pt 18pt; }
+  [data-certificate-signature] { margin: 30pt 0 0 auto; width: 58mm; border-top: 1px solid currentColor; text-align: center; }
+  [data-certificate-issue-date] { text-align: right; }
 `;
 
 export function CollectionIdentity({ record, t }: { record: CollectionRecord; t: ProcessingTranslate }) {
@@ -110,26 +123,60 @@ export function CollectionLabelDocument({
   );
 }
 export function DonationCertificateDocument({ record, t }: { record: CollectionRecord; t: ProcessingTranslate }) {
+  const { application, registry, label, certificate } = record;
+  const { donationType, documentType, documentNumber, beneficiaryName } = application.admission;
+  const sex = application.personal.sex;
+  const validDate = isDate(registry.date);
+  const [year, month, day] = registry.date.split('-');
+  const issueDate = validDate
+    ? t('certificateIssueDate', {
+        day: String(Number(day)),
+        month: new Intl.DateTimeFormat(t('certificateDateLocale'), { month: 'long', timeZone: 'UTC' }).format(
+          new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))),
+        ),
+        year,
+      })
+    : '—';
+  const resultsDate = formatDonorDate(certificate.resultsAvailableOn);
   const values = {
-    applicant: fullName(record.application),
-    document: `${record.application.admission.documentType} ${record.application.admission.documentNumber}`,
-    age: String(ageOnDate(record.application.personal.birthDate, record.registry.date) ?? '—'),
-    number: record.application.number,
-    bagLot: record.registry.bagLot,
-    collectionDate: record.registry.date,
-    bloodGroup: `${record.application.physical.bloodGroup}${record.application.physical.rh}`,
-    hemoglobin: record.application.physical.hemoglobin,
-    hematocrit: record.application.physical.hematocrit,
-    recipientName: record.label.recipientName,
-    resultsAvailableOn: record.certificate.resultsAvailableOn,
-    emailConsent: record.certificate.emailConsent ? t(record.certificate.emailConsent) : '—',
-    email: record.certificate.emailConsent === 'yes' ? record.certificate.email : '',
+    bagLot: registry.bagLot,
+    collectionDate: formatDonorDate(registry.date),
+    bloodGroup: `${application.physical.bloodGroup}${application.physical.rh}`,
+    hemoglobin: application.physical.hemoglobin,
+    hematocrit: application.physical.hematocrit,
+    certificatePatientName: donationType === 'replacement' ? beneficiaryName : '',
+    recipientName: donationType === 'autologous' ? label.recipientName : '',
+    emailConsent: certificate.emailConsent ? t(certificate.emailConsent) : '—',
+    email: certificate.emailConsent === 'yes' ? certificate.email : '',
   };
   return (
-    <article className={styles.report}>
-      <p data-demo>{t('printPrototype')}</p>
-      <h2>{t('certificate')}</h2>
-      <p>{t('certificateIntro')}</p>
+    <article className={`${styles.report} ${collectionStyles.certificate}`}>
+      <header data-certificate-header>
+        <h2>{t('certificate')}</h2>
+        <div data-applicant-number>
+          <span>{t('applicantNumber')}</span>
+          <strong>{application.number}</strong>
+        </div>
+      </header>
+      <p>
+        {t('certificateIntro', {
+          title: t(sex === 'F' ? 'certificateMrs' : sex === 'M' ? 'certificateMr' : 'certificatePerson'),
+          name: fullName(application),
+          documentType,
+          documentNumber,
+          age: String(ageOnDate(application.personal.birthDate, registry.date) ?? '—'),
+          component: label.component,
+        })}
+      </p>
+      <p data-donation-types>
+        <span>
+          {donationType === 'voluntary' ? '☒' : '☐'} {t('certificateVoluntary')}
+        </span>
+        <span>
+          {donationType === 'replacement' ? '☒' : '☐'} {t('replacement')}
+        </span>
+        {donationType === 'autologous' && <span>☒ {t('autologous')}</span>}
+      </p>
       <dl>
         {Object.entries(values)
           .filter(([, value]) => value)
@@ -140,10 +187,12 @@ export function DonationCertificateDocument({ record, t }: { record: CollectionR
             </div>
           ))}
       </dl>
-      <p>{t(record.application.admission.donationType)}</p>
+      <p data-certificate-issue-date>{issueDate}</p>
+      <p data-certificate-signature>{t('certificateDonorSignature')}</p>
       <footer>
+        <strong>{t('certificateNoteHeading')}</strong>
         <p>{t('certificateNote')}</p>
-        <p>{t('signature')}: __________________________</p>
+        <p>{t('certificateResultsDate', { date: resultsDate })}</p>
       </footer>
     </article>
   );

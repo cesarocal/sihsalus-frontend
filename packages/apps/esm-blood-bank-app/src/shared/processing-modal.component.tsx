@@ -39,6 +39,7 @@ export function ProcessingModal({
   extraActions,
   footerClassName,
   compactHeader = false,
+  hideStepHeading = false,
   t,
 }: {
   title: string;
@@ -63,6 +64,7 @@ export function ProcessingModal({
   extraActions?: ReactNode;
   footerClassName?: string;
   compactHeader?: boolean;
+  hideStepHeading?: boolean;
   t: ProcessingTranslate;
 }) {
   const [confirm, setConfirm] = useState(false);
@@ -127,9 +129,11 @@ export function ProcessingModal({
               </ul>
             </div>
           )}
-          <div className={styles.stepHeading}>
-            <h3>{t(steps[step])}</h3>
-          </div>
+          {!hideStepHeading && (
+            <div className={styles.stepHeading}>
+              <h3>{t(steps[step])}</h3>
+            </div>
+          )}
           {children}
         </ModalBody>
         <ModalFooter className={[styles.footer, footerClassName].filter(Boolean).join(' ')}>

@@ -112,7 +112,9 @@ describe('independent screening queues and histories', () => {
       render(<ScreeningPage api={instance} />);
       if (category === 'followUps') fireEvent.click(screen.getByRole('tab', { name: t('followUpSamples') }));
       fireEvent.click(screen.getByRole('button', { name: t('reportHistory') }));
-      const history = screen.getByRole('dialog');
+      const history = screen.getByRole('dialog', {
+        name: `${t('reportHistory')} - ${t(category === 'donors' ? 'donorSamples' : 'followUpSamples')}`,
+      });
       expect(within(history).getAllByRole('button', { name: t('close') })).toHaveLength(1);
       expect(history.querySelector('.cds--modal-footer')).not.toBeInTheDocument();
       expect(within(history).queryByRole('button', { name: t('printResults') })).not.toBeInTheDocument();

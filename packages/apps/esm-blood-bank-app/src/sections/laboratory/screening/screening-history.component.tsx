@@ -40,7 +40,7 @@ export function ScreeningHistory({
   const [result, setResult] = useState('');
   const [detail, setDetail] = useState<ScreeningRecord | null>(null);
   const [printFailed, setPrintFailed] = useState(false);
-  const title = `${t('reportHistory')} — ${t(category === 'donors' ? 'donorSamples' : 'followUpSamples')}`;
+  const title = `${t('reportHistory')} - ${t(category === 'donors' ? 'donorSamples' : 'followUpSamples')}`;
   const filtered = records
     .filter(
       (record) =>

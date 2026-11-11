@@ -20,11 +20,12 @@ import styles from '../sections/applicant-selection/selection.scss';
 import { BloodBankPageHeader } from './blood-bank-page-header.component';
 import { type BloodBankIllustration, BloodBankPageIllustration } from './blood-bank-page-illustration.component';
 
-export type ProcessingTranslate = (key: string) => string;
+export type ProcessingTranslate = (key: string, values?: Record<string, string>) => string;
 export function useProcessingTranslation() {
   const { t } = useTranslation(moduleName);
   return useCallback(
-    (key: string) => String(t(`processing.${key}`, (spanish.processing as Record<string, string>)[key] ?? key)),
+    (key: string, values?: Record<string, string>) =>
+      String(t(`processing.${key}`, (spanish.processing as Record<string, string>)[key] ?? key, values)),
     [t],
   );
 }

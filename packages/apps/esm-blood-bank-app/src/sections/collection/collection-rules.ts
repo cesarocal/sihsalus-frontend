@@ -1,7 +1,7 @@
 import { ageOnDate, calculateReturnDate, isDate, today } from '../applicant-selection/selection-rules';
 import type { SelectionApplication } from '../applicant-selection/selection.types';
 import type { CollectionRecord, CollectionStep } from './collection.types';
-import { bagLotExceedsLimit, validateObservations } from '../../shared/text-field-contracts';
+import { bagLotExceedsLimit } from '../../shared/text-field-contracts';
 
 export const collectionSampleDefaults = { sampleType: 'Sangre', sampleContainer: 'Tubo' };
 
@@ -9,6 +9,7 @@ export function fullName(application: SelectionApplication) {
   return `${application.personal.givenName} ${application.personal.familyName}`.trim();
 }
 export function newCollection(application: SelectionApplication): CollectionRecord {
+  const date = today();
   return {
     id: `mock-collection-${application.id}`,
     revision: 0,
@@ -33,9 +34,9 @@ export function newCollection(application: SelectionApplication): CollectionReco
       ...collectionSampleDefaults,
     },
     extractedVolume: '',
-    registry: { date: today(), bagLot: '', complications: '', extractionStatus: '', attendedBy: '', observations: '' },
+    registry: { date, bagLot: '', complications: '', extractionStatus: '', attendedBy: '' },
     certificate: {
-      resultsAvailableOn: calculateReturnDate(today(), '10', 'days') ?? '',
+      resultsAvailableOn: calculateReturnDate(date, '10', 'days') ?? '',
       emailConsent: '',
       email: application.personal.email,
     },
@@ -45,14 +46,14 @@ export function newCollection(application: SelectionApplication): CollectionReco
 // Storage bounds (DECIMAL(8,2)), not a clinical collection-volume recommendation.
 export const validVolume = (value: string) => /^\d{1,6}(\.\d{1,2})?$/.test(value) && Number(value) > 0;
 
-export function validateCollectionText(record: CollectionRecord): string[] {
+export function validateCollectionDraft(record: CollectionRecord): string[] {
   const errors = bagLotExceedsLimit(record.registry.bagLot) ? ['bagLotTooLong'] : [];
-  if (!record.completedSteps.includes('registry')) errors.push(...validateObservations(record.registry.observations));
+  if (!record.completedSteps.includes('registry') && record.registry.date > today()) errors.push('collectionDate');
   return errors;
 }
 
 export function validateCollection(record: CollectionRecord, step: CollectionStep): string[] {
-  const missing = validateCollectionText(record);
+  const missing = validateCollectionDraft(record);
   if (step === 'label') {
     if (!record.label.component.trim()) missing.push('component');
     if (!record.label.collectedBy.trim()) missing.push('collectionOperatorUnavailable');
@@ -66,11 +67,7 @@ export function validateCollection(record: CollectionRecord, step: CollectionSte
   }
   if (step === 'volume' && !validVolume(record.extractedVolume)) missing.push('extractedVolume');
   if (step === 'registry') {
-    if (
-      !isDate(record.registry.date) ||
-      record.registry.date < record.application.admission.date ||
-      record.registry.date > today()
-    )
+    if (!isDate(record.registry.date) || record.registry.date < record.application.admission.date)
       missing.push('collectionDate');
     if (!record.registry.bagLot.trim()) missing.push('bagLot');
     if (!['yes', 'no'].includes(record.registry.complications)) missing.push('complications');

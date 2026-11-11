@@ -1,5 +1,6 @@
 import { Button, Checkbox, InlineNotification, Select, SelectItem, TextInput } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
+import { formatDatetime } from '@openmrs/esm-framework';
 import { useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
 import { ObservationsTextArea } from '../../../shared/observations-text-area.component';
@@ -86,10 +87,14 @@ export function ScreeningWorkflow({
       key={field}
       id={`screening-${field}`}
       labelText={t(field)}
-      value={record[field]}
-      type={field.endsWith('On') ? 'datetime-local' : 'text'}
+      value={
+        locked && field.endsWith('On') && record[field]
+          ? formatDatetime(new Date(record[field]), { noToday: true })
+          : record[field]
+      }
+      type={!locked && field.endsWith('On') ? 'datetime-local' : 'text'}
       readOnly={locked}
-      disabled={saving}
+      disabled={saving && !locked}
       invalid={errors.includes(field)}
       invalidText={t('requiredFields')}
       onChange={(event) => change({ ...record, [field]: event.target.value })}
@@ -132,6 +137,8 @@ export function ScreeningWorkflow({
         setFailed('');
       }}
       advanceLabel={t(step === 2 ? 'validateResults' : 'next')}
+      compactHeader={step === 0}
+      hideStepHeading={step === 0}
       t={t}
       extraActions={
         <>
@@ -168,13 +175,22 @@ export function ScreeningWorkflow({
             {input('receivedOn')}
             {input('receivedBy')}
           </div>
-          <Checkbox
-            id="screening-identity"
-            labelText={t('identityVerified')}
-            checked={record.identityVerified}
-            disabled={locked || saving}
-            onChange={(_event, { checked }) => change({ ...record, identityVerified: checked })}
-          />
+          {locked ? (
+            <TextInput
+              id="screening-identity"
+              labelText={t('identityVerified')}
+              value={t(record.identityVerified ? 'yes' : 'no')}
+              readOnly
+            />
+          ) : (
+            <Checkbox
+              id="screening-identity"
+              labelText={t('identityVerified')}
+              checked={record.identityVerified}
+              disabled={saving}
+              onChange={(_event, { checked }) => change({ ...record, identityVerified: checked })}
+            />
+          )}
           <p className={styles.help}>{t('identityHelp')}</p>
         </>
       )}
@@ -188,28 +204,37 @@ export function ScreeningWorkflow({
             <section className={styles.questionGroup} key={test} aria-label={t(test)}>
               <h3>{t(test)}</h3>
               <div className={styles.fields}>
-                <Select
-                  id={`screening-${test}-result`}
-                  labelText={t('result')}
-                  value={record.tests[test].result}
-                  disabled={locked || saving}
-                  invalid={errors.includes(test)}
-                  invalidText={t('requiredFields')}
-                  onChange={(event) =>
-                    change({
-                      ...record,
-                      tests: {
-                        ...record.tests,
-                        [test]: { ...record.tests[test], result: event.target.value as ScreeningResult },
-                      },
-                    })
-                  }
-                >
-                  <SelectItem value="" text={t('choose')} />
-                  {['nonReactive', 'reactive', 'inconclusive'].map((value) => (
-                    <SelectItem key={value} value={value} text={t(value)} />
-                  ))}
-                </Select>
+                {locked ? (
+                  <TextInput
+                    id={`screening-${test}-result`}
+                    labelText={t('result')}
+                    value={record.tests[test].result ? t(record.tests[test].result) : '—'}
+                    readOnly
+                  />
+                ) : (
+                  <Select
+                    id={`screening-${test}-result`}
+                    labelText={t('result')}
+                    value={record.tests[test].result}
+                    disabled={saving}
+                    invalid={errors.includes(test)}
+                    invalidText={t('requiredFields')}
+                    onChange={(event) =>
+                      change({
+                        ...record,
+                        tests: {
+                          ...record.tests,
+                          [test]: { ...record.tests[test], result: event.target.value as ScreeningResult },
+                        },
+                      })
+                    }
+                  >
+                    <SelectItem value="" text={t('choose')} />
+                    {['nonReactive', 'reactive', 'inconclusive'].map((value) => (
+                      <SelectItem key={value} value={value} text={t(value)} />
+                    ))}
+                  </Select>
+                )}
                 {(['reagent', 'brand', 'lot'] as const).map((field) => (
                   <TextInput
                     key={field}
@@ -217,7 +242,7 @@ export function ScreeningWorkflow({
                     labelText={t(field)}
                     value={record.tests[test][field]}
                     readOnly={locked}
-                    disabled={saving}
+                    disabled={saving && !locked}
                     onChange={(event) =>
                       change({
                         ...record,
@@ -235,7 +260,7 @@ export function ScreeningWorkflow({
             labelText={t('observations')}
             value={record.observations}
             readOnly={locked}
-            disabled={saving}
+            disabled={saving && !locked}
             onChange={(event) => change({ ...record, observations: event.target.value })}
           />
         </>

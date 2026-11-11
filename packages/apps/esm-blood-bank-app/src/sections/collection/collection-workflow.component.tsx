@@ -13,21 +13,22 @@ import { useSession } from '@openmrs/esm-framework';
 import { useCallback, useState } from 'react';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
 import { useApiData } from '../../api/use-api-data';
-import { ObservationsTextArea } from '../../shared/observations-text-area.component';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { printDocument } from '../../shared/print-document';
 import { notifySuccess } from '../../shared/notify-success';
 import { bagLotExceedsLimit, bagLotTextContract, countUtf16Units } from '../../shared/text-field-contracts';
-import { calculateReturnDate } from '../applicant-selection/selection-rules';
+import { calculateReturnDate, today } from '../applicant-selection/selection-rules';
 import styles from '../applicant-selection/selection.scss';
+import { formatDonorDate } from '../donors/donor-utils';
 import {
   CollectionIdentity,
   CollectionLabelDocument,
   collectionLabelPrintCss,
+  donationCertificatePrintCss,
   DonationCertificateDocument,
 } from './collection-documents.component';
-import { validateCollection, validateCollectionText, validVolume } from './collection-rules';
+import { validateCollection, validateCollectionDraft, validVolume } from './collection-rules';
 import {
   collectionSteps,
   type CollectionConceptField,
@@ -73,9 +74,12 @@ export function CollectionWorkflow({
   const finalized = storedRecord.status === 'completed';
   const locked = finalized || storedRecord.completedSteps.includes(stage);
   const editingLabel = stage === 'label' && !locked;
-  const record = editingLabel
-    ? { ...storedRecord, label: { ...storedRecord.label, collectedBy: operatorName } }
-    : storedRecord;
+  const editingRegistry = stage === 'registry' && !locked;
+  const record = {
+    ...storedRecord,
+    label: editingLabel ? { ...storedRecord.label, collectedBy: operatorName } : storedRecord.label,
+    registry: editingRegistry ? { ...storedRecord.registry, attendedBy: operatorName } : storedRecord.registry,
+  };
   const anticoagulants = useLabelConcepts(api, 'anticoagulant', editingLabel);
   const services = useLabelConcepts(api, 'service', editingLabel);
   const validateLabelCatalogs = (missing: string[]) => {
@@ -98,15 +102,11 @@ export function CollectionWorkflow({
       setStep((value) => Math.min(value + 1, 3));
       return true;
     }
-    const missing = advance ? validateCollection(record, stage) : validateCollectionText(record);
+    const missing = advance ? validateCollection(record, stage) : validateCollectionDraft(record);
     if (advance) validateLabelCatalogs(missing);
     setErrors(missing);
     setFailed('');
-    if (missing.length) {
-      if (missing.includes('observationsTooLong') && record.completedSteps.includes('volume'))
-        setStep(collectionSteps.indexOf('registry'));
-      return false;
-    }
+    if (missing.length) return false;
     setSaving(true);
     try {
       const result = await api.saveCollection(record, advance ? stage : undefined);
@@ -151,7 +151,7 @@ export function CollectionWorkflow({
         ),
         t(kind === 'certificate' ? 'printCertificate' : kind === 'sample' ? 'printSample' : 'printUnit'),
         () => setFailed('printFailed'),
-        kind === 'certificate' ? undefined : collectionLabelPrintCss,
+        kind === 'certificate' ? donationCertificatePrintCss : collectionLabelPrintCss,
       );
     } catch {
       setFailed('printFailed');
@@ -169,7 +169,7 @@ export function CollectionWorkflow({
       labelText={t(field)}
       value={record.label[field]}
       readOnly={locked}
-      disabled={saving}
+      disabled={saving && !locked}
       invalid={errors.includes(field) || (field === 'preservative' && errors.includes('anticoagulantOrPreservative'))}
       invalidText={t(field === 'preservative' ? 'anticoagulantOrPreservative' : 'requiredFields')}
       onChange={(event) => change({ ...record, label: { ...record.label, [field]: event.target.value } })}
@@ -235,35 +235,40 @@ export function CollectionWorkflow({
       </div>
     );
   };
-  const registryInput = (
-    field: Exclude<keyof DonationRegistry, 'complications' | 'extractionStatus' | 'observations'>,
-  ) => {
+  const registryInput = (field: 'date' | 'bagLot' | 'attendedBy') => {
     const lot = field === 'bagLot';
-    const overflow = lot && bagLotExceedsLimit(record.registry.bagLot);
-    const counter = lot
-      ? `${countUtf16Units(record.registry.bagLot)} / ${bagLotTextContract.maxUtf16Units} ${t('textUnits')}. ${t('textLimitHelp')}`
-      : '';
+    const overflow = lot && !locked && bagLotExceedsLimit(record.registry.bagLot);
+    const counter = `${countUtf16Units(record.registry.bagLot)} / ${bagLotTextContract.maxUtf16Units}`;
+    const currentDate = today();
+    const isDateField = field === 'date';
     return (
       <TextInput
         key={field}
         id={`collection-${field}`}
         labelText={t(field === 'date' ? 'collectionDate' : field)}
-        value={record.registry[field]}
-        type={field === 'date' ? 'date' : 'text'}
-        readOnly={locked}
-        disabled={saving}
-        helperText={lot ? <span aria-live="polite">{counter}</span> : undefined}
-        invalid={overflow || errors.includes(field === 'date' ? 'collectionDate' : field)}
+        value={isDateField && locked ? formatDonorDate(record.registry.date) : record.registry[field]}
+        type={isDateField && !locked ? 'date' : 'text'}
+        min={isDateField ? record.application.admission.date : undefined}
+        max={isDateField ? currentDate : undefined}
+        readOnly={locked || field === 'attendedBy'}
+        disabled={saving && !locked && field !== 'attendedBy'}
+        helperText={lot && !locked ? <span aria-live="polite">{counter}</span> : undefined}
+        invalid={
+          overflow ||
+          (isDateField && !locked && record.registry.date > currentDate) ||
+          errors.includes(isDateField ? 'collectionDate' : field)
+        }
         invalidText={
           lot ? (
             <span aria-live="polite">
               {t(overflow ? 'bagLotTooLong' : 'requiredFields')} {counter}
             </span>
           ) : (
-            t('requiredFields')
+            t(isDateField ? 'collectionDateRange' : 'requiredFields')
           )
         }
-        onChange={(event) =>
+        onChange={(event) => {
+          if (locked || field === 'attendedBy') return;
           change({
             ...record,
             registry: { ...record.registry, [field]: event.target.value },
@@ -274,8 +279,8 @@ export function CollectionWorkflow({
                     resultsAvailableOn: calculateReturnDate(event.target.value, '10', 'days') ?? '',
                   }
                 : record.certificate,
-          })
-        }
+          });
+        }}
       />
     );
   };
@@ -344,15 +349,24 @@ export function CollectionWorkflow({
               value={record.label.collectedBy}
               readOnly
             />
-            <Checkbox
-              id="collection-leukocytes"
-              labelText={t('leukocytesReduced')}
-              checked={record.label.leukocytesReduced}
-              disabled={locked || saving}
-              onChange={(_event, { checked }) =>
-                change({ ...record, label: { ...record.label, leukocytesReduced: checked } })
-              }
-            />
+            {locked ? (
+              <TextInput
+                id="collection-leukocytes"
+                labelText={t('leukocytesReduced')}
+                value={t(record.label.leukocytesReduced ? 'yes' : 'no')}
+                readOnly
+              />
+            ) : (
+              <Checkbox
+                id="collection-leukocytes"
+                labelText={t('leukocytesReduced')}
+                checked={record.label.leukocytesReduced}
+                disabled={saving}
+                onChange={(_event, { checked }) =>
+                  change({ ...record, label: { ...record.label, leukocytesReduced: checked } })
+                }
+              />
+            )}
           </div>
           {record.application.admission.donationType === 'autologous' && (
             <>
@@ -377,14 +391,14 @@ export function CollectionWorkflow({
           <div className={styles.fields}>
             <TextInput
               id="collection-extractedVolume"
-              type="number"
+              type={locked ? 'text' : 'number'}
               min={0.01}
               max={999999.99}
               step={0.01}
               labelText={t('extractedVolume')}
               value={record.extractedVolume}
               readOnly={locked}
-              disabled={saving}
+              disabled={saving && !locked}
               invalid={errors.includes('extractedVolume')}
               invalidText={t('requiredFields')}
               onChange={(event) => change({ ...record, extractedVolume: event.target.value })}
@@ -403,50 +417,55 @@ export function CollectionWorkflow({
       {step === 2 && (
         <div className={styles.fields}>
           {(['date', 'bagLot', 'attendedBy'] as const).map(registryInput)}
-          <RadioButtonGroup
-            name="collection-complications"
-            legendText={t('complications')}
-            valueSelected={record.registry.complications}
-            disabled={locked || saving}
-            onChange={(value) =>
-              change({ ...record, registry: { ...record.registry, complications: value as 'yes' | 'no' } })
-            }
-          >
-            <RadioButton id="collection-complications-no" value="no" labelText={t('no')} />
-            <RadioButton id="collection-complications-yes" value="yes" labelText={t('yes')} />
-          </RadioButtonGroup>
-          <Select
-            id="collection-outcome"
-            labelText={t('extractionStatus')}
-            value={record.registry.extractionStatus}
-            disabled={locked || saving}
-            invalid={errors.includes('extractionStatus')}
-            invalidText={t('requiredFields')}
-            onChange={(event) =>
-              change({
-                ...record,
-                registry: {
-                  ...record.registry,
-                  extractionStatus: event.target.value as DonationRegistry['extractionStatus'],
-                },
-              })
-            }
-          >
-            <SelectItem value="" text={t('choose')} />
-            <SelectItem value="complete" text={t('complete')} />
-            <SelectItem value="incomplete" text={t('incomplete')} />
-          </Select>
-          <ObservationsTextArea
-            id="collection-observations"
-            t={t}
-            labelText={t('observations')}
-            value={record.registry.observations}
-            readOnly={locked}
-            disabled={saving}
-            onChange={(event) =>
-              change({ ...record, registry: { ...record.registry, observations: event.target.value } })
-            }
-          />
+          {locked ? (
+            <>
+              <TextInput
+                id="collection-complications"
+                labelText={t('complications')}
+                value={record.registry.complications ? t(record.registry.complications) : '—'}
+                readOnly
+              />
+              <TextInput
+                id="collection-outcome"
+                labelText={t('extractionStatus')}
+                value={record.registry.extractionStatus ? t(record.registry.extractionStatus) : '—'}
+                readOnly
+              />
+            </>
+          ) : (
+            <>
+              <RadioButtonGroup
+                name="collection-complications"
+                legendText={t('complications')}
+                valueSelected={record.registry.complications}
+                disabled={saving}
+                onChange={(value) =>
+                  change({ ...record, registry: { ...record.registry, complications: value as 'yes' | 'no' } })
+                }
+              >
+                <RadioButton id="collection-complications-no" value="no" labelText={t('no')} />
+                <RadioButton id="collection-complications-yes" value="yes" labelText={t('yes')} />
+              </RadioButtonGroup>
+              <RadioButtonGroup
+                name="collection-outcome"
+                legendText={t('extractionStatus')}
+                valueSelected={record.registry.extractionStatus}
+                disabled={saving}
+                onChange={(value) =>
+                  change({
+                    ...record,
+                    registry: {
+                      ...record.registry,
+                      extractionStatus: value as DonationRegistry['extractionStatus'],
+                    },
+                  })
+                }
+              >
+                <RadioButton id="collection-outcome-complete" value="complete" labelText={t('complete')} />
+                <RadioButton id="collection-outcome-incomplete" value="incomplete" labelText={t('incomplete')} />
+              </RadioButtonGroup>
+            </>
+          )}
         </div>
       )}
       {step === 3 && (
@@ -454,37 +473,48 @@ export function CollectionWorkflow({
           <div className={styles.fields}>
             <TextInput
               id="certificate-date"
-              type="date"
+              type={locked ? 'text' : 'date'}
               labelText={t('resultsAvailableOn')}
-              value={record.certificate.resultsAvailableOn}
+              value={
+                locked ? formatDonorDate(record.certificate.resultsAvailableOn) : record.certificate.resultsAvailableOn
+              }
               readOnly={locked}
-              disabled={saving}
+              disabled={saving && !locked}
               invalid={errors.includes('resultsAvailableOn')}
               invalidText={t('requiredFields')}
               onChange={(event) =>
                 change({ ...record, certificate: { ...record.certificate, resultsAvailableOn: event.target.value } })
               }
             />
-            <RadioButtonGroup
-              name="certificate-consent"
-              legendText={t('emailConsent')}
-              valueSelected={record.certificate.emailConsent}
-              disabled={locked || saving}
-              onChange={(value) =>
-                change({ ...record, certificate: { ...record.certificate, emailConsent: value as 'yes' | 'no' } })
-              }
-            >
-              <RadioButton id="certificate-email-no" value="no" labelText={t('no')} />
-              <RadioButton id="certificate-email-yes" value="yes" labelText={t('yes')} />
-            </RadioButtonGroup>
+            {locked ? (
+              <TextInput
+                id="certificate-consent"
+                labelText={t('emailConsent')}
+                value={record.certificate.emailConsent ? t(record.certificate.emailConsent) : '—'}
+                readOnly
+              />
+            ) : (
+              <RadioButtonGroup
+                name="certificate-consent"
+                legendText={t('emailConsent')}
+                valueSelected={record.certificate.emailConsent}
+                disabled={saving}
+                onChange={(value) =>
+                  change({ ...record, certificate: { ...record.certificate, emailConsent: value as 'yes' | 'no' } })
+                }
+              >
+                <RadioButton id="certificate-email-no" value="no" labelText={t('no')} />
+                <RadioButton id="certificate-email-yes" value="yes" labelText={t('yes')} />
+              </RadioButtonGroup>
+            )}
             {record.certificate.emailConsent === 'yes' && (
               <TextInput
                 id="certificate-email"
-                type="email"
+                type={locked ? 'text' : 'email'}
                 labelText={t('email')}
                 value={record.certificate.email}
                 readOnly={locked}
-                disabled={saving}
+                disabled={saving && !locked}
                 invalid={errors.includes('email')}
                 invalidText={t('requiredFields')}
                 onChange={(event) =>

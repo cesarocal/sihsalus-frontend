@@ -1,4 +1,4 @@
-import { newCollection, validateCollection, validateCollectionText } from '../sections/collection/collection-rules';
+import { newCollection, validateCollection, validateCollectionDraft } from '../sections/collection/collection-rules';
 import { collectionSteps } from '../sections/collection/collection.types';
 import {
   globalScreeningResult,
@@ -96,7 +96,9 @@ export function createMockProcessingApi(
         application: canonical.application,
       });
       // Drafts and completed stages share the same bound; never crop historical input.
-      if (validateCollectionText(record).length) throw new Error('COLLECTION_TEXT_LIMIT');
+      const draftErrors = validateCollectionDraft(record);
+      if (draftErrors.includes('bagLotTooLong')) throw new Error('COLLECTION_TEXT_LIMIT');
+      if (!step && draftErrors.length) throw new Error('COLLECTION_INCOMPLETE');
       if (step) {
         const index = collectionSteps.indexOf(step);
         if (

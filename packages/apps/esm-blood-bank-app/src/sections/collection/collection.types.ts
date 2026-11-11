@@ -32,7 +32,8 @@ export interface DonationRegistry {
   complications: '' | 'yes' | 'no';
   extractionStatus: '' | 'complete' | 'incomplete';
   attendedBy: string;
-  observations: string;
+  /** Notes from older records, retained when a draft is resumed. */
+  observations?: string;
 }
 export interface DonationCertificate {
   resultsAvailableOn: string;

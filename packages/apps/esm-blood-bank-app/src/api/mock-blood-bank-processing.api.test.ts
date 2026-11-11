@@ -105,18 +105,13 @@ describe('collection and screening mock contracts', () => {
     expect((await api.collection.listCollections()).find((item) => item.id === saved.id)).toEqual(saved);
     expect(edited.registry.bagLot).toHaveLength(51);
   });
-  it('bounds donation observations when saving a draft or completing the registry', async () => {
+  it('preserves historical donation observations when completing a resumed registry', async () => {
     const { api, record } = await collectionFixture();
     let saved = await api.collection.saveCollection(record, 'label');
     saved = await api.collection.saveCollection(saved, 'volume');
-    const atLimit = 'a'.repeat(500);
-    const edited = { ...saved, registry: { ...saved.registry, observations: `${atLimit}a` } };
-    const before = sessionStorage.getItem(processingStorageKey);
-    await expect(api.collection.saveCollection(edited)).rejects.toThrow('COLLECTION_TEXT_LIMIT');
-    await expect(api.collection.saveCollection(edited, 'registry')).rejects.toThrow('COLLECTION_TEXT_LIMIT');
-    expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
-    edited.registry.observations = atLimit;
-    expect((await api.collection.saveCollection(edited, 'registry')).registry.observations).toBe(atLimit);
+    const observations = 'a'.repeat(501);
+    const draft = await api.collection.saveCollection({ ...saved, registry: { ...saved.registry, observations } });
+    expect((await api.collection.saveCollection(draft, 'registry')).registry.observations).toBe(observations);
   });
   it.each(['postExtraction', 'followUp'] as const)('bounds %s screening observations', async (origin) => {
     const { api } = await collectionFixture();

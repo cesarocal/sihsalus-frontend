@@ -1,7 +1,58 @@
 @use "@carbon/layout";
+@use "@carbon/themes";
 
 .quarantineNotice:global(.cds--inline-notification) {
   inline-size: 100%;
   max-inline-size: none;
   margin-block-start: layout.$spacing-05;
+}
+
+.certificate {
+  [data-certificate-header] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: layout.$spacing-04;
+    text-align: start;
+    margin-block-end: layout.$spacing-05;
+
+    h2 {
+      margin: 0;
+    }
+  }
+
+  [data-applicant-number] {
+    margin-inline-start: auto;
+    border: 1px solid themes.$link-primary;
+    color: themes.$link-primary;
+    padding: layout.$spacing-03 layout.$spacing-05;
+    text-align: center;
+
+    strong {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  [data-donation-types] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: layout.$spacing-03 layout.$spacing-06;
+    margin-block: layout.$spacing-05;
+  }
+
+  [data-certificate-issue-date] {
+    margin-block-start: layout.$spacing-05;
+    text-align: end;
+  }
+
+  [data-certificate-signature] {
+    max-inline-size: 100%;
+    inline-size: 14rem;
+    margin-block: layout.$spacing-08 layout.$spacing-05;
+    margin-inline-start: auto;
+    border-block-start: 1px solid themes.$text-primary;
+    text-align: center;
+  }
 }

@@ -14,6 +14,7 @@ import { ScreeningPage } from '../laboratory/screening/screening-page.component'
 import { screeningTests } from '../laboratory/screening/screening.types';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { showSnackbar } from '@openmrs/esm-framework';
+import { calculateReturnDate, today } from '../applicant-selection/selection-rules';
 
 const sessionPerson = vi.hoisted(() => ({ display: 'Rosa Torres García' }));
 
@@ -31,7 +32,11 @@ vi.mock('@openmrs/esm-framework', () => ({
   LaboratoryPictogram: () => null,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
-const t = (key: string) => (spanish.processing as Record<string, string>)[key] ?? key;
+const t = (key: string, values?: Record<string, string>) =>
+  ((spanish.processing as Record<string, string>)[key] ?? key).replace(
+    /\{\{(\w+)\}\}/g,
+    (match, name) => values?.[name] ?? match,
+  );
 const api = () => createMockProcessingApi(createMockApplicantSelectionApi());
 describe('collection and screening screens', () => {
   beforeEach(() => {
@@ -331,7 +336,7 @@ describe('collection and screening screens', () => {
     expect(finalized).not.toHaveBeenCalled();
     expect((await processing.screening.listScreenings()).some((item) => item.collectionId === record.id)).toBe(true);
   });
-  it('announces collection completion only after saving the certificate', async () => {
+  it('saves the registry with the current operator and shows the saved data in read-only fields', async () => {
     const processing = api();
     let record = (await processing.collection.listCollections()).find((item) => item.status === 'pending');
     if (!record) throw new Error('SYNTHETIC_COLLECTION_MISSING');
@@ -348,19 +353,45 @@ describe('collection and screening screens', () => {
       sampleContainer: 'Tubo DEMO',
     };
     record.extractedVolume = '420';
-    record.registry = {
-      ...record.registry,
-      bagLot: 'LOTE DEMO',
-      complications: 'no',
-      extractionStatus: 'complete',
-      attendedBy: 'Profesional DEMO',
-    };
     record.certificate.emailConsent = 'no';
-    for (const stage of ['label', 'volume', 'registry'] as const)
+    for (const stage of ['label', 'volume'] as const)
       record = await processing.collection.saveCollection(record, stage);
     render(<CollectionPage api={processing.collection} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Continuar extracción' }));
+    const date = screen.getByLabelText(t('collectionDate'));
+    const attendedBy = screen.getByLabelText(t('attendedBy'));
+    expect(attendedBy).toHaveValue(sessionPerson.display);
+    expect(attendedBy).toHaveAttribute('readonly');
+    expect(date).toHaveValue(today());
+    expect(date).toHaveAttribute('max', today());
+    expect(screen.queryByLabelText(t('observations'))).not.toBeInTheDocument();
+    const outcome = within(screen.getByRole('group', { name: t('extractionStatus') }));
+    expect(outcome.getAllByRole('radio')).toHaveLength(2);
+    expect(outcome.getByRole('radio', { name: t('complete') })).not.toBeChecked();
+    fireEvent.click(outcome.getByRole('radio', { name: t('incomplete') }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: t('complications') })).getByRole('radio', { name: t('no') }),
+    );
+    fireEvent.change(screen.getByLabelText(t('bagLot')), { target: { value: 'LOTE DEMO' } });
+    fireEvent.change(date, { target: { value: calculateReturnDate(today(), '1', 'days') } });
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
     expect(showSnackbar).not.toHaveBeenCalled();
+    fireEvent.change(date, { target: { value: today() } });
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    await screen.findByRole('button', { name: t('certificateSave') });
+    sessionPerson.display = 'Otra persona';
+    fireEvent.click(screen.getByRole('button', { name: t('previous') }));
+    expect(screen.getByLabelText(t('attendedBy'))).toHaveValue('Rosa Torres García');
+    const savedOutcome = screen.getByLabelText(t('extractionStatus'));
+    expect(savedOutcome).toHaveValue(t('incomplete'));
+    expect(savedOutcome).toHaveAttribute('readonly');
+    expect(savedOutcome).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    fireEvent.click(screen.getByRole('button', { name: t('printCertificate') }));
+    const documentFrame = document.querySelector('iframe');
+    expect(documentFrame?.srcdoc).toContain('@bottom-left { content: ""; }');
+    expect(documentFrame?.srcdoc).toContain(t('certificateDonorSignature'));
+    documentFrame?.remove();
     fireEvent.click(screen.getByRole('button', { name: t('certificateSave') }));
     await waitFor(() =>
       expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ title: t('collectionFinished') })),
@@ -508,6 +539,8 @@ describe('collection and screening screens', () => {
   it('opens laboratory reception, requires identity confirmation and saves only a draft on exit', async () => {
     render(<ScreeningPage api={api().screening} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
+    expect(screen.getByText(t('applicantNumber'), { selector: 'dt' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: t('reception') })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Guardar y continuar' }));
     expect(screen.getByRole('alert', { name: t('requiredFields') })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(t('receivedBy')), { target: { value: 'Recepción DEMO' } });
@@ -516,17 +549,39 @@ describe('collection and screening screens', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
     expect(screen.getByLabelText(t('receivedBy'))).toHaveValue('Recepción DEMO');
+    fireEvent.click(screen.getByRole('checkbox', { name: t('identityVerified') }));
+    fireEvent.click(screen.getByRole('button', { name: t('next') }));
+    await screen.findByLabelText(t('performedBy'));
+    fireEvent.click(screen.getByRole('button', { name: t('previous') }));
+    const confirmation = screen.getByRole('textbox', { name: t('identityVerified') });
+    expect(confirmation).toHaveValue(t('yes'));
+    expect(confirmation).toBeEnabled();
+    expect(confirmation).toHaveAttribute('readonly');
   });
-  it('escapes printable synthetic names and shows both independent sample identifiers and the certificate disclaimer', () => {
+  it('escapes names in printed documents and includes the completed replacement donation details', () => {
     const record = newCollection(applicationsMock()[2]);
     record.application.personal.givenName = '<script>unsafe</script>';
+    record.application.personal.sex = 'F';
+    record.application.admission.donationType = 'replacement';
+    record.application.admission.beneficiaryName = 'Paciente de prueba';
+    record.registry.date = '2026-11-11';
+    record.certificate.resultsAvailableOn = '2026-11-21';
+    record.label.component = 'Paquete globular';
     const label = renderToStaticMarkup(<CollectionLabelDocument record={record} sample t={t} />);
     expect(label).not.toContain('<script>unsafe');
     expect(label).toContain('&lt;script&gt;');
     expect(label).toContain(record.sampleCode);
     expect(label).toContain(record.application.admission.documentNumber);
     const certificate = renderToStaticMarkup(<DonationCertificateDocument record={record} t={t} />);
-    expect(certificate).toContain('NO acredita');
-    expect(certificate).toContain(t('printPrototype'));
+    expect(certificate).toContain('NO ACREDITA');
+    expect(certificate).not.toContain(t('printPrototype'));
+    expect(certificate).toContain('la Sra. &lt;script&gt;unsafe&lt;/script&gt;');
+    expect(certificate).toContain('donó una unidad de Paquete globular');
+    expect(certificate).toContain('☒ Donación por reposición');
+    expect(certificate).toContain('Paciente de prueba');
+    expect(certificate).toContain('11/11/2026');
+    expect(certificate).toContain('21/11/2026');
+    expect(certificate).toContain('Iquitos, 11 de noviembre del 2026');
+    expect(certificate).toContain('Firma del donante');
   });
 });

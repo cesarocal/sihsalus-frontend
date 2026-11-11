@@ -20,9 +20,9 @@ en consulta y la confirmación de salida.
 2. Etiqueta captura sangre o componente, servicio de recolección y leucocitos reducidos. El responsable se obtiene del nombre de la persona autenticada en OpenMRS. El campo es de solo lectura y, al cerrar la etapa, conserva el nombre registrado. Requiere un anticoagulante del catálogo, una solución de conservación en texto o ambos. El agente sedimentario es opcional. Autóloga habilita receptor, documento, servicio e historia.
 3. Solo Etiqueta ofrece las dos impresiones. La de unidad deja un espacio para escribir el volumen en mL. La de tubo usa un recuadro rectangular de 65 mm de ancho. Completar Etiqueta genera una muestra visible en Tamizaje, sin duplicarla.
 4. Cantidad extraída exige un número positivo con hasta dos decimales (límite técnico DECIMAL(8,2)). Continuar ingresa la unidad mock en Inventario en cuarentena. Reacción adversa queda deshabilitada y pendiente.
-5. Registro guarda fecha, lote de bolsa, complicaciones, completa/incompleta, responsable y notas. La donación efectiva actualiza Donantes.
-6. Constancia deriva identidad/edad/grupo/Rh/Hb/Hct, permite decidir correo y fecha de resultados (diez días calendario por defecto). No envía correos. Guardar finaliza y retira la postulación del listado activo; la conserva para antecedentes/autocompletado.
-7. Tamizaje lista muestras, permite buscar y filtrar por estado/resultado. Recepción exige responsable, fecha/hora y confirmación de concordancia de nombre/documento/código entre tubo y registro.
+5. Registro propone la fecha de hoy y admite fechas desde la admisión hasta hoy. Guarda el lote de bolsa, las complicaciones y la elección explícita de Completa o Incompleta. Toma el nombre del responsable de la sesión de OpenMRS y lo conserva al completar el paso. La donación efectiva actualiza Donantes.
+6. Constancia deriva identidad/edad/grupo/Rh/Hb/Hct, permite decidir correo y fecha de resultados (diez días calendario por defecto). Incluye el tipo de donación, el paciente beneficiario cuando es por reposición y la firma física del donante. Guardar finaliza y retira la postulación del listado activo y la conserva para antecedentes/autocompletado.
+7. Tamizaje lista muestras, permite buscar y filtrar por estado/resultado. Recepción muestra el número de postulante cuando corresponde y exige responsable, fecha/hora y confirmación de concordancia de nombre/documento/código entre tubo y registro. Los valores de etapas cerradas se pueden seleccionar y copiar en campos de solo lectura.
 8. Captura siete pruebas: HBsAg, Anti-HBc, Anti-HCV, Anti-VIH 1/2, Anti-HTLV I/II, Chagas y Sífilis. Cada una requiere resultado y reactivo/marca/lote. Fecha y profesional comunes se aplican a todas las pruebas de esta captura.
 9. Revisión exige validador y todas las pruebas completas. Resultado global: Reactivo si alguna es reactiva, luego Indeterminado si corresponde, sino No reactivo. Validar bloquea edición; permite imprimir el resumen.
 
@@ -32,7 +32,7 @@ El [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) documenta 
 
 **La unidad permanece en cuarentena con cualquier resultado. Reactivo no confirma diagnóstico.** Liberación/descarte, confirmaciones/repeticiones, sello de calidad, seguimiento, rechazo/reemplazo de muestras y reacción adversa están pendientes. El riesgo biológico autólogo no se infiere automáticamente de un tamizaje único.
 
-El panel proviene de los documentos entregados y necesita validación del protocolo vigente antes de uso clínico. Las etiquetas muestran los datos del entorno activo. La constancia conserva su marca DEMO y su espacio para firma física.
+El panel proviene de los documentos entregados y necesita validación del protocolo vigente antes de uso clínico. Las etiquetas y la constancia muestran los datos del entorno activo.
 
 ## Organización y API futura
 
@@ -56,6 +56,8 @@ Con guardado mock y los tres UUID vacíos, el flujo usa un catálogo de demostra
 La muestra postextracción se genera como **Sangre** en **Tubo** en el mock, conservando los datos de muestras previas. El OMOD deberá asignar los conceptos de tipo y recipiente y acordar dónde persistir el texto de conservación, dado que el DDL propone una referencia a concepto para ese dato.
 
 Los registros históricos conservan el volumen aproximado. Para las nuevas extracciones, Fraccionamiento requiere conocer la capacidad nominal de la bolsa cuando la validación de bajo volumen depende de ese dato. Al integrar el OMOD, el responsable debe identificarse a partir de la sesión autenticada del servidor.
+
+Completa e Incompleta usan valores locales. Su mapeo a conceptos de OpenMRS queda pendiente de la integración del OMOD.
 
 | Datos                   | Mapeo previsto                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------ |
