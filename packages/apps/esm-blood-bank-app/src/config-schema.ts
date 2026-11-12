@@ -8,12 +8,40 @@ export interface CollectionLabelConceptConfig {
 
 export interface BloodBankConfig {
   collectionLabelConcepts?: CollectionLabelConceptConfig;
+  laboratoryCatalogs?: {
+    modifierLocationUuid?: string;
+    storageTemperatureSetUuid?: string;
+    irregularAntibodySetUuid?: string;
+    cmvIgGConceptUuid?: string;
+  };
   dashboardExpiryWarningDays?: number;
   enabled: boolean;
   useMockData: boolean;
 }
 
 export const configSchema = {
+  laboratoryCatalogs: {
+    modifierLocationUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'UUID de la localidad de OpenMRS que fracciona los hemocomponentes.',
+    },
+    storageTemperatureSetUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'UUID del conjunto de temperaturas de almacenamiento del banco de sangre.',
+    },
+    irregularAntibodySetUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'UUID del conjunto de especificidades de anticuerpos eritrocitarios irregulares.',
+    },
+    cmvIgGConceptUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'UUID de la prueba de anticuerpos IgG contra citomegalovirus (CMV).',
+    },
+  },
   collectionLabelConcepts: {
     bloodBankServiceUuid: {
       _type: Type.String,

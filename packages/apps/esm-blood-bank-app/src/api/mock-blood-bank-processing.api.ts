@@ -131,6 +131,9 @@ export function createMockProcessingApi(
     },
   };
   const screening: ScreeningApi = {
+    async listAdditionalTestConcepts() {
+      return [{ uuid: 'mock-cmv-igg', display: 'Anticuerpos IgG contra citomegalovirus (CMV)' }];
+    },
     listApheresisCandidates: candidates,
     async getApheresisDraft() {
       return structuredClone(readProcessingState(getStorage).apheresisDraft ?? null);

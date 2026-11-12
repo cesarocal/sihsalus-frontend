@@ -3,6 +3,7 @@ import {
   componentDefinitions,
   eligibleSource,
   finalNodes,
+  isFractionationRemainder,
   newBatch,
   positiveVolume,
   validTree,
@@ -15,6 +16,7 @@ import {
   type FractionationStore,
   type FractionationUnit,
 } from '../sections/laboratory/fractionation/fractionation.types';
+import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
 import type { InventorySummary } from '../types/blood-bank.types';
 import { observationsExceedLimit } from '../shared/text-field-contracts';
 import type { FractionationApi } from './fractionation.api';
@@ -45,6 +47,45 @@ const emptyLabel = (): ComponentLabel => ({
   recipientService: '',
   recipientHistory: '',
 });
+
+function unitCmvIgGResult(state: ProcessingState, source: FractionationUnit): ComponentLabel['cmvIgGResult'] {
+  const original = state.collections.find(({ unitCode }) => unitCode === source.originalWholeBloodCode);
+  if (!original) return source.label.cmvIgGResult;
+  return (
+    state.screenings
+      .filter(
+        (record) =>
+          record.status === 'validated' &&
+          record.validatedAt &&
+          record.collectionId === original.id &&
+          record.unitCode === original.unitCode &&
+          (!record.origin || (record.origin.type === 'postExtraction' && record.origin.collectionId === original.id)) &&
+          record.additionalTest?.cmvIgGConceptUuid,
+      )
+      .map((record) => consolidatedScreening(record))
+      .sort((a, b) => (b.validatedAt ?? '').localeCompare(a.validatedAt ?? ''))[0]?.additionalTest?.result || undefined
+  );
+}
+
+function refreshCmvResults(state: ProcessingState, batch: FractionationBatch): FractionationBatch {
+  if (batch.status === 'completed') return batch;
+  const results = new Map(batch.sources.map((source) => [source.id, unitCmvIgGResult(state, source)]));
+  if (batch.sources.every((source) => source.label.cmvIgGResult === results.get(source.id))) return batch;
+  return {
+    ...batch,
+    sources: batch.sources.map((source) => ({
+      ...source,
+      label: { ...source.label, cmvIgGResult: results.get(source.id) },
+    })),
+    nodes: batch.nodes.map((node) => ({
+      ...node,
+      label: { ...node.label, cmvIgGResult: results.get(node.sourceId) },
+    })),
+    completedSteps: batch.completedSteps.slice(0, 1),
+    labelsVerified: false,
+    finalChecks: false,
+  };
+}
 
 /** Additive projection: old session data remains valid; no collections or screening results are reset. */
 export function fractionationStore(state: ProcessingState): FractionationStore {
@@ -80,6 +121,7 @@ export function fractionationStore(state: ProcessingState): FractionationStore {
       label: {
         ...emptyLabel(),
         anticoagulant: record.label.anticoagulant,
+        anticoagulantConceptUuid: record.label.anticoagulantConceptUuid,
         preservative: record.label.preservative,
         sedimentingAgent: record.label.sedimentingAgent,
         collectionService: record.label.service,
@@ -115,6 +157,7 @@ export function fractionationStore(state: ProcessingState): FractionationStore {
       },
     });
   for (const source of sources) if (!store.units.some((unit) => unit.id === source.id)) store.units.push(source);
+  store.batches = store.batches.map((batch) => refreshCmvResults(state, batch));
   return store;
 }
 
@@ -125,6 +168,7 @@ export function fractionationInventory(state: ProcessingState): InventorySummary
       id: unit.code,
       component: (spanish.processing as Record<string, string>)[componentDefinitions[unit.component].key],
       bloodGroup: unit.label.bloodGroup,
+      volume: unit.volume,
       expiresAt: unit.label.expiresAt || '—',
       location: unit.location,
       status:
@@ -186,6 +230,7 @@ function prepare(input: FractionationBatch, previous: FractionationBatch): Fract
     if (!source) throw new Error('FRACTIONATION_IDENTITY_CONFLICT');
     for (const key of [
       'bloodGroup',
+      'cmvIgGResult',
       'voluntary',
       'remunerated',
       'leukocytesReduced',
@@ -221,6 +266,14 @@ export function createMockFractionationApi(
   const write = (state: ProcessingState, store: FractionationStore) =>
     writeProcessingState(getStorage, { ...state, fractionation: store });
   return {
+    async listLabelConcepts(field) {
+      const values = {
+        anticoagulant: ['CPDA-1', 'CPD', 'ACD', 'CP2D'],
+        storageTemperature: ['1–6 °C', '20–24 °C', '≤ −18 °C', '≤ −65 °C'],
+        antibodies: ['Anti-K', 'Anti-E'],
+      }[field];
+      return values.map((display, index) => ({ uuid: `mock-fractionation-${field}-${index}`, display }));
+    },
     async list() {
       const { state, store } = load();
       return structuredClone({
@@ -240,9 +293,9 @@ export function createMockFractionationApi(
         new Set(sources.map((source) => source?.component)).size !== 1
       )
         throw new Error('FRACTIONATION_INVALID_SELECTION');
-      const batch = newBatch(
-        `F-DEMO-${String(store.batches.length + 1).padStart(5, '0')}`,
-        sources as FractionationUnit[],
+      const batch = refreshCmvResults(
+        state,
+        newBatch(`F-DEMO-${String(store.batches.length + 1).padStart(5, '0')}`, sources as FractionationUnit[]),
       );
       for (const unit of store.units)
         if (sourceIds.includes(unit.id)) {
@@ -294,6 +347,7 @@ export function createMockFractionationApi(
         throw new Error('FRACTIONATION_CONFLICT');
       const leaves = finalNodes(next);
       for (const node of next.nodes.filter((item) => item.parentId !== null)) {
+        if (isFractionationRemainder(node)) continue;
         if (store.units.some((unit) => unit.id === node.id || unit.code === node.code))
           throw new Error('FRACTIONATION_IDENTITY_CONFLICT');
         const source = next.sources.find((unit) => unit.id === node.sourceId);
@@ -307,7 +361,7 @@ export function createMockFractionationApi(
           originalWholeBloodCode: source.originalWholeBloodCode,
           component: node.component,
           volume: isFinal ? node.volume : '',
-          nominalVolume: node.estimatedVolume,
+          nominalVolume: '',
           collectedAt: source.collectedAt,
           location: next.service,
           state: isFinal ? 'quarantine' : 'fractionated',
@@ -316,8 +370,17 @@ export function createMockFractionationApi(
           parentId: parent.parentId === null ? source.id : parent.id,
         });
       }
-      for (const unit of store.units)
-        if (next.sources.some((source) => source.id === unit.id)) unit.state = 'fractionated';
+      for (const unit of store.units) {
+        const source = next.sources.find((item) => item.id === unit.id);
+        if (!source) continue;
+        const remainder = leaves.find((node) => node.sourceId === unit.id && isFractionationRemainder(node));
+        if (remainder) {
+          unit.volume = remainder.volume;
+          unit.label = structuredClone(remainder.label);
+          unit.state = source.state;
+          unit.fractionationRemainder = true;
+        } else unit.state = 'fractionated';
+      }
       next.status = 'completed';
       next.completedSteps = [...fractionationSteps];
       next.revision += 1;

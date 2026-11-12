@@ -12,6 +12,9 @@ export const processingPrintCss = `
   tr { break-inside: avoid; } footer { margin-top: 20pt; border-top: 1px solid #999; padding-top: 8pt; }
   [data-label] { max-width: 110mm; padding: 8mm; border: 1px solid #111; }
   [data-demo] { text-align: center; font-weight: bold; padding: 6pt; border: 1px solid #111; }
+  [data-blood-group] { display: flex; justify-content: center; align-items: baseline; gap: 9pt; margin: 6pt 0 12pt; font-size: 15pt; font-weight: bold; }
+  [data-blood-group] strong { font-size: 32pt; line-height: 1; }
+  [data-manual-volume] { display: inline-block; width: 32mm; border-bottom: 1px solid; margin-right: 4pt; }
 `;
 export function printDocument(content: ReactNode, title: string, onError?: () => void, css = processingPrintCss) {
   // Use the shell's shared client renderer. A dev server renderer can depend on

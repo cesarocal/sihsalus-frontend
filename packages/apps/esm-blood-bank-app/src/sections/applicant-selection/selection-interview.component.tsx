@@ -1,6 +1,5 @@
 import { Button, InlineNotification, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react';
 import { Add, TrashCan } from '@carbon/react/icons';
-import { useRef } from 'react';
 import {
   interviewGeneralGroups,
   interviewListEntries,
@@ -28,20 +27,6 @@ interface SelectionInterviewProps {
 }
 
 export function SelectionInterview({ interview, sex, readOnly, onChange, t }: SelectionInterviewProps) {
-  const formRef = useRef<HTMLDivElement>(null);
-
-  const scrollAfterAnswer = (id: string) => {
-    requestAnimationFrame(() => {
-      const form = formRef.current;
-      if (!form) return;
-      const questions = Array.from(form.querySelectorAll<HTMLElement>('[data-interview-question]'));
-      const index = questions.findIndex((question) => question.dataset.interviewQuestion === id);
-      if (index < 0) return;
-      const target = questions[index].querySelector<HTMLElement>('[data-interview-detail]') ?? questions[index + 1];
-      target?.scrollIntoView?.({ block: 'nearest' });
-    });
-  };
-
   const answer = (id: string, value: Answer) => {
     const question = interviewQuestions.find((item) => item.id === id);
     const details = { ...interview.details };
@@ -68,10 +53,7 @@ export function SelectionInterview({ interview, sex, readOnly, onChange, t }: Se
       name={`selection-${id}`}
       valueSelected={value}
       disabled={readOnly}
-      onChange={(next) => {
-        updateAnswer(next as Answer);
-        scrollAfterAnswer(id);
-      }}
+      onChange={(next) => updateAnswer(next as Answer)}
     >
       <RadioButton id={`selection-${id}-yes`} labelText={t('yes')} value="yes" />
       <RadioButton id={`selection-${id}-no`} labelText={t('no')} value="no" />
@@ -202,7 +184,7 @@ export function SelectionInterview({ interview, sex, readOnly, onChange, t }: Se
   );
 
   return (
-    <div ref={formRef}>
+    <div>
       {interviewGeneralGroups.map(group)}
       {sex === 'F' && (
         <section className={styles.questionGroup} aria-labelledby="selection-interview-women">

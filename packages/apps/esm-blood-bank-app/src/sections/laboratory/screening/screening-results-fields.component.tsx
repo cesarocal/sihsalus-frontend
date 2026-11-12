@@ -1,4 +1,5 @@
 import {
+  Button,
   RadioButton,
   RadioButtonGroup,
   Select,
@@ -11,7 +12,8 @@ import {
   TableRow,
   TextInput,
 } from '@carbon/react';
-import type { ProcessingTranslate } from '../../../shared/processing-page.component';
+import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
+import { useProcessingData, type ProcessingTranslate } from '../../../shared/processing-page.component';
 import styles from '../../applicant-selection/selection.scss';
 import {
   screeningBloodGroups,
@@ -66,6 +68,7 @@ export function ScreeningResultsFields({
   readOnly,
   saving,
   errors,
+  loadAdditionalTests,
   onChange,
   t,
 }: {
@@ -73,11 +76,14 @@ export function ScreeningResultsFields({
   readOnly: boolean;
   saving: boolean;
   errors: string[];
+  loadAdditionalTests: ScreeningApi['listAdditionalTestConcepts'];
   onChange: (record: ScreeningRecord) => void;
   t: ProcessingTranslate;
 }) {
   const bloodData = record.bloodData ?? { aboGroup: '', rhFactor: '', hematocrit: '', hemoglobin: '' };
   const additional = record.additionalTest ?? { name: '', result: '' };
+  const additionalTests = useProcessingData(loadAdditionalTests, !readOnly);
+  const options = additionalTests.failed ? [] : (additionalTests.data ?? []);
   const recommendations = record.recommendations ?? { gastroenterology: '', infectiousDiseases: '', procets: '' };
   const resultField = (
     name: string,
@@ -165,30 +171,64 @@ export function ScreeningResultsFields({
           {(!readOnly || additional.name) && (
             <TableRow>
               <TableCell>
-                <TextInput
-                  id="screening-additional-test"
-                  labelText={t('screeningAdditionalTest')}
-                  value={additional.name}
-                  readOnly={readOnly}
-                  disabled={saving && !readOnly}
-                  invalid={errors.includes('screeningAdditionalTest')}
-                  invalidText={t('requiredFields')}
-                  onChange={({ target: { value } }) =>
-                    onChange({
-                      ...record,
-                      additionalTest: { name: value, result: value.trim() ? additional.result : '' },
-                    })
-                  }
-                />
+                {readOnly ? (
+                  <TextInput
+                    id="screening-additional-test"
+                    labelText={t('screeningAdditionalTest')}
+                    value={additional.name}
+                    readOnly
+                  />
+                ) : (
+                  <>
+                    <Select
+                      id="screening-additional-test"
+                      labelText={t('screeningAdditionalTest')}
+                      value={additional.cmvIgGConceptUuid || (additional.name ? 'saved' : '')}
+                      disabled={saving || additionalTests.loading}
+                      invalid={errors.includes('screeningAdditionalTest')}
+                      invalidText={t('requiredFields')}
+                      helperText={
+                        additionalTests.loading
+                          ? t('laboratoryCatalogLoading')
+                          : !options.length
+                            ? t('laboratoryCatalogUnavailable')
+                            : undefined
+                      }
+                      onChange={({ target: { value } }) => {
+                        const concept = options.find(({ uuid }) => uuid === value);
+                        onChange({
+                          ...record,
+                          additionalTest: concept
+                            ? { name: concept.display, cmvIgGConceptUuid: concept.uuid, result: '' }
+                            : undefined,
+                        });
+                      }}
+                    >
+                      <SelectItem value="" text={t('screeningNoAdditionalTest')} />
+                      {additional.name && !options.some(({ uuid }) => uuid === additional.cmvIgGConceptUuid) && (
+                        <SelectItem disabled value={additional.cmvIgGConceptUuid || 'saved'} text={additional.name} />
+                      )}
+                      {options.map(({ uuid, display }) => (
+                        <SelectItem key={uuid} value={uuid} text={display} />
+                      ))}
+                    </Select>
+                    {additionalTests.failed && (
+                      <Button kind="ghost" size="sm" onClick={additionalTests.reload}>
+                        {t('retry')}
+                      </Button>
+                    )}
+                  </>
+                )}
               </TableCell>
               <TableCell>
-                {resultField(
-                  'screening-additional-result',
-                  t('screeningAdditionalResult'),
-                  additional.result,
-                  'screeningAdditionalResult',
-                  (result) => onChange({ ...record, additionalTest: { ...additional, result } }),
-                )}
+                {additional.name &&
+                  resultField(
+                    'screening-additional-result',
+                    t('screeningAdditionalResult'),
+                    additional.result,
+                    'screeningAdditionalResult',
+                    (result) => onChange({ ...record, additionalTest: { ...additional, result } }),
+                  )}
               </TableCell>
             </TableRow>
           )}

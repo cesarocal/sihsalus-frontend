@@ -30,6 +30,7 @@ export interface InventorySummary {
   id: string;
   component: string;
   bloodGroup: string;
+  volume?: string;
   expiresAt: string;
   location: string;
   status:

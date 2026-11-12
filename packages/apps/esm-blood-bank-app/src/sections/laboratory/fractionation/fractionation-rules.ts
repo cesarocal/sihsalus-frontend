@@ -23,7 +23,7 @@ export const componentDefinitions: Record<
     suffix: 'ST',
     color: '#a2191f',
     fill: 0.86,
-    temperature: '',
+    temperature: '1–6 °C',
   },
   redCells: {
     key: 'componentRedCells',
@@ -38,6 +38,20 @@ export const componentDefinitions: Record<
     color: '#b28600',
     fill: 0.65,
     temperature: '',
+  },
+  liquidPlasma: {
+    key: 'componentLiquidPlasma',
+    suffix: 'PL',
+    color: '#b28600',
+    fill: 0.65,
+    temperature: '1–6 °C',
+  },
+  pediatricFraction: {
+    key: 'componentPediatricFraction',
+    suffix: 'PED',
+    color: '#a2191f',
+    fill: 0.32,
+    temperature: '1–6 °C',
   },
   platelets: {
     key: 'componentPlatelets',
@@ -77,7 +91,10 @@ export const componentDefinitions: Record<
 };
 
 export const separationOptions: Partial<Record<ComponentType, ComponentType[][]>> = {
-  wholeBlood: [['redCells', 'plateletRichPlasma']],
+  wholeBlood: [
+    ['redCells', 'liquidPlasma'],
+    ['wholeBlood', 'pediatricFraction'],
+  ],
   plateletRichPlasma: [
     ['platelets', 'freshFrozenPlasma'],
     ['platelets', 'plasma24'],
@@ -90,6 +107,7 @@ export const positiveVolume = (value: string) =>
 export const finalNodes = (batch: FractionationBatch) =>
   batch.nodes.filter((node) => !batch.nodes.some((child) => child.parentId === node.id));
 export const eligibleSource = (unit: FractionationUnit) =>
+  !unit.fractionationRemainder &&
   ['wholeBlood', 'freshFrozenPlasma'].includes(unit.component) &&
   ['quarantine', 'available'].includes(unit.state) &&
   positiveVolume(unit.volume) &&
@@ -130,7 +148,7 @@ export function newBatch(id: string, sources: FractionationUnit[]): Fractionatio
 export function splitNode(batch: FractionationBatch, id: string, option: number | null): FractionationBatch {
   const next = structuredClone(batch);
   const node = next.nodes.find((item) => item.id === id);
-  if (!node) throw new Error('INVALID_FRACTIONATION_TREE');
+  if (!node || isFractionationRemainder(node)) throw new Error('INVALID_FRACTIONATION_TREE');
   const descendants = new Set([id]);
   let previousSize = 0;
   while (descendants.size !== previousSize) {
@@ -147,13 +165,16 @@ export function splitNode(batch: FractionationBatch, id: string, option: number 
         sourceId: node.sourceId,
         parentId: id,
         component,
-        code: `${node.code}-${componentDefinitions[component].suffix}`,
+        code: childCode(node, component),
         estimatedVolume: '',
         volume: '',
         label: {
           ...node.label,
+          processingService: batch.service,
           expiresAt: '',
-          storageTemperature: componentDefinitions[component].temperature,
+          expiresAtManual: false,
+          storageTemperature: '',
+          storageTemperatureConceptUuid: undefined,
           antibodies: component === 'cryoprecipitate' ? '' : node.label.antibodies,
         },
       })),
@@ -165,6 +186,25 @@ export function splitNode(batch: FractionationBatch, id: string, option: number 
     labelsVerified: false,
     finalChecks: false,
   };
+}
+
+export const isFractionationRemainder = (node: FractionationNode) =>
+  node.parentId !== null && node.component === 'wholeBlood';
+
+const childCode = (parent: FractionationNode, component: ComponentType) =>
+  component === 'wholeBlood' ? parent.code : `${parent.code}-${componentDefinitions[component].suffix}`;
+
+function validChildren(node: FractionationNode, children: FractionationNode[]) {
+  if (!children.length) return true;
+  if (isFractionationRemainder(node)) return false;
+  const options = separationOptions[node.component] ?? [];
+  // Keep previously stored PRP branches valid under their original component identity.
+  const allowed = node.component === 'wholeBlood' ? [...options, ['redCells', 'plateletRichPlasma']] : options;
+  return allowed.some(
+    (option) =>
+      option.length === children.length &&
+      option.every((component) => children.some((child) => child.component === component)),
+  );
 }
 
 /** Validate topology even on draft writes; client data cannot introduce untracked sources or cycles. */
@@ -179,8 +219,9 @@ export function validTree(batch: FractionationBatch): boolean {
   )
     return false;
   const ids = new Set(batch.nodes.map((node) => node.id));
-  const codes = new Set(batch.nodes.map((node) => node.code));
-  if (ids.size !== batch.nodes.length || codes.size !== batch.nodes.length) return false;
+  const distinctUnits = batch.nodes.filter((node) => !isFractionationRemainder(node));
+  const codes = new Set(distinctUnits.map((node) => node.code));
+  if (ids.size !== batch.nodes.length || codes.size !== distinctUnits.length) return false;
   return (
     batch.sources.every((source) => {
       const root = batch.nodes.find((node) => node.id === `${source.id}:root`);
@@ -197,19 +238,11 @@ export function validTree(batch: FractionationBatch): boolean {
         if (reachable.has(node.id) || node.sourceId !== source.id) return false;
         reachable.add(node.id);
         const children = batch.nodes.filter((child) => child.parentId === node.id);
-        if (
-          children.length &&
-          !separationOptions[node.component]?.some(
-            (option) =>
-              option.length === children.length &&
-              option.every((component) => children.some((child) => child.component === component)),
-          )
-        )
-          return false;
+        if (!validChildren(node, children)) return false;
         return children.every(
           (child) =>
             child.id === `${node.id}:${child.component}` &&
-            child.code === `${node.code}-${componentDefinitions[child.component].suffix}` &&
+            child.code === childCode(node, child.component) &&
             visit(child),
         );
       };
@@ -223,8 +256,7 @@ export function validateFractionation(batch: FractionationBatch, step: Fractiona
   const end = fractionationSteps.indexOf(step);
   const leaves = finalNodes(batch);
   if (!validTree(batch)) return ['fractionationInvalidTree'];
-  if (!batch.operator.trim() || !batch.service.trim() || !['open', 'closed'].includes(batch.system))
-    errors.add('fractionationProcessRequired');
+  if (!batch.operator.trim() || !batch.service.trim()) errors.add('fractionationProcessRequired');
   if (leaves.some((node) => node.parentId === null)) errors.add('fractionationFinishBranches');
   // EG05-CC07 E7: the general multi-component flow does not implement low-volume red-cell preparation.
   for (const source of batch.sources) {
@@ -237,7 +269,6 @@ export function validateFractionation(batch: FractionationBatch, step: Fractiona
     for (const node of leaves) {
       const label = node.label;
       if (
-        !positiveVolume(node.estimatedVolume) ||
         !(label.anticoagulant.trim() || label.preservative.trim()) ||
         !label.collectionService.trim() ||
         !label.processingService.trim() ||
@@ -246,21 +277,11 @@ export function validateFractionation(batch: FractionationBatch, step: Fractiona
         !label.expiresAt ||
         !Number.isFinite(Date.parse(label.expiresAt)) ||
         Date.parse(label.expiresAt) <= Date.now() ||
-        (node.component !== 'cryoprecipitate' && !label.antibodies.trim()) ||
         (label.autologous && (!label.recipientName.trim() || !label.recipientDocument.trim()))
       )
         errors.add('fractionationLabelsRequired');
     }
     if (!batch.labelsVerified) errors.add('fractionationVerifyLabels');
-    for (const source of batch.sources) {
-      if (
-        leaves
-          .filter((node) => node.sourceId === source.id)
-          .reduce((sum, node) => sum + Math.round(Number(node.estimatedVolume || 0) * 100), 0) >
-        Math.round(Number(source.volume) * 100)
-      )
-        errors.add('fractionationVolumeExceeded');
-    }
   }
   if (end >= 2) {
     for (const source of batch.sources) {

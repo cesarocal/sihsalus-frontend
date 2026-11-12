@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockBloodBankApi } from './mock-blood-bank.api';
 import { createMockFractionationApi, fractionationInventory, fractionationStore } from './mock-fractionation.api';
+import { suggestFractionationExpirations } from '../sections/laboratory/fractionation/fractionation-expiration';
 import { openmrsFractionationApi } from './fractionation.api';
 import { processingStorageKey, readProcessingState, writeProcessingState } from './mock-processing-store';
 import {
@@ -86,41 +87,71 @@ describe('atomic synthetic fractionation and inventory', () => {
     expect(await instance.finalize(batch)).toEqual(finalized);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });
-  it('preserves PRP as a final component with required labels, volume and quarantine inventory', async () => {
+  it('keeps the original unit and atomically adds a pediatric fraction to inventory', async () => {
     const instance = api();
     const source = (await instance.list()).units.find((unit) => unit.component === 'wholeBlood');
     if (!source) throw new Error('SYNTHETIC_UNIT_MISSING');
     let batch = plannedBatch(await instance.start([source.id]));
-    const prp = batch.nodes.find((node) => node.component === 'plateletRichPlasma');
-    if (!prp) throw new Error('SYNTHETIC_PRP_MISSING');
-    batch = splitNode(batch, prp.id, null);
-    expect(validateFractionation(batch, 'fractionationPlan')).toEqual([]);
+    batch = splitNode(batch, batch.nodes[0].id, 1);
+    expect(finalNodes(batch).map((node) => node.code)).toEqual([source.code, source.code + '-PED']);
     batch = await instance.save(batch, 'fractionationPlan');
-    batch = labeledBatch(batch);
-    expect(validateFractionation(batch, 'fractionationLabels')).toContain('fractionationLabelsRequired');
-    await expect(instance.save(batch, 'fractionationLabels')).rejects.toThrow('INVALID_FRACTIONATION_STEP');
-    const finalPrp = finalNodes(batch).find((node) => node.component === 'plateletRichPlasma');
-    if (!finalPrp) throw new Error('SYNTHETIC_PRP_MISSING');
-    // Explicit synthetic input, not a clinical storage default for PRP.
-    finalPrp.label.storageTemperature = 'Temperatura DEMO';
-    batch = await instance.save(batch, 'fractionationLabels');
-    expect(validateFractionation(batch, 'fractionationVolumes')).toContain('fractionationVolumesRequired');
-    for (const node of finalNodes(batch)) node.volume = node.estimatedVolume;
+    batch = await instance.save(labeledBatch(batch), 'fractionationLabels');
+    const [remainder, pediatric] = finalNodes(batch);
+    remainder.volume = '300';
+    pediatric.volume = '100';
     batch = await instance.save(batch, 'fractionationVolumes');
     batch.finalChecks = true;
     const completed = await instance.finalize(batch);
-    expect(finalNodes(completed).map((node) => node.component)).toEqual(['redCells', 'plateletRichPlasma']);
-    const storedPrp = (await instance.list()).units.find((unit) => unit.code === finalPrp.code);
-    expect(storedPrp).toMatchObject({
-      component: 'plateletRichPlasma',
-      state: 'quarantine',
-      parentId: source.id,
+    expect(await instance.finalize(batch)).toEqual(completed);
+    const updated = (await instance.list()).units;
+    expect(updated.find(({ id }) => id === source.id)).toMatchObject({
+      code: source.code,
+      volume: '300',
+      state: source.state,
+    });
+    expect(updated.find(({ code }) => code === pediatric.code)).toMatchObject({
+      component: 'pediatricFraction',
       volume: '100',
-      originalWholeBloodCode: source.originalWholeBloodCode,
+      parentId: source.id,
+      state: 'quarantine',
     });
     const stock = await mockBloodBankApi.getInventory();
-    expect(stock.find((unit) => unit.id === finalPrp.code)).toMatchObject({ status: 'Cuarentena' });
-    expect(stock.some((unit) => unit.id === source.code)).toBe(false);
+    expect(stock.filter(({ id }) => id === source.code)).toHaveLength(1);
+    expect(stock.find(({ id }) => id === pediatric.code)?.status).toBe('Cuarentena');
+  });
+
+  it('refreshes the latest validated CMV result when resuming and requires label verification again', async () => {
+    const instance = api();
+    const before = await reviewBatch(instance, await instance.start(['BB-DEMO-001']));
+    expect(finalNodes(before).every(({ label }) => !label.cmvIgGResult)).toBe(true);
+    const state = readProcessingState(() => sessionStorage);
+    const record = state.screenings.find(({ unitCode }) => unitCode === 'BB-DEMO-001');
+    if (!record) throw new Error('SYNTHETIC_SCREENING_MISSING');
+    record.status = 'validated';
+    record.validatedAt = '2026-10-05T12:00:00Z';
+    record.additionalTest = { name: 'CMV IgG', result: 'inconclusive', cmvIgGConceptUuid: 'mock-cmv-igg' };
+    record.repeatRounds = [
+      {
+        id: 'mock-repeat',
+        number: 2,
+        previousReportId: record.id,
+        revision: 1,
+        status: 'validated',
+        results: { additional: 'nonReactive' },
+        performedOn: '2026-10-05T12:00',
+        performedBy: 'DEMO',
+        validatedAt: '2026-10-05T13:00:00Z',
+        validatedBy: 'DEMO',
+      },
+    ];
+    writeProcessingState(() => sessionStorage, state);
+    const batch = (await instance.list()).batches.find(({ id }) => id === before.id);
+    if (!batch) throw new Error('SYNTHETIC_BATCH_MISSING');
+    expect(finalNodes(batch).map((node) => node.label.cmvIgGResult)).toEqual(['nonReactive', 'nonReactive']);
+    expect(batch.completedSteps).toEqual(['fractionationPlan']);
+    expect(batch.labelsVerified).toBe(false);
+    await expect(instance.finalize(before)).rejects.toThrow('FRACTIONATION_IDENTITY_CONFLICT');
+    expect((await instance.start(['PFC-2026-002'])).sources[0].label.cmvIgGResult).toBeUndefined();
   });
   it('saves partial progress, reloads it, and performs no write or revision bump for unchanged drafts', async () => {
     const instance = api();
@@ -255,36 +286,36 @@ describe('fractionation tree and quality boundaries', () => {
   beforeEach(() => sessionStorage.clear());
   it.each(['', '0', '-1', '1e3', 'NaN', '12.345', '9999999', '1,5'])('rejects invalid mL input %s', (value) =>
     expect(positiveVolume(value)).toBe(false));
-  it('supports whole blood → RBC / PRP → platelets / PFC → cryo / reduced plasma, without industrial derivatives', async () => {
+  it('preserves old PRP trees without creating them in new separations', async () => {
     const instance = createMockFractionationApi();
     const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
-    expect(unit).toBeDefined();
-    let batch = plannedBatch(await instance.start([unit?.id ?? '']));
-    const pfc = batch.nodes.find((node) => node.component === 'freshFrozenPlasma');
-    batch = splitNode(batch, pfc?.id ?? '', 0);
+    const batch = plannedBatch(await instance.start([unit?.id ?? '']));
+    expect(finalNodes(batch).map((node) => node.component)).toEqual(['redCells', 'liquidPlasma']);
+    const legacy = finalNodes(batch).find((node) => node.component === 'liquidPlasma');
+    if (!legacy) throw new Error('SYNTHETIC_PLASMA_MISSING');
+    Object.assign(legacy, {
+      id: legacy.parentId + ':plateletRichPlasma',
+      code: batch.sources[0].code + '-PRP',
+      component: 'plateletRichPlasma',
+    });
     expect(validTree(batch)).toBe(true);
-    expect(finalNodes(batch).map((node) => node.component)).toEqual([
-      'redCells',
-      'platelets',
-      'cryoprecipitate',
-      'cryoReducedPlasma',
-    ]);
-    expect(() => splitNode(batch, batch.nodes[0].id, 9)).toThrow('INVALID_FRACTIONATION_TREE');
+    expect(validTree(splitNode(batch, legacy.id, 1))).toBe(true);
   });
-  it('requires source separation but allows final PRP and keeps optional PFC / plasma24 branches exclusive', async () => {
+
+  it('suggests CPDA-1, additive and liquid plasma expirations and preserves a manual date', async () => {
     const instance = createMockFractionationApi();
     const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
-    let batch = await instance.start([unit?.id ?? '']);
-    expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationFinishBranches');
-    batch = splitNode(batch, batch.nodes[0].id, 0);
-    expect(validateFractionation(batch, 'fractionationPlan')).not.toContain('fractionationFinishBranches');
-    const prp = batch.nodes.find((node) => node.component === 'plateletRichPlasma');
-    batch = splitNode(batch, prp?.id ?? '', 1);
-    expect(finalNodes(batch).some((node) => node.component === 'plasma24')).toBe(true);
-    expect(batch.nodes.some((node) => node.component === 'freshFrozenPlasma')).toBe(false);
-    batch = splitNode(batch, prp?.id ?? '', 0);
-    expect(finalNodes(batch).some((node) => node.component === 'freshFrozenPlasma')).toBe(true);
-    expect(batch.nodes.some((node) => node.component === 'plasma24')).toBe(false);
+    const batch = labeledBatch(plannedBatch(await instance.start([unit?.id ?? ''])));
+    batch.sources[0].collectedAt = '2026-11-12';
+    const [redCells, plasma] = finalNodes(batch);
+    Object.assign(redCells.label, { anticoagulant: 'CPDA-1', preservative: '', expiresAtManual: false });
+    plasma.label.expiresAtManual = false;
+    let suggested = suggestFractionationExpirations(batch);
+    expect(finalNodes(suggested).map((node) => node.label.expiresAt)).toEqual(['2026-12-17T00:00', '2026-12-22T00:00']);
+    redCells.label.preservative = 'SAG-M';
+    plasma.label.expiresAtManual = true;
+    suggested = suggestFractionationExpirations(batch);
+    expect(finalNodes(suggested).map((node) => node.label.expiresAt)).toEqual(['2026-12-24T00:00', '2099-01-01T12:00']);
   });
   it('blocks the general multi-component path for low-volume collection in a 450 mL bag', async () => {
     const instance = createMockFractionationApi();

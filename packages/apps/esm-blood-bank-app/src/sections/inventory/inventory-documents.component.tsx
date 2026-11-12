@@ -1,4 +1,5 @@
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
+import { BloodGroupLabel } from '../../shared/blood-group-label.component';
 import { inventoryDisplayDate } from './inventory-rules';
 import type { InventoryOperation } from './inventory.types';
 import shared from '../applicant-selection/selection.scss';
@@ -24,12 +25,12 @@ export function QualitySeals({
         <article key={unit.id} data-label data-quality-seal className={styles.seal}>
           {print && <p data-demo>{t('printPrototype')}</p>}
           <h2>{t('inventoryQualitySeal')}</h2>
+          <BloodGroupLabel value={unit.bloodGroup} t={t} />
           <dl>
             {Object.entries({
               inventoryOperation: `${operation.id}/${unit.id}`,
               fractionationCode: unit.id,
               fractionationComponent: unit.component,
-              bloodGroup: unit.bloodGroup,
               inventoryExpiration: inventoryDisplayDate(unit.expiresAt),
               inventoryDate: `${inventoryDisplayDate(operation.date)} ${operation.time}`,
               inventoryServiceResponsible: operation.serviceResponsible,

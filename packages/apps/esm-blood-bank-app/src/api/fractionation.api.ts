@@ -3,8 +3,13 @@ import type {
   FractionationStep,
   FractionationWorkspace,
 } from '../sections/laboratory/fractionation/fractionation.types';
+import type { CollectionConcept } from '../sections/collection/collection.types';
+
+export type FractionationCatalogField = 'anticoagulant' | 'storageTemperature' | 'antibodies';
 
 export interface FractionationApi {
+  listLabelConcepts(field: FractionationCatalogField): Promise<CollectionConcept[]>;
+  getModifierLocation?: () => Promise<string>;
   list(): Promise<FractionationWorkspace>;
   start(sourceIds: string[]): Promise<FractionationBatch>;
   save(batch: FractionationBatch, completedStep?: FractionationStep): Promise<FractionationBatch>;
@@ -23,6 +28,7 @@ const unavailable = async (): Promise<never> => {
   throw new Error('BACKEND_NOT_IMPLEMENTED');
 };
 export const openmrsFractionationApi: FractionationApi = {
+  listLabelConcepts: unavailable,
   list: unavailable,
   start: unavailable,
   save: unavailable,

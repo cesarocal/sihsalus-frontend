@@ -21,7 +21,7 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 - `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
 
-El máximo de 500 unidades UTF-16 también se aplica a las observaciones de fraccionamiento y detección de seguimientos al guardar un borrador o completar el flujo.
+El máximo de 500 unidades UTF-16 también se aplica a las observaciones de detección de seguimientos al guardar un borrador o completar el flujo.
 
 ## Contratos de integración
 
@@ -151,11 +151,13 @@ Cada fila elegible también permite fraccionar su unidad sin usar la selección
 del lote. Dividir queda bloqueado hasta deshacer esa rama; el avance se guarda
 al continuar o, de forma opcional, al salir con la X, sin botón Guardar avance
 en este flujo. Los demás formularios conservan sus acciones existentes.
-El plasma rico en plaquetas puede ser un resultado final del flujo mock sin
-obligar a dividirlo; mantiene etiqueta, volumen y cuarentena. Esta opción no
-aprueba su conservación ni su uso clínico.
-Los orígenes pasan a En laboratorio al iniciar y a Fraccionados al finalizar;
-permanecen trazables en el historial, fuera del inventario activo.
+La sangre total se divide en plasma líquido y glóbulos rojos, o conserva su
+código con menor volumen y genera una fracción pediátrica. Las etiquetas de
+los resultados dejan una línea para anotar el volumen a mano. El responsable se
+obtiene de la sesión y la caducidad sugerida se puede editar.
+Los catálogos de laboratorio se consultan en OpenMRS aun con persistencia mock.
+La configuración y el tratamiento de registros anteriores se documentan en
+[Fraccionamiento](src/sections/laboratory/fractionation/README.md).
 Usa los mocks de procesamiento existentes de forma aditiva y mantiene sus datos.
 Ver [Fraccionamiento](src/sections/laboratory/fractionation/README.md) para los
 contratos propuestos de API/OMOD, referencias aportadas, límites y validación.

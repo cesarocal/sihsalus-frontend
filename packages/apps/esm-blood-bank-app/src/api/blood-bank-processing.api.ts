@@ -20,6 +20,7 @@ export interface CollectionApi {
   saveCollection(record: CollectionRecord, step?: CollectionStep): Promise<CollectionRecord>;
 }
 export interface ScreeningApi {
+  listAdditionalTestConcepts(): Promise<CollectionConcept[]>;
   listScreenings(): Promise<ScreeningRecord[]>;
   saveScreening(record: ScreeningRecord, step?: ScreeningStep): Promise<ScreeningRecord>;
   saveScreeningRepeat(
@@ -51,6 +52,7 @@ export const openmrsCollectionApi: CollectionApi = {
   saveCollection: unavailable,
 };
 export const openmrsScreeningApi: ScreeningApi = {
+  listAdditionalTestConcepts: unavailable,
   listScreenings: unavailable,
   saveScreening: unavailable,
   saveScreeningRepeat: unavailable,

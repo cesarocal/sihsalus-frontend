@@ -1,4 +1,5 @@
 import { Accordion, AccordionItem } from '@carbon/react';
+import { BloodGroupLabel } from '../../../shared/blood-group-label.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { componentDefinitions, finalNodes } from './fractionation-rules';
 import type { FractionationBatch } from './fractionation.types';
@@ -10,12 +11,14 @@ import styles from './fractionation.scss';
 export function FractionationLabels({
   batch,
   actual = false,
+  print = false,
   nodeId,
   showDemoMark = true,
   t,
 }: {
   batch: FractionationBatch;
   actual?: boolean;
+  print?: boolean;
   nodeId?: string;
   showDemoMark?: boolean;
   t: ProcessingTranslate;
@@ -31,7 +34,7 @@ export function FractionationLabels({
             fractionationCode: node.code,
             fractionationOrigin: source?.originalWholeBloodCode,
             fractionationSource: source?.code,
-            fractionationVolume: actual ? node.volume : node.estimatedVolume,
+            fractionationVolume: !print && actual ? node.volume : '',
             anticoagulant: label.anticoagulant,
             preservative: label.preservative,
             sedimentingAgent: label.sedimentingAgent,
@@ -39,8 +42,16 @@ export function FractionationLabels({
             fractionationService: label.processingService,
             fractionationTemperature: label.storageTemperature,
             fractionationExpiration: label.expiresAt ? fractionationDateTime(label.expiresAt) : '',
-            bloodGroup: label.bloodGroup,
             fractionationAntibodies: label.antibodies,
+            fractionationCmvSeronegative: label.cmvIgGResult
+              ? t(
+                  label.cmvIgGResult === 'nonReactive'
+                    ? 'fractionationCmvYes'
+                    : label.cmvIgGResult === 'reactive'
+                      ? 'fractionationCmvNo'
+                      : 'inconclusive',
+                )
+              : '',
             ...(label.autologous
               ? {
                   recipientName: label.recipientName,
@@ -54,6 +65,7 @@ export function FractionationLabels({
             <article data-label key={node.id} className={shared.report} style={{ breakAfter: 'page' }}>
               {showDemoMark && <p data-demo>{t('printPrototype')}</p>}
               <h2>{t(componentDefinitions[node.component].key)}</h2>
+              <BloodGroupLabel value={label.bloodGroup} t={t} />
               <dl>
                 {Object.entries(values)
                   .filter(([, value]) => value)
@@ -66,6 +78,14 @@ export function FractionationLabels({
                       </dd>
                     </div>
                   ))}
+                {print && (
+                  <div>
+                    <dt>{t('fractionationVolume')}</dt>
+                    <dd>
+                      <span data-manual-volume aria-hidden="true" /> mL
+                    </dd>
+                  </div>
+                )}
               </dl>
               {label.voluntary && <p>{t('fractionationVoluntary')}</p>}
               {label.remunerated && <p>{t('fractionationRemunerated')}</p>}

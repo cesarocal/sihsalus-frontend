@@ -29,7 +29,7 @@ export function useProcessingTranslation() {
     [t],
   );
 }
-export function useProcessingData<T>(load: () => Promise<T>) {
+export function useProcessingData<T>(load: () => Promise<T>, enabled = true) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -37,6 +37,7 @@ export function useProcessingData<T>(load: () => Promise<T>) {
   const reload = useCallback(() => setVersion((value) => value + 1), []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is an explicit retry/refresh trigger.
   useEffect(() => {
+    if (!enabled) return;
     let current = true;
     setLoading(true);
     setFailed(false);
@@ -53,7 +54,7 @@ export function useProcessingData<T>(load: () => Promise<T>) {
     return () => {
       current = false;
     };
-  }, [load, version]);
+  }, [load, enabled, version]);
   return { data, loading, failed, reload };
 }
 export function ProcessingPage({

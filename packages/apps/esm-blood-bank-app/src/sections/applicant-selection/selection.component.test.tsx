@@ -184,21 +184,15 @@ describe('applicant selection UI', () => {
     expect(screen.queryByLabelText(first)).not.toBeInTheDocument();
   });
 
-  it('scrolls to the next question or to a newly opened detail when answering', async () => {
-    const targets: HTMLElement[] = [];
-    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (this: HTMLElement) {
-      targets.push(this);
-    });
+  it('keeps scroll position after answering, including when a detail opens', async () => {
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
     try {
       render(<Fields initial={validApplication()} stage="interview" />);
-      const health = within(screen.getByRole('group', { name: t('feelsWell') }));
-      fireEvent.click(health.getByLabelText('No'));
-      await waitFor(() => expect(targets.at(-1)?.dataset.interviewQuestion).toBe('strenuousActivity'));
-      const medication = within(screen.getByRole('group', { name: t('medication') }));
-      fireEvent.click(medication.getByLabelText('Sí'));
-      await waitFor(() =>
-        expect(targets.at(-1)).toContainElement(screen.getByRole('button', { name: t('addMedication') })),
-      );
+      fireEvent.click(within(screen.getByRole('group', { name: t('feelsWell') })).getByLabelText('No'));
+      fireEvent.click(within(screen.getByRole('group', { name: t('medication') })).getByLabelText('Sí'));
+      expect(screen.getByRole('button', { name: t('addMedication') })).toBeInTheDocument();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(scroll).not.toHaveBeenCalled();
     } finally {
       scroll.mockRestore();
     }

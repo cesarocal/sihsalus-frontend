@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { mockBloodBankApi, openmrsBloodBankApi } from './api';
 import { createCollectionLabelConceptLoader } from './api/collection-label-concepts.api';
+import { createLaboratoryCatalogs } from './api/laboratory-catalogs.api';
 import { bloodBankPrivileges } from './access/blood-bank-privileges';
 import { BloodBankApp } from './blood-bank-app.component';
 import type { BloodBankConfig } from './config-schema';
@@ -15,16 +16,25 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
   const modulePath = `${globalThis.getOpenmrsSpaBase().slice(0, -1)}${basePath}`;
   const leftNav = useMemo(() => ({ name: 'blood-bank-nav-slot', basePath: modulePath }), [modulePath]);
   useLeftNav(leftNav);
-  const { collectionLabelConcepts, useMockData } = config;
+  const { collectionLabelConcepts, laboratoryCatalogs, useMockData } = config;
   const api = useMemo(() => {
     const source = useMockData ? mockBloodBankApi : openmrsBloodBankApi;
     const concepts = collectionLabelConcepts ?? {};
-    if (useMockData && !Object.values(concepts).some(Boolean)) return source;
+    const catalogs = createLaboratoryCatalogs(laboratoryCatalogs ?? {}, concepts.anticoagulantSetUuid);
     return {
       ...source,
-      collection: { ...source.collection, listLabelConcepts: createCollectionLabelConceptLoader(concepts) },
+      collection:
+        useMockData && !Object.values(concepts).some(Boolean)
+          ? source.collection
+          : { ...source.collection, listLabelConcepts: createCollectionLabelConceptLoader(concepts) },
+      fractionation: {
+        ...source.fractionation,
+        listLabelConcepts: catalogs.listLabelConcepts,
+        getModifierLocation: catalogs.getModifierLocation,
+      },
+      screening: { ...source.screening, listAdditionalTestConcepts: catalogs.listAdditionalTestConcepts },
     };
-  }, [collectionLabelConcepts, useMockData]);
+  }, [collectionLabelConcepts, laboratoryCatalogs, useMockData]);
 
   return (
     <BloodBankApp

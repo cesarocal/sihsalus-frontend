@@ -21,22 +21,30 @@ un aviso y permite quitar los filtros. El guard existente sigue siendo necesario
 - Al iniciar se guarda el proceso y sus orígenes pasan a **En laboratorio**.
   Cerrar no devuelve automáticamente esas unidades al almacén: **Retomar
   fraccionamiento** conserva el proceso y evita iniciar otro sobre el mismo origen.
-- **Fraccionamiento**: responsable, servicio, sistema abierto/cerrado,
-  observaciones y un árbol separado por cada unidad. Sangre total produce
-  glóbulos rojos y PRP. El PRP puede conservarse como componente final en el
-  prototipo o dividirse opcionalmente en plaquetas y PFC o plasma de 24 h; PFC
-  produce crioprecipitado y plasma con crioprecipitado reducido.
+- **Fraccionamiento**. El responsable se toma de la sesión al abrir el flujo
+  y se conserva al continuar. El servicio modificador se obtiene de la
+  localidad configurada de OpenMRS. Si no se configuró, se compone con el
+  nombre de la ubicación activa de la sesión. Sangre total produce glóbulos
+  rojos y plasma líquido o una fracción pediátrica y el remanente con el código
+  original. PFC produce factor antihemofílico crioprecipitado y plasma con
+  crioprecipitado reducido.
   Una división bloquea todas las opciones de ese nodo hasta **Deshacer división**;
   al deshacer se eliminan sus descendientes y desaparece ese botón.
-- **Imprimir etiquetas**: datos del componente final, volumen aproximado,
-  temperatura y vencimiento explícitos; verificación física de etiquetas.
+- **Imprimir etiquetas**. Incluye temperatura, vencimiento editable, ABO y Rh
+  destacados y una línea para rotular el volumen. Usa el resultado validado de
+  CMV IgG de la extracción de origen, incluida la última ronda validada.
+  Reactivo imprime «No», no reactivo «Sí» e indeterminado «Indeterminado».
+  Si el resultado cambia antes de finalizar, al retomar se verifica la
+  etiqueta nuevamente. Los informes de procesos finalizados son históricos.
 - **Completar datos (mL)**: volumen final positivo por componente. Se controla
-  el balance por origen, no solo la suma del lote. Las etiquetas pueden
-  reimprimirse con los volúmenes finales.
+  el balance por origen. Inventario muestra el volumen registrado y las
+  etiquetas reimpresas conservan la línea para rotularlo a mano.
 - **Revisión**: árbol, datos del proceso, resultados y confirmación de integridad,
   aspecto y etiquetas actualizadas. La advertencia final exige aceptación antes
   de registrar la salida de los orígenes como **Fraccionados** y el ingreso de
-  los resultados en **Cuarentena**. No se liberan unidades para transfusión.
+  los resultados en **Cuarentena**. En la división pediátrica se actualiza
+  el volumen de la unidad original sin crear un segundo registro con su código.
+  El remanente conserva su estado previo y la fracción entra en **Cuarentena**.
 - Historial consultable con búsqueda, estado, detalle y reimpresión final.
   El detalle vuelve al listado con **Volver al historial** y flecha a la izquierda,
   conservando búsqueda y filtro.
@@ -87,7 +95,7 @@ Mapeo de `criterios_calidad.md` y capturas facilitadas por el usuario:
 | EG05-PC06, pasos 01–04              | Registro de componentes previstos, separación, verificación de etiquetas y datos del proceso.                                                                                             |
 | EG05-CC07 E12                       | Dos resultados del PFC: crioprecipitado y plasma con crioprecipitado reducido.                                                                                                            |
 | EG05-TB01, columna Componente Final | Nombre, código, soluciones, agente si aplica, volumen, servicios, temperatura, caducidad, ABO/Rh, anticuerpos salvo crioprecipitado, instrucciones y expresiones condicionales heredadas. |
-| EG05-CC07 A/B y EG05-TB02           | Sistema abierto/cerrado y vencimiento explícito. No se asigna una vida útil universal ni se certifica la cadena de frío.                                                                  |
+| EG05-CC07 A/B y EG05-TB02           | Caducidad editable, sugerida para condiciones conocidas y circuito cerrado. El personal registra la caducidad aplicable si hubo apertura u otras condiciones.                             |
 | EG05-CC07 E7                        | El flujo general bloquea sangre total de 300–400 mL en bolsa nominal de 450 mL; la preparación específica de GR de bajo volumen queda pendiente.                                          |
 | EG05-CC09                           | Revisión manual de bolsas/etiquetas y cuarentena; no equivale a liberación transfusional ni sello de calidad.                                                                             |
 
@@ -100,11 +108,11 @@ real. No se certifica automáticamente que una unidad sea PFC por elegirlo en el
 El balance mock compara volúmenes contra el origen sin modelar adiciones de
 soluciones; su registro y efecto sobre el balance deben acordarse con el OMOD
 antes de usar este control en un procedimiento real.
-La opción de conservar PRP como resultado final es una decisión funcional del
-prototipo, no una indicación transfusional ni una aprobación normativa. Su
-conservación, caducidad y uso requieren revisión clínica; no se asignan valores
-predeterminados nuevos. Sigue exigiendo etiqueta completa, volumen, revisión
-final y cuarentena como los demás resultados.
+Los árboles históricos con PRP conservan sus nombres, componentes y códigos.
+La fecha sugerida se calcula cuando la tabla define un plazo y se dispone de los
+datos necesarios. Los registros con fecha sin hora usan el inicio de ese día.
+El plasma líquido toma como referencia la caducidad de los glóbulos rojos de la
+misma división. Una fecha ingresada manualmente se conserva al cambiar campos.
 
 Se heredan las expresiones de donante voluntario, leucocitos reducidos y uso
 autólogo con receptor cuando constan en el origen. No se inventan resultados
@@ -120,6 +128,21 @@ impresoras validadas, archivo PDF ni recuento/auditoría real de impresión.
 `useMockData=false` falla de forma segura: el adaptador no emite solicitudes
 de fraccionamiento hasta implementar y validar su capacidad. Endpoints en
 `fractionation.api.ts` son propuestas, no contratos desplegados.
+
+La lectura de catálogos usa REST de OpenMRS, con la sesión autenticada, incluso
+cuando el flujo guarda por pestaña. Configurar en `@sihsalus/esm-blood-bank-app`:
+
+- `collectionLabelConcepts.anticoagulantSetUuid`: conjunto de anticoagulantes.
+- `laboratoryCatalogs.storageTemperatureSetUuid`: conjunto de temperaturas.
+- `laboratoryCatalogs.irregularAntibodySetUuid`: conjunto de especificidades.
+- `laboratoryCatalogs.modifierLocationUuid`: localidad del servicio modificador.
+- `laboratoryCatalogs.cmvIgGConceptUuid`: concepto de CMV IgG. Con el UUID vacío
+  se busca el nombre exacto «Anticuerpos IgG contra citomegalovirus (CMV)».
+
+Los conjuntos se consultan mediante `GET /ws/rest/v1/concept/{uuid}` y solo se
+muestran miembros activos. La ubicación configurada usa
+`GET /ws/rest/v1/location/{uuid}`. Un catálogo ausente o una sesión sin acceso
+muestran un aviso en el campo y permiten reintentar la lectura.
 
 Mapeo propuesto de `DDL_Banco_Sangre.sql` / `DDL_Banco_y_Nucleo.sql`:
 

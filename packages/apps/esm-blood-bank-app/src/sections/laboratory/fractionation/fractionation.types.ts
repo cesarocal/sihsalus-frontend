@@ -2,6 +2,8 @@ export type ComponentType =
   | 'wholeBlood'
   | 'redCells'
   | 'plateletRichPlasma'
+  | 'liquidPlasma'
+  | 'pediatricFraction'
   | 'platelets'
   | 'freshFrozenPlasma'
   | 'plasma24'
@@ -19,14 +21,19 @@ export type UnitState = 'quarantine' | 'available' | 'inLaboratory' | 'fractiona
 
 export interface ComponentLabel {
   anticoagulant: string;
+  anticoagulantConceptUuid?: string;
   preservative: string;
   sedimentingAgent: string;
   collectionService: string;
   processingService: string;
   storageTemperature: string;
+  storageTemperatureConceptUuid?: string;
   expiresAt: string;
+  expiresAtManual?: boolean;
   bloodGroup: string;
   antibodies: string;
+  antibodyConceptUuid?: string;
+  cmvIgGResult?: 'reactive' | 'nonReactive' | 'inconclusive';
   voluntary: boolean;
   remunerated: boolean;
   leukocytesReduced: boolean;
@@ -50,6 +57,7 @@ export interface FractionationUnit {
   label: ComponentLabel;
   parentId?: string;
   batchId?: string;
+  fractionationRemainder?: boolean;
 }
 
 export interface FractionationNode {

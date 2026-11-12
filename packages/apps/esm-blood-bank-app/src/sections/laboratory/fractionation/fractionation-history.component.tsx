@@ -148,7 +148,9 @@ export function FractionationHistory({
               renderIcon={Printer}
               onClick={() => {
                 try {
-                  printDocument(<FractionationLabels batch={detail} actual t={t} />, t('fractionationPrint'));
+                  printDocument(<FractionationLabels batch={detail} print t={t} />, t('fractionationPrint'), () =>
+                    setPrintFailed(true),
+                  );
                   setPrintFailed(false);
                 } catch {
                   setPrintFailed(true);

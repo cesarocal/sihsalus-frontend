@@ -1,7 +1,7 @@
 import { Button, Tag } from '@carbon/react';
 import { Fork } from '@carbon/react/icons';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
-import { componentDefinitions, separationOptions } from './fractionation-rules';
+import { componentDefinitions, isFractionationRemainder, separationOptions } from './fractionation-rules';
 import type { ComponentType, FractionationBatch, FractionationNode } from './fractionation.types';
 import styles from './fractionation.scss';
 
@@ -36,7 +36,13 @@ export function FractionationTree({
 }) {
   const renderNode = (node: FractionationNode) => {
     const children = batch.nodes.filter((item) => item.parentId === node.id);
-    const options = separationOptions[node.component];
+    const options = isFractionationRemainder(node) ? undefined : separationOptions[node.component];
+    const actions =
+      node.component === 'wholeBlood'
+        ? ['fractionationSeparatePlasma', 'fractionationSeparatePediatric']
+        : node.component === 'plateletRichPlasma'
+          ? ['fractionationUsePFC', 'fractionationUsePlasma24']
+          : ['fractionationSplit'];
     return (
       <li key={node.id}>
         <div className={styles.node}>
@@ -53,23 +59,17 @@ export function FractionationTree({
           </div>
           {onSplit && options && (
             <div className={styles.nodeActions}>
-              {options.map((_option, index) => (
+              {actions.map((action, index) => (
                 <Button
-                  key={index === 0 ? 'primary' : 'alternative'}
+                  key={action}
                   size="sm"
                   kind="tertiary"
                   renderIcon={Fork}
                   disabled={disabled || children.length > 0}
                   onClick={() => onSplit(node.id, index)}
-                  aria-label={`${t(node.component === 'plateletRichPlasma' ? (index === 0 ? 'fractionationUsePFC' : 'fractionationUsePlasma24') : 'fractionationSplit')} — ${node.code}`}
+                  aria-label={`${t(action)} - ${node.code}`}
                 >
-                  {t(
-                    node.component === 'plateletRichPlasma'
-                      ? index === 0
-                        ? 'fractionationUsePFC'
-                        : 'fractionationUsePlasma24'
-                      : 'fractionationSplit',
-                  )}
+                  {t(action)}
                 </Button>
               ))}
               {!!children.length && (

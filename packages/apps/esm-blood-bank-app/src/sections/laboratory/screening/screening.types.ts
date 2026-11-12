@@ -13,6 +13,7 @@ export const screeningTableTests = [
 ] as const satisfies readonly ScreeningTest[];
 export const screeningResultOptions = ['reactive', 'nonReactive', 'inconclusive'] as const;
 export type ScreeningResult = '' | (typeof screeningResultOptions)[number];
+export const cmvIgGTestName = 'Anticuerpos IgG contra citomegalovirus (CMV)';
 export type ScreeningRepeatTest = ScreeningTest | 'additional';
 export type ScreeningRepeatResults = Partial<Record<ScreeningRepeatTest, ScreeningResult>>;
 export type ScreeningRepeatStep = 'results' | 'validation';
@@ -91,7 +92,7 @@ export interface ScreeningRecord {
   performedBy: string;
   tests: Record<ScreeningTest, ScreeningTestResult>;
   bloodData?: ScreeningBloodData;
-  additionalTest?: { name: string; result: ScreeningResult };
+  additionalTest?: { name: string; result: ScreeningResult; cmvIgGConceptUuid?: string };
   recommendations?: ScreeningRecommendations;
   observations?: string;
   validatedBy: string;

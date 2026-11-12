@@ -14,7 +14,11 @@ import { reviewBatch } from './fractionation-test-fixtures';
 import { printDocument } from '../../../shared/print-document';
 
 vi.mock('@openmrs/esm-framework', () => ({
-  useSession: () => ({ sessionLocation: { display: 'Hospital DEMO' } }),
+  useSession: () => ({
+    authenticated: true,
+    user: { person: { display: 'Profesional DEMO' } },
+    sessionLocation: { display: 'Hospital DEMO' },
+  }),
   formatDatetime: () => '05 oct 2026, 13:47',
   showSnackbar: vi.fn(),
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
@@ -72,35 +76,24 @@ describe('fractionation UI', () => {
     expect(data.units.find((unit) => unit.id === 'PFC-2026-002')?.state).toBe('inLaboratory');
     expect(screen.queryByRole('button', { name: t('saveDraft') })).not.toBeInTheDocument();
   });
-  it('locks all division options until undo clears the branch and then removes undo', async () => {
+  it('locks both whole-blood options until undo and keeps the original code in the pediatric branch', async () => {
     const api = createMockFractionationApi();
     const source = (await api.list()).units.find((unit) => unit.component === 'wholeBlood');
     if (!source) throw new Error('Missing synthetic whole-blood fixture');
     const initial = await api.start([source.id]);
     render(<FractionationWorkflow initial={initial} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
-    const root = screen.getByRole('button', { name: `Dividir — ${source.code}` });
-    expect(screen.queryByRole('button', { name: t('fractionationClearBranch') })).not.toBeInTheDocument();
-    fireEvent.click(root);
-    expect(root).toBeDisabled();
-    const plasma = screen.getByRole('button', { name: `${t('fractionationUsePFC')} — ${source.code}-PRP` });
-    const alternative = screen.getByRole('button', { name: `${t('fractionationUsePlasma24')} — ${source.code}-PRP` });
+    const plasma = screen.getByRole('button', { name: `${t('fractionationSeparatePlasma')} - ${source.code}` });
+    const pediatric = screen.getByRole('button', { name: `${t('fractionationSeparatePediatric')} - ${source.code}` });
     fireEvent.click(plasma);
     expect(plasma).toBeDisabled();
-    expect(alternative).toBeDisabled();
-    const plasmaNode = plasma.closest('li') as HTMLElement;
-    fireEvent.click(within(plasmaNode).getByRole('button', { name: t('fractionationClearBranch') }));
+    expect(pediatric).toBeDisabled();
+    expect(screen.getByText(`${source.code}-PL`)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('fractionationClearBranch') }));
+    expect(screen.queryByText(`${source.code}-PL`)).not.toBeInTheDocument();
     expect(plasma).toBeEnabled();
-    expect(alternative).toBeEnabled();
-    expect(within(plasmaNode).queryByRole('button', { name: t('fractionationClearBranch') })).not.toBeInTheDocument();
-    expect(screen.queryByText(`${source.code}-PRP-PFC`)).not.toBeInTheDocument();
-    fireEvent.click(alternative);
-    expect(screen.getByText(`${source.code}-PRP-P24`)).toBeInTheDocument();
-    expect(alternative).toBeDisabled();
-    const rootNode = root.closest('li') as HTMLElement;
-    fireEvent.click(within(rootNode).getAllByRole('button', { name: t('fractionationClearBranch') })[0]);
-    expect(root).toBeEnabled();
-    expect(screen.queryByText(`${source.code}-PRP-P24`)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: t('fractionationClearBranch') })).not.toBeInTheDocument();
+    fireEvent.click(pediatric);
+    expect(screen.getByText(`${source.code}-PED`)).toBeInTheDocument();
+    expect(screen.getAllByText(source.code)).toHaveLength(2);
   });
   it('starts a process, saves a partial tree and resumes after the two-action exit confirmation', async () => {
     const api = createMockFractionationApi();
@@ -110,8 +103,7 @@ describe('fractionation UI', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByRole('button', { name: t('saveDraft') })).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: t('next') })).toBeEnabled();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Dividir — PFC-2026-002' }));
-    fireEvent.change(screen.getByLabelText(t('fractionationOperator')), { target: { value: 'Operador DEMO' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Dividir - PFC-2026-002' }));
     fireEvent.click(within(dialog).getByRole('button', { name: t('close') }));
     const exit = screen.getByRole('dialog', { name: t('exitTitle') });
     expect(exit).toBeDefined();
@@ -120,30 +112,36 @@ describe('fractionation UI', () => {
     fireEvent.click(within(exit as HTMLElement).getByRole('button', { name: t('leave') }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const saved = (await api.list()).batches[0];
-    expect(saved.operator).toBe('Operador DEMO');
+    expect(saved.operator).toBe('Profesional DEMO');
     expect(saved.nodes).toHaveLength(3);
     fireEvent.click(await screen.findByRole('button', { name: t('fractionationResume') }));
-    expect(screen.getByLabelText(t('fractionationOperator'))).toHaveValue('Operador DEMO');
+    expect(screen.getByLabelText(t('fractionationOperator'))).toHaveValue('Profesional DEMO');
     expect(screen.getByText(t('componentCryo'))).toBeInTheDocument();
   });
-  it('saves and advances to labels without forcing the PRP branch to be divided', async () => {
+  it('autofills the operator and service and advances to the liquid plasma labels', async () => {
     const api = createMockFractionationApi();
     const source = (await api.list()).units.find((unit) => unit.component === 'wholeBlood');
     if (!source) throw new Error('Missing synthetic whole-blood fixture');
     const initial = await api.start([source.id]);
     render(<FractionationWorkflow initial={initial} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
-    fireEvent.change(screen.getByLabelText(t('fractionationOperator')), { target: { value: 'Profesional DEMO' } });
-    fireEvent.change(screen.getByLabelText(t('fractionationService')), { target: { value: 'Laboratorio DEMO' } });
-    fireEvent.change(screen.getByLabelText(t('fractionationSystem')), { target: { value: 'closed' } });
-    fireEvent.click(screen.getByRole('button', { name: `Dividir — ${source.code}` }));
+    expect(screen.getByLabelText(t('fractionationOperator'))).toHaveValue('Profesional DEMO');
+    expect(screen.getByLabelText(t('fractionationOperator'))).toHaveAttribute('readonly');
+    await waitFor(() =>
+      expect(screen.getByLabelText(t('fractionationService'))).toHaveValue('UPSS Banco de Sangre - Hospital DEMO'),
+    );
+    expect(screen.queryByLabelText(t('fractionationSystem'))).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(t('observations'))).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: `${t('fractionationSeparatePlasma')} - ${source.code}` }));
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
-    expect(await screen.findAllByLabelText(t('fractionationVolumeEstimated'))).toHaveLength(2);
-    expect(screen.getByRole('region', { name: `${source.code}-PRP` })).toHaveTextContent(t('componentPRP'));
+    expect(await screen.findByRole('region', { name: `${source.code}-PL` })).toHaveTextContent(
+      t('componentLiquidPlasma'),
+    );
+    expect(screen.queryByLabelText(t('fractionationVolumeEstimated'))).not.toBeInTheDocument();
     expect(screen.queryByText(t('fractionationFinishBranches'))).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: t('previous') })).toBeEnabled();
     const saved = (await api.list()).batches[0];
     expect(saved.completedSteps).toEqual(['fractionationPlan']);
-    expect(finalNodes(saved).map((node) => node.component)).toEqual(['redCells', 'plateletRichPlasma']);
+    expect(finalNodes(saved).map((node) => node.component)).toEqual(['redCells', 'liquidPlasma']);
   });
   it('keeps the two-action X confirmation and can discard only unsaved edits', async () => {
     const api = createMockFractionationApi();
@@ -151,12 +149,12 @@ describe('fractionation UI', () => {
     const save = vi.spyOn(api, 'save');
     const close = vi.fn();
     render(<FractionationWorkflow initial={initial} api={api} onClose={close} onSaved={vi.fn()} t={t} />);
-    fireEvent.change(screen.getByLabelText(t('fractionationOperator')), { target: { value: 'Edición DEMO' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Dividir - PFC-2026-002' }));
     fireEvent.click(screen.getByRole('button', { name: t('close') }));
     let exit = screen.getByRole('dialog', { name: t('exitTitle') });
     fireEvent.click(within(exit).getByRole('button', { name: t('keepEditing') }));
     expect(close).not.toHaveBeenCalled();
-    expect(screen.getByLabelText(t('fractionationOperator'))).toHaveValue('Edición DEMO');
+    expect(screen.getByText('PFC-2026-002-CRIO')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: t('close') }));
     exit = screen.getByRole('dialog', { name: t('exitTitle') });
     fireEvent.click(within(exit).getByRole('checkbox', { name: t('saveBeforeExit') }));
@@ -239,7 +237,7 @@ describe('fractionation UI', () => {
       </div>,
     );
     const field = screen.getByLabelText(t('fractionationOperator'));
-    const button = screen.getByRole('button', { name: 'Dividir — PFC-2026-002' });
+    const button = screen.getByRole('button', { name: 'Dividir - PFC-2026-002' });
     fireEvent.pointerDown(button);
     fireEvent.blur(field, { relatedTarget: button });
     expect(blur).not.toHaveBeenCalled();
@@ -254,12 +252,12 @@ describe('fractionation UI', () => {
     const initial = await api.start(['PFC-2026-002']);
     const failing = { ...api, save: vi.fn().mockRejectedValue(new Error('PRIVATE_BACKEND_TRACE')) };
     render(<FractionationWorkflow initial={initial} api={failing} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
-    fireEvent.change(screen.getByLabelText(t('fractionationOperator')), { target: { value: 'Edición DEMO' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Dividir - PFC-2026-002' }));
     fireEvent.click(screen.getByRole('button', { name: t('close') }));
     const exit = screen.getByRole('dialog', { name: t('exitTitle') });
     fireEvent.click(within(exit).getByRole('button', { name: t('leave') }));
     expect(await screen.findByText(t('fractionationSaveFailed'))).toBeInTheDocument();
-    expect(screen.getByLabelText(t('fractionationOperator'))).toHaveValue('Edición DEMO');
+    expect(screen.getByText('PFC-2026-002-CRIO')).toBeInTheDocument();
     expect(screen.queryByText('PRIVATE_BACKEND_TRACE')).not.toBeInTheDocument();
     expect(showSnackbar).not.toHaveBeenCalled();
   });
@@ -280,5 +278,22 @@ describe('fractionation UI', () => {
   });
   it('keeps EN/ES keys in parity for all new fractionation content', () => {
     expect(Object.keys(spanish.processing).sort()).toEqual(Object.keys(english.processing).sort());
+  });
+  it('prints ABO and Rh prominently, includes a blank volume and prints only recorded CMV outcomes', async () => {
+    const api = createMockFractionationApi();
+    const batch = await reviewBatch(api, await api.start(['PFC-2026-002']));
+    const [cryo, plasma] = finalNodes(batch);
+    cryo.label.cmvIgGResult = 'reactive';
+    plasma.label.cmvIgGResult = 'nonReactive';
+    const { container, rerender } = render(<FractionationLabels batch={batch} print t={t} />);
+    expect(container.querySelectorAll('[data-manual-volume]')).toHaveLength(2);
+    expect(screen.getAllByText('NEGATIVO')).toHaveLength(2);
+    expect(screen.getAllByText('A-')).toHaveLength(2);
+    expect(screen.getByText('No')).toBeInTheDocument();
+    expect(screen.getByText('Sí')).toBeInTheDocument();
+    delete cryo.label.cmvIgGResult;
+    delete plasma.label.cmvIgGResult;
+    rerender(<FractionationLabels batch={batch} print t={t} />);
+    expect(screen.queryByText(t('fractionationCmvSeronegative'))).not.toBeInTheDocument();
   });
 });

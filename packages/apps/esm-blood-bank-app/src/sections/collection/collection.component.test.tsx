@@ -619,8 +619,9 @@ describe('collection and screening screens', () => {
       const row = within(screen.getByRole('group', { name: t(`screeningTest_${test}`) }));
       fireEvent.click(row.getByRole('radio', { name: t('nonReactive') }));
     }
+    await screen.findByRole('option', { name: 'Anticuerpos IgG contra citomegalovirus (CMV)' });
     fireEvent.change(screen.getByLabelText(t('screeningAdditionalTest')), {
-      target: { value: 'Prueba adicional DEMO' },
+      target: { value: 'mock-cmv-igg' },
     });
     fireEvent.click(
       within(screen.getByRole('group', { name: t('screeningAdditionalResult') })).getByRole('radio', {
@@ -645,12 +646,18 @@ describe('collection and screening screens', () => {
     expect(saved).toMatchObject({
       performedBy: 'Tecnóloga de prueba',
       bloodData: { aboGroup: 'AB', rhFactor: '-', hematocrit: '42,5', hemoglobin: '14' },
-      additionalTest: { name: 'Prueba adicional DEMO', result: 'inconclusive' },
+      additionalTest: {
+        name: 'Anticuerpos IgG contra citomegalovirus (CMV)',
+        cmvIgGConceptUuid: 'mock-cmv-igg',
+        result: 'inconclusive',
+      },
       recommendations: { gastroenterology: 'no', infectiousDiseases: 'yes', procets: 'no' },
     });
     if (!saved) throw new Error('SCREENING_RESULT_NOT_SAVED');
     expect(saved.performedOn >= confirmedAt && saved.performedOn <= localDateTime()).toBe(true);
-    expect(screen.getByRole('row', { name: 'Prueba adicional DEMO Indeterminado' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('row', { name: 'Anticuerpos IgG contra citomegalovirus (CMV) Indeterminado' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('42,5')).toBeInTheDocument();
     expect(screen.getAllByText(t('screeningWarning'))).toHaveLength(1);
   });

@@ -12,7 +12,9 @@ interface OpenmrsCollectionConcept extends CollectionConcept {
 const active = (concept: OpenmrsCollectionConcept) =>
   concept?.retired === false && Boolean(concept.uuid?.trim() && concept.display?.trim());
 
-async function getConcept(uuid: string, fields: string) {
+export const conceptFields = 'uuid,display,retired';
+
+export async function getConcept(uuid: string, fields = conceptFields) {
   const { data } = await openmrsFetch<OpenmrsCollectionConcept>(
     `${restBaseUrl}/concept/${encodeURIComponent(uuid)}?v=custom:(${fields})`,
     { rejectOnAuthFailure: true },
@@ -21,27 +23,27 @@ async function getConcept(uuid: string, fields: string) {
   return data;
 }
 
+export async function getActiveConceptSet(uuid: string): Promise<CollectionConcept[]> {
+  const set = await getConcept(uuid, `${conceptFields},set,setMembers:(${conceptFields})`);
+  if (set.set !== true || !Array.isArray(set.setMembers)) throw new Error('COLLECTION_ANTICOAGULANTS_INVALID');
+  return Array.from(
+    new Map(set.setMembers.filter(active).map(({ uuid, display }) => [uuid, { uuid, display }])).values(),
+  );
+}
+
 export function createCollectionLabelConceptLoader({
   bloodBankServiceUuid,
   campaignServiceUuid,
   anticoagulantSetUuid,
 }: CollectionLabelConceptConfig): CollectionApi['listLabelConcepts'] {
   return async (field) => {
-    const fields = 'uuid,display,retired';
     if (field === 'service') {
       if (!bloodBankServiceUuid || !campaignServiceUuid || bloodBankServiceUuid === campaignServiceUuid)
         throw new Error('COLLECTION_SERVICES_NOT_CONFIGURED');
-      const services = await Promise.all([
-        getConcept(bloodBankServiceUuid, fields),
-        getConcept(campaignServiceUuid, fields),
-      ]);
+      const services = await Promise.all([getConcept(bloodBankServiceUuid), getConcept(campaignServiceUuid)]);
       return services.map(({ uuid, display }) => ({ uuid, display }));
     }
     if (!anticoagulantSetUuid) throw new Error('COLLECTION_ANTICOAGULANTS_NOT_CONFIGURED');
-    const set = await getConcept(anticoagulantSetUuid, `${fields},set,setMembers:(${fields})`);
-    if (set.set !== true || !Array.isArray(set.setMembers)) throw new Error('COLLECTION_ANTICOAGULANTS_INVALID');
-    return Array.from(
-      new Map(set.setMembers.filter(active).map(({ uuid, display }) => [uuid, { uuid, display }])).values(),
-    );
+    return getActiveConceptSet(anticoagulantSetUuid);
   };
 }

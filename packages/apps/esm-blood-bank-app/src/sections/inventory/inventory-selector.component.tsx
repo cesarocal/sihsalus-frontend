@@ -178,6 +178,7 @@ export function InventorySelector({
           'fractionationCode',
           'fractionationComponent',
           'bloodGroup',
+          ...(!kind ? ['fractionationVolume'] : []),
           'inventoryExpiration',
           'fractionationLocation',
           'status',
@@ -204,6 +205,7 @@ export function InventorySelector({
             unit.id,
             unit.component,
             unit.bloodGroup || '—',
+            ...(!kind ? [unit.volume || '—'] : []),
             inventoryDisplayDate(unit.expiresAt),
             unit.location,
             <Tag

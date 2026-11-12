@@ -242,6 +242,7 @@ export function ScreeningWorkflow({
               />
             </div>
             <ScreeningResultsFields
+              loadAdditionalTests={api.listAdditionalTestConcepts}
               record={record}
               readOnly={locked}
               saving={saving}
