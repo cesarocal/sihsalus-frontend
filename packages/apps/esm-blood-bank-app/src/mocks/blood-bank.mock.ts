@@ -40,7 +40,7 @@ export const inventoryMock: InventorySummary[] = [
     bloodGroup: 'O+',
     expiresAt: '18/10/2026',
     location: 'Cámara 01',
-    status: 'Disponible',
+    status: 'Cuarentena',
   },
   {
     id: 'PFC-2026-002',

@@ -126,7 +126,7 @@ esa fuente; no muestra alertas antiguas mientras se actualiza o hay un error.
 - Fraccionamiento: `/laboratory/fractionation?category=eligible`, muestra solo unidades que cumplen la función existente `eligibleSource`, con opción de quitar el filtro.
 - Fraccionar una fila: `/laboratory/fractionation?category=eligible&unit=<id>`; localiza y preselecciona únicamente la unidad exacta todavía elegible. No llama a `start`: crear el lote y cambiar estados requiere pulsar Fraccionar en la cola. Limpiar los filtros permite volver al listado completo.
 - Aptas: `/inventory?status=APTO`; cuenta el estado operativo, sin afirmar que un estado por sí solo sustituye las verificaciones del proceso transfusional.
-- Pendientes de sello: `/inventory?category=seal`, restringe a `canSeal`. El botón habitual inicia la operación; el enlace no asigna sellos ni cambia estados.
+- Pendientes de sello: `/inventory?category=seal`, restringe al estado **Sello pendiente**. El botón habitual inicia la operación; el enlace no asigna sellos ni cambia estados.
 - Próximas a vencer: `/inventory?expires=7`; aplica el mismo predicado que cuenta las alertas de Inicio.
 - Alerta individual: `/inventory?unit=<identificador codificado>`; coincidencia **exacta**, nunca un prefijo que mezcle unidades. La búsqueda muestra el código; el botón de escoba Limpiar filtros, a la derecha de Estado, devuelve el listado. No selecciona la casilla ni inicia una eliminación.
 - Solicitudes y seguimientos: abren sus bandejas pendientes actuales, conservando orden, validaciones, confirmaciones y permisos existentes.

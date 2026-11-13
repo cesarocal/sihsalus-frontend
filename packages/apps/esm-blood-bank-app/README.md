@@ -170,23 +170,25 @@ contratos propuestos de API/OMOD, referencias aportadas, límites y validación.
 de componente/grupo/estado, selección múltiple y flujos de Sello de calidad y
 Eliminar unidades. Cada popup admite selección previa o búsqueda interna.
 El sello exige tamizaje original validado no reactivo e inspección manual.
-Su popup muestra exclusivamente unidades no reactivas, con o sin selección
-previa. La tabla resume el tamizaje sin columna Verificación para sello;
+Su popup muestra exclusivamente unidades con estado **Sello pendiente**,
+con o sin selección previa. Un resultado reactivo confirmado en repetición
+cambia la unidad a **No apta**. La tabla resume el tamizaje sin columna Verificación para sello;
 Seleccionar resultados filtrados se conserva únicamente en los popups.
 Se conservan tres unidades mock no reactivas y dos reactivas y se añaden veinte
 unidades no reactivas de cinco tipos para probar Transfusiones. Estas veinte
 unidades `BB-TX-DEMO-001..020` se precargan aptas con sellos sintéticos distintos;
 no se reemplazan datos ni movimientos existentes. Son aprobaciones iniciales de
 la fixture, no impresiones realizadas por el operador. Para el flujo normal,
-solo una solicitud de impresión y confirmación explícita pasan la unidad a
-`APTO`. Estado operativo y resultado de tamizaje permanecen separados, conforme
+la primera solicitud de impresión exige confirmación. La reimpresión conserva
+el código por unidad y registra selección, justificación, responsable y fecha.
+Solo la confirmación de impresión pasa la unidad a `APTO`. Estado operativo y resultado de tamizaje permanecen separados, conforme
 al SQL aportado. Eliminar unidades tiene tres pasos: selección, causas (ocho
 opciones del BPMN por unidad) y revisión con impresión del borrador. Imprimir
 no retira stock. El acta EG010-FR02 registra las causas y responsables, marca el lote
 `ELIMINADAS` y lo retira del stock activo sin borrar su historial.
 
 El historial permite retomar borradores y consultar/imprimir actas. Los sellos
-pendientes y unidades eliminadas se bloquean también en Fraccionamiento.
+asignados y pendientes de impresión, así como las unidades eliminadas, se bloquean también en Fraccionamiento.
 Persistencia atómica mock en la misma pestaña, sin cambios de backend/login ni
 standalone; el adaptador OMOD nuevo está deshabilitado. Ver [Inventario](src/sections/inventory/README.md)
 para los contratos, límites de impresión y validación clínica pendiente.

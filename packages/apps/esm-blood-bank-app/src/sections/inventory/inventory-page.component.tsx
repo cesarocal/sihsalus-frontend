@@ -4,7 +4,7 @@ import { CertificateCheck, RecentlyViewed, TrashCan } from '@carbon/react/icons'
 import { useCallback, useState } from 'react';
 import type { BloodBankApi } from '../../api';
 import { ProcessingPage, useProcessingData, useProcessingTranslation } from '../../shared/processing-page.component';
-import { newInventoryOperation } from './inventory-rules';
+import { canSeal, newInventoryOperation } from './inventory-rules';
 import { InventorySelector } from './inventory-selector.component';
 import { InventoryHistory } from './inventory-history.component';
 import { InventoryWorkflow } from './inventory-workflow.component';
@@ -19,14 +19,13 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
   const [selected, setSelected] = useState<InventorySummary[]>([]);
   const [active, setActive] = useState<InventoryOperation | null>(null);
   const [history, setHistory] = useState(false);
+  const [openReprint, setOpenReprint] = useState(false);
   const units = data?.units ?? [];
   const unavailable = loading || failed;
   const open = (kind: InventoryOperation['kind']) => {
     if (unavailable) return;
     const candidates = units.filter(
-      (unit) =>
-        selected.some((item) => item.id === unit.id) &&
-        (kind !== 'qualitySeal' || unit.screeningResult === 'nonReactive'),
+      (unit) => selected.some((item) => item.id === unit.id) && (kind !== 'qualitySeal' || canSeal(unit)),
     );
     setActive(newInventoryOperation(kind, candidates));
   };
@@ -102,6 +101,7 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
           initial={active}
           units={units}
           api={api.inventory}
+          openReprint={openReprint}
           t={t}
           onSaved={() => {
             setSelected([]);
@@ -109,6 +109,7 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
           }}
           onClose={() => {
             setActive(null);
+            setOpenReprint(false);
             setSelected([]);
             reload();
           }}
@@ -119,8 +120,9 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
           operations={data?.operations ?? []}
           t={t}
           onClose={() => setHistory(false)}
-          onResume={(operation) => {
+          onResume={(operation, reprint = false) => {
             setHistory(false);
+            setOpenReprint(reprint);
             setActive(operation);
           }}
         />

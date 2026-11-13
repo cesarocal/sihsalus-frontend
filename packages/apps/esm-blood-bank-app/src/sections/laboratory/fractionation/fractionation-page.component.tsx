@@ -62,7 +62,7 @@ export function FractionationPage({ api, shortcut }: { api: FractionationApi; sh
       (!exactUnit || unit.id === exactUnit) &&
       (!onlyEligible || eligibleSource(unit)) &&
       (!component || unit.component === component) &&
-      (!status || unit.state === status) &&
+      (!status || (unit.state === 'available' ? 'quarantine' : unit.state) === status) &&
       normalizeSearch(
         `${unit.code} ${unit.originalWholeBloodCode} ${t(componentDefinitions[unit.component].key)}`,
       ).includes(normalizeSearch(search)),
@@ -175,7 +175,6 @@ export function FractionationPage({ api, shortcut }: { api: FractionationApi; sh
           >
             <SelectItem value="" text={t('allStatuses')} />
             <SelectItem value="quarantine" text={t('quarantine')} />
-            <SelectItem value="available" text={t('fractionationAvailable')} />
             <SelectItem value="inLaboratory" text={t('fractionationInLab')} />
           </Select>
           {!!selected.length && (
@@ -238,13 +237,7 @@ export function FractionationPage({ api, shortcut }: { api: FractionationApi; sh
               unit.collectedAt,
               unit.location,
               <Tag key="state" type={unit.state === 'inLaboratory' ? 'blue' : 'gray'}>
-                {t(
-                  unit.state === 'inLaboratory'
-                    ? 'fractionationInLab'
-                    : unit.state === 'available'
-                      ? 'fractionationAvailable'
-                      : 'quarantine',
-                )}
+                {t(unit.state === 'inLaboratory' ? 'fractionationInLab' : 'quarantine')}
               </Tag>,
               eligibleSource(unit) ? (
                 <Button

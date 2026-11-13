@@ -1,13 +1,32 @@
 import type { InventorySummary } from '../../types/blood-bank.types';
 import type { ScreeningResult } from '../laboratory/screening/screening.types';
+import type { ComponentLabel } from '../laboratory/fractionation/fractionation.types';
 
 export interface InventoryUnit extends InventorySummary {
   originalCode: string;
   qualityIssues: string[];
-  screeningResult: Exclude<ScreeningResult, ''> | 'pending';
+  screeningResult: Exclude<ScreeningResult, ''> | 'pending' | 'inProgress';
   sealId?: string;
+  sealCode?: string;
   canDispose: boolean;
 }
+export interface QualitySealLabel {
+  code: string;
+  originalCode: string;
+  details?: ComponentLabel;
+  lowVolume?: boolean;
+}
+
+export interface QualitySealReprint {
+  number: number;
+  unitIds: string[];
+  reason: string;
+  operator: string;
+  requestedAt: string;
+}
+
+export type QualitySealReprintRequest = Pick<QualitySealReprint, 'unitIds' | 'reason' | 'operator'>;
+
 export interface InventoryOperation {
   id: string;
   revision: number;
@@ -23,6 +42,8 @@ export interface InventoryOperation {
   labelsVerified: boolean;
   integrityVerified: boolean;
   recordsVerified: boolean;
+  sealLabels?: Record<string, QualitySealLabel>;
+  sealReprints?: QualitySealReprint[];
   requestedAt: string | null;
   completedAt: string | null;
   outcome?: 'APTO' | 'ELIMINADAS';

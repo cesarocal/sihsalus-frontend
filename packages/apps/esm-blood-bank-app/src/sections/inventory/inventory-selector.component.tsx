@@ -64,18 +64,17 @@ export function InventorySelector({
     setComponent('');
     setGroup('');
   };
-  const filtered = units.filter(
+  const sealWorkflow = kind === 'qualitySeal';
+  const candidates = sealWorkflow ? units.filter((unit) => unit.status === 'Sello pendiente') : units;
+  const filtered = candidates.filter(
     (unit) =>
       (!exactUnit || unit.id === exactUnit) &&
       (!expiryDays || expiresSoon(unit.expiresAt, expiryDays)) &&
-      (!sealOnly || canSeal(unit)) &&
-      (kind !== 'qualitySeal' || unit.screeningResult === 'nonReactive') &&
+      (!sealOnly || unit.status === 'Sello pendiente') &&
       (!component || unit.component === component) &&
       (!status || unit.status === status) &&
       (!group || unit.bloodGroup === group) &&
-      normalizeSearch(`${unit.id} ${unit.originalCode} ${unit.component} ${unit.location}`).includes(
-        normalizeSearch(search),
-      ),
+      normalizeSearch(`${unit.id} ${unit.originalCode} ${unit.component}`).includes(normalizeSearch(search)),
   );
   const eligible = (unit: InventoryUnit) => (kind === 'qualitySeal' ? canSeal(unit) : unit.canDispose);
   const visibleEligible = filtered.filter(eligible);
@@ -120,7 +119,7 @@ export function InventorySelector({
           {t('homeUnitUnavailable')}
         </p>
       )}
-      <div className={styles.filters}>
+      <div className={`${styles.filters} ${sealWorkflow ? styles.sealFilters : ''}`}>
         <Select
           id={`${prefix}-component`}
           labelText={t('fractionationComponent')}
@@ -128,7 +127,7 @@ export function InventorySelector({
           onChange={(event) => setComponent(event.target.value)}
         >
           <SelectItem value="" text={t('fractionationAllComponents')} />
-          {[...new Set(units.map((unit) => unit.component))].sort().map((value) => (
+          {[...new Set(candidates.map((unit) => unit.component))].sort().map((value) => (
             <SelectItem key={value} value={value} text={value} />
           ))}
         </Select>
@@ -139,24 +138,26 @@ export function InventorySelector({
           onChange={(event) => setGroup(event.target.value)}
         >
           <SelectItem value="" text={t('inventoryAllGroups')} />
-          {[...new Set(units.map((unit) => unit.bloodGroup))]
+          {[...new Set(candidates.map((unit) => unit.bloodGroup))]
             .filter(Boolean)
             .sort()
             .map((value) => (
               <SelectItem key={value} value={value} text={value} />
             ))}
         </Select>
-        <Select
-          id={`${prefix}-status`}
-          labelText={t('status')}
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-        >
-          <SelectItem value="" text={t('allStatuses')} />
-          {[...new Set(units.map((unit) => unit.status))].map((value) => (
-            <SelectItem key={value} value={value} text={t(inventoryStatusKey[value])} />
-          ))}
-        </Select>
+        {!sealWorkflow && (
+          <Select
+            id={`${prefix}-status`}
+            labelText={t('status')}
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <SelectItem value="" text={t('allStatuses')} />
+            {[...new Set(units.map((unit) => unit.status))].map((value) => (
+              <SelectItem key={value} value={value} text={t(inventoryStatusKey[value])} />
+            ))}
+          </Select>
+        )}
         <Button
           kind="tertiary"
           size="md"
@@ -180,7 +181,6 @@ export function InventorySelector({
           'bloodGroup',
           ...(!kind ? ['fractionationVolume'] : []),
           'inventoryExpiration',
-          'fractionationLocation',
           'status',
           'inventoryScreeningResult',
         ]}
@@ -207,15 +207,18 @@ export function InventorySelector({
             unit.bloodGroup || '—',
             ...(!kind ? [unit.volume || '—'] : []),
             inventoryDisplayDate(unit.expiresAt),
-            unit.location,
             <Tag
               key="status"
               type={
-                ['Disponible', 'APTO'].includes(unit.status)
+                unit.status === 'APTO'
                   ? 'green'
-                  : unit.status === 'En laboratorio'
+                  : unit.status === 'En fraccionamiento'
                     ? 'blue'
-                    : 'gray'
+                    : unit.status === 'Sello pendiente'
+                      ? 'warm-gray'
+                      : unit.status === 'No apta'
+                        ? 'red'
+                        : 'gray'
               }
             >
               {t(inventoryStatusKey[unit.status])}
@@ -223,7 +226,13 @@ export function InventorySelector({
             <Tag
               key="screening"
               type={
-                unit.screeningResult === 'nonReactive' ? 'green' : unit.screeningResult === 'reactive' ? 'red' : 'gray'
+                unit.screeningResult === 'nonReactive'
+                  ? 'green'
+                  : unit.screeningResult === 'reactive'
+                    ? 'red'
+                    : unit.screeningResult === 'inProgress'
+                      ? 'blue'
+                      : 'gray'
               }
             >
               {t(`inventoryResult_${unit.screeningResult}`)}

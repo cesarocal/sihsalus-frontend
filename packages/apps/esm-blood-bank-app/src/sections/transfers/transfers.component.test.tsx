@@ -31,7 +31,9 @@ async function ready() {
   const units = (await inventory.list()).units.filter((unit) =>
     ['BB-SELLO-DEMO-001', 'BB-SELLO-DEMO-003'].includes(unit.id),
   );
-  await inventory.confirmSeal(await inventory.requestSealPrint(await inventory.prepareSeal(sealOperation(units))));
+  await inventory.confirmSeal(
+    await inventory.requestSealPrint(await inventory.prepareSeal(sealOperation(units)), 'Operador de prueba'),
+  );
   const api = createMockTransfersApi();
   const workspace = await api.list();
   return { api, request: workspace.requests[0], units: workspace.units };

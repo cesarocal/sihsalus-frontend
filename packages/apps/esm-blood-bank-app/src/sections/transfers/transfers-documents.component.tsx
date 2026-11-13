@@ -1,6 +1,6 @@
 import { formatDatetime } from '@openmrs/esm-framework';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import { inventoryDisplayDate } from '../inventory/inventory-rules';
+import { inventoryDisplayDate, inventoryUnitSealCode } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { screeningTests } from '../laboratory/screening/screening.types';
 import styles from './transfers.scss';
@@ -184,7 +184,7 @@ export function TransferCertificate({
             <tr key={unit.id}>
               <td>{unit.id}</td>
               <td>{unit.bagLot || '—'}</td>
-              <td>{unit.sealId ? `${unit.sealId}/${unit.id}` : '—'}</td>
+              <td>{inventoryUnitSealCode(unit) || '—'}</td>
               <td>{unit.bloodGroup.replace(/[+−-]$/, '')}</td>
               <td>{/[+−-]$/.exec(unit.bloodGroup)?.[0]}</td>
               <td>{unit.componentType ? t(componentDefinitions[unit.componentType].key) : unit.component}</td>

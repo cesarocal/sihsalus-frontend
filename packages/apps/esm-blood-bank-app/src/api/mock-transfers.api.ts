@@ -1,3 +1,4 @@
+import { inventoryUnitSealCode } from '../sections/inventory/inventory-rules';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
 import { screeningTests } from '../sections/laboratory/screening/screening.types';
 import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
@@ -219,7 +220,7 @@ export function createMockTransfersApi(getStorage: () => MockStorage = () => glo
           requestingDoctor: request.data.requestingDoctor,
           requestingDoctorLicense: request.data.requestingDoctorLicense,
           unitCode: unit.id,
-          seal: `${unit.sealId}/${unit.id}`,
+          seal: inventoryUnitSealCode(unit),
           component: unit.componentType,
           bloodGroup: unit.bloodGroup,
           bagLot: unit.bagLot,

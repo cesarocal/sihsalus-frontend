@@ -2,11 +2,63 @@ import { Accordion, AccordionItem } from '@carbon/react';
 import { BloodGroupLabel } from '../../../shared/blood-group-label.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { componentDefinitions, finalNodes } from './fractionation-rules';
-import type { FractionationBatch } from './fractionation.types';
+import type { ComponentLabel, FractionationBatch } from './fractionation.types';
 import { FractionationTree } from './fractionation-tree.component';
 import { fractionationDateTime } from './fractionation-format';
 import shared from '../../applicant-selection/selection.scss';
 import styles from './fractionation.scss';
+
+export function finalComponentLabelFields(label: ComponentLabel | undefined, t: ProcessingTranslate) {
+  if (!label) return {};
+  return {
+    anticoagulant: label.anticoagulant,
+    preservative: label.preservative,
+    sedimentingAgent: label.sedimentingAgent,
+    service: label.collectionService,
+    fractionationService: label.processingService,
+    fractionationTemperature: label.storageTemperature,
+    fractionationAntibodies: label.antibodies,
+    fractionationCmvSeronegative: label.cmvIgGResult
+      ? t(
+          label.cmvIgGResult === 'nonReactive'
+            ? 'fractionationCmvYes'
+            : label.cmvIgGResult === 'reactive'
+              ? 'fractionationCmvNo'
+              : 'inconclusive',
+        )
+      : '',
+    ...(label.autologous
+      ? {
+          recipientName: label.recipientName,
+          recipientDocument: label.recipientDocument,
+          recipientService: label.recipientService,
+          recipientHistory: label.recipientHistory,
+        }
+      : {}),
+  };
+}
+
+export function FinalComponentLabelNotes({ label, t }: { label?: ComponentLabel; t: ProcessingTranslate }) {
+  return (
+    <>
+      {label?.voluntary && <p>{t('fractionationVoluntary')}</p>}
+      {label?.remunerated && <p>{t('fractionationRemunerated')}</p>}
+      {label?.leukocytesReduced && <p>{t('leukocytesReduced')}</p>}
+      {label?.autologous && <p>{t('fractionationAutologousOnly')}</p>}
+    </>
+  );
+}
+
+export function FinalComponentTransfusionInstructions({ t }: { t: ProcessingTranslate }) {
+  return (
+    <>
+      <p>{t('fractionationCircular')}</p>
+      <p>{t('fractionationRecipientCheck')}</p>
+      <p>{t('fractionationInfectionWarning')}</p>
+      <p>{t('fractionationRx')}</p>
+    </>
+  );
+}
 
 export function FractionationLabels({
   batch,
@@ -35,31 +87,8 @@ export function FractionationLabels({
             fractionationOrigin: source?.originalWholeBloodCode,
             fractionationSource: source?.code,
             fractionationVolume: !print && actual && node.component !== 'lowVolumeRedCells' ? node.volume : '',
-            anticoagulant: label.anticoagulant,
-            preservative: label.preservative,
-            sedimentingAgent: label.sedimentingAgent,
-            service: label.collectionService,
-            fractionationService: label.processingService,
-            fractionationTemperature: label.storageTemperature,
+            ...finalComponentLabelFields(label, t),
             fractionationExpiration: label.expiresAt ? fractionationDateTime(label.expiresAt) : '',
-            fractionationAntibodies: label.antibodies,
-            fractionationCmvSeronegative: label.cmvIgGResult
-              ? t(
-                  label.cmvIgGResult === 'nonReactive'
-                    ? 'fractionationCmvYes'
-                    : label.cmvIgGResult === 'reactive'
-                      ? 'fractionationCmvNo'
-                      : 'inconclusive',
-                )
-              : '',
-            ...(label.autologous
-              ? {
-                  recipientName: label.recipientName,
-                  recipientDocument: label.recipientDocument,
-                  recipientService: label.recipientService,
-                  recipientHistory: label.recipientHistory,
-                }
-              : {}),
           };
           return (
             <article data-label key={node.id} className={shared.report} style={{ breakAfter: 'page' }}>
@@ -89,19 +118,14 @@ export function FractionationLabels({
               </dl>
               {node.component === 'lowVolumeRedCells' && (print || actual) && (
                 <p data-low-volume-label>
-                  {t('fractionationLowVolumeLabel')} {print ? <span data-manual-volume aria-hidden="true" /> : node.volume}{' '}
+                  {t('fractionationLowVolumeLabel')}{' '}
+                  {print ? <span data-manual-volume aria-hidden="true" /> : node.volume}{' '}
                   {t('fractionationLowVolumeLabelUnit')}
                 </p>
               )}
-              {label.voluntary && <p>{t('fractionationVoluntary')}</p>}
-              {label.remunerated && <p>{t('fractionationRemunerated')}</p>}
-              {label.leukocytesReduced && <p>{t('leukocytesReduced')}</p>}
-              {label.autologous && <p>{t('fractionationAutologousOnly')}</p>}
+              <FinalComponentLabelNotes label={label} t={t} />
               <footer>
-                <p>{t('fractionationCircular')}</p>
-                <p>{t('fractionationRecipientCheck')}</p>
-                <p>{t('fractionationInfectionWarning')}</p>
-                <p>{t('fractionationRx')}</p>
+                <FinalComponentTransfusionInstructions t={t} />
                 <p>
                   {t('quarantine')} — {t('fractionationQuarantineHelp')}
                 </p>

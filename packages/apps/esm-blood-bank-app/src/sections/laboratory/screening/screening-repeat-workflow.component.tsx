@@ -12,10 +12,11 @@ import { useSession } from '@openmrs/esm-framework';
 import { useState } from 'react';
 import type { ScreeningApi } from '../../../api/blood-bank-processing.api';
 import { notifySuccess } from '../../../shared/notify-success';
+import { useLiveClock } from '../../../shared/use-live-clock';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import styles from '../../applicant-selection/selection.scss';
-import { formatScreeningCollectionTime } from './screening-rules';
+import { formatScreeningCollectionTime, localDateTime } from './screening-rules';
 import {
   screeningReportCode,
   screeningReportedTests,
@@ -46,6 +47,7 @@ export function ScreeningRepeatWorkflow({
 }) {
   const [round, setRound] = useState(initial);
   const [step, setStep] = useState(initial.status === 'readyForValidation' ? 1 : 0);
+  const clock = useLiveClock(step === 0);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -125,8 +127,7 @@ export function ScreeningRepeatWorkflow({
             <TextInput
               id="screening-repeat-time"
               labelText={t('performedOn')}
-              value={formatScreeningCollectionTime(round.performedOn)}
-              helperText={t('screeningPerformedOnHelp')}
+              value={formatScreeningCollectionTime(localDateTime(clock))}
               readOnly
             />
           </div>

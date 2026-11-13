@@ -19,7 +19,7 @@ import { printDocument } from '../../shared/print-document';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
-import { inventoryDisplayDate } from '../inventory/inventory-rules';
+import { inventoryDisplayDate, inventoryUnitSealCode } from '../inventory/inventory-rules';
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import styles from './transfers.scss';
@@ -340,7 +340,7 @@ export function TransfersWorkflow({
                       unit.id,
                       unit.componentType ? t(componentDefinitions[unit.componentType].key) : unit.component,
                       unit.bloodGroup,
-                      unit.sealId ? `${unit.sealId}/${unit.id}` : '—',
+                      inventoryUnitSealCode(unit) || '—',
                       inventoryDisplayDate(unit.expiresAt),
                     ],
                   }))}

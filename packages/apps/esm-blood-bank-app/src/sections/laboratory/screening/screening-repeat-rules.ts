@@ -71,10 +71,30 @@ export function consolidatedScreening(record: ScreeningRecord, throughRound = In
 export function pendingScreeningRepeatTests(record: ScreeningRecord) {
   if (record.status !== 'validated') return [];
   const current = consolidatedScreening(record);
-  return testOrder.filter((test) =>
-    test === 'additional'
-      ? Boolean(current.additionalTest?.name.trim()) && current.additionalTest?.result === 'inconclusive'
-      : current.tests[test]?.result === 'inconclusive',
+  const requiresReactiveConfirmation =
+    record.origin?.type === 'postExtraction' || (!record.origin && Boolean(record.collectionId && record.unitCode));
+  const confirmedRounds = (record.repeatRounds ?? []).filter((round) => round.status === 'validated');
+  return screeningReportedTests(current).flatMap(({ test, result }) =>
+    result === 'inconclusive' ||
+    (result === 'reactive' &&
+      (test !== 'additional' || !current.additionalTest?.cmvIgGConceptUuid) &&
+      requiresReactiveConfirmation &&
+      !confirmedRounds.some((round) => round.results[test] === 'reactive'))
+      ? [test]
+      : [],
+  );
+}
+
+export function hasConfirmedReactiveScreening(record: ScreeningRecord) {
+  const current = consolidatedScreening(record);
+  return (
+    record.status === 'validated' &&
+    screeningReportedTests(current).some(
+      ({ test, result }) =>
+        result === 'reactive' &&
+        (test !== 'additional' || !current.additionalTest?.cmvIgGConceptUuid) &&
+        (record.repeatRounds ?? []).some((round) => round.status === 'validated' && round.results[test] === 'reactive'),
+    )
   );
 }
 

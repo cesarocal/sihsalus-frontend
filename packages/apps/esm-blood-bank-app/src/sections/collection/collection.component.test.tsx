@@ -13,7 +13,7 @@ import { CollectionWorkflow } from './collection-workflow.component';
 import { ScreeningPage } from '../laboratory/screening/screening-page.component';
 import { screeningResultsFixture } from '../laboratory/screening/screening-test-fixtures';
 import { screeningSpecialties, screeningTests } from '../laboratory/screening/screening.types';
-import { localDateTime } from '../laboratory/screening/screening-rules';
+import { formatScreeningCollectionTime, localDateTime } from '../laboratory/screening/screening-rules';
 import { showSnackbar } from '@openmrs/esm-framework';
 import { calculateReturnDate, today } from '../applicant-selection/selection-rules';
 
@@ -608,7 +608,9 @@ describe('collection and screening screens', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar tamizaje' }));
     expect(screen.getByLabelText(t('performedBy'))).toHaveValue('Tecnóloga de prueba');
     expect(screen.getByLabelText(t('performedBy'))).toHaveAttribute('readonly');
-    expect(screen.getByLabelText(t('performedOn'))).toHaveValue('');
+    const performedOn = screen.getByLabelText(t('performedOn'));
+    expect(performedOn).toHaveAttribute('readonly');
+    expect(performedOn).toHaveValue(formatScreeningCollectionTime(localDateTime()));
     expect(screen.queryByLabelText(t('observations'))).not.toBeInTheDocument();
     expect(screen.queryByLabelText(t('reagent'))).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(t('aboGroup')), { target: { value: 'AB' } });

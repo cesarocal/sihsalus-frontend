@@ -1,6 +1,6 @@
 import { formatDatetime } from '@openmrs/esm-framework';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import { inventoryDisplayDate } from '../inventory/inventory-rules';
+import { inventoryDisplayDate, inventoryUnitSealCode } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import styles from './transfusions.scss';
 import type { CompatibilityRound, RecipientSample, TransfusionRequest } from './transfusions.types';
@@ -29,7 +29,7 @@ export function TransfusionLabels({
       .map((item) => ({
         code: item.unitSampleCode ?? '',
         name: item.unit.id,
-        identification: `${item.unit.bloodGroup} · ${item.unit.sealId}/${item.unit.id}`,
+        identification: `${item.unit.bloodGroup} · ${inventoryUnitSealCode(item.unit)}`,
         date: item.assignedAt,
         operator: request.draft.reviewer,
       })),

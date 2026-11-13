@@ -94,14 +94,14 @@ describe('mock inventory state transitions and retained traceability', () => {
     ).toHaveLength(0);
     await expect(instance.prepareSeal(sealOperation(units))).rejects.toThrow('INVENTORY_NOT_ELIGIBLE');
     await expect(instance.confirmSeal(assigned)).rejects.toThrow('INVENTORY_LOCKED');
-    const requested = await instance.requestSealPrint(assigned);
+    const requested = await instance.requestSealPrint(assigned, 'Operador de prueba');
     expect(
       (await instance.list()).units
         .filter((unit) => units.some((item) => item.id === unit.id))
-        .every((unit) => unit.status === 'Cuarentena'),
+        .every((unit) => unit.status === 'Sello pendiente'),
     ).toBe(true);
-    await expect(instance.requestSealPrint(requested)).rejects.toThrow('INVENTORY_LOCKED');
-    await expect(instance.requestSealPrint(assigned)).rejects.toThrow('INVENTORY_CONFLICT');
+    await expect(instance.requestSealPrint(requested, 'Operador de prueba')).rejects.toThrow('INVENTORY_LOCKED');
+    await expect(instance.requestSealPrint(assigned, 'Operador de prueba')).rejects.toThrow('INVENTORY_CONFLICT');
     const completed = await instance.confirmSeal(requested);
     expect(completed.outcome).toBe('APTO');
     expect((await mockBloodBankApi.getInventory()).filter((unit) => unit.status === 'APTO')).toHaveLength(22);
@@ -121,6 +121,50 @@ describe('mock inventory state transitions and retained traceability', () => {
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
     expect((await createMockInventoryApi().list()).operations[0].witnesses).toBe(input.witnesses);
     expect((await api().list()).units).toHaveLength(31);
+  });
+  it('audits scoped retries without changing seal codes, stock state or the initial print timestamp', async () => {
+    const units = await ready();
+    const instance = api();
+    const assigned = await instance.prepareSeal(sealOperation(units));
+    const request = { unitIds: [units[0].id], reason: ' Atasco ', operator: ' Operador de prueba ' };
+    await expect(instance.requestSealReprint(assigned, request)).rejects.toThrow('INVENTORY_REPRINT_NOT_ELIGIBLE');
+    const printed = await instance.requestSealPrint(assigned, 'Primer operador');
+    for (const invalid of [
+      { ...request, reason: ' ' },
+      { ...request, unitIds: ['unknown'] },
+      { ...request, unitIds: [units[0].id, units[0].id] },
+      { ...request, operator: '' },
+    ])
+      await expect(instance.requestSealReprint(printed, invalid)).rejects.toThrow('INVENTORY_REPRINT_NOT_ELIGIBLE');
+    vi.setSystemTime(new Date('2026-10-06T12:02:00'));
+    const first = await instance.requestSealReprint(printed, request);
+    expect(first).toMatchObject({
+      stage: 'printRequested',
+      requestedAt: printed.requestedAt,
+      sealLabels: printed.sealLabels,
+      sealReprints: [
+        {
+          ...request,
+          number: 1,
+          reason: 'Atasco',
+          operator: 'Operador de prueba',
+          requestedAt: new Date().toISOString(),
+        },
+      ],
+    });
+    await expect(instance.requestSealReprint(printed, request)).rejects.toThrow('INVENTORY_CONFLICT');
+    const completed = await instance.confirmSeal(first);
+    const second = await instance.requestSealReprint(completed, { ...request, unitIds: [units[1].id] });
+    expect(second).toMatchObject({
+      stage: 'completed',
+      completedAt: completed.completedAt,
+      sealLabels: printed.sealLabels,
+    });
+    expect(second.sealReprints?.map(({ number, unitIds }) => [number, unitIds])).toEqual([
+      [1, [units[0].id]],
+      [2, [units[1].id]],
+    ]);
+    expect((await api().list()).operations[0]).toEqual(second);
   });
   it('rejects unknown, duplicate, tampered and stale unit snapshots without any stock change', async () => {
     const units = await ready();
@@ -184,7 +228,10 @@ describe('mock inventory state transitions and retained traceability', () => {
   });
   it('retains seals and the act if a sealed unit is subsequently disposed', async () => {
     const units = await ready();
-    const requested = await api().requestSealPrint(await api().prepareSeal(sealOperation([units[0]])));
+    const requested = await api().requestSealPrint(
+      await api().prepareSeal(sealOperation([units[0]])),
+      'Operador de prueba',
+    );
     await api().confirmSeal(requested);
     const unit = (await api().list()).units.find((item) => item.id === units[0].id);
     if (!unit) throw new Error('TEST_FIXTURE_MISSING');
@@ -193,17 +240,19 @@ describe('mock inventory state transitions and retained traceability', () => {
   });
   it('allows final sealed plasma to be fractionated; new children stay in quarantine without inherited seals', async () => {
     const units = await ready();
-    await api().confirmSeal(await api().requestSealPrint(await api().prepareSeal(sealOperation([units[0]]))));
+    await api().confirmSeal(
+      await api().requestSealPrint(await api().prepareSeal(sealOperation([units[0]])), 'Operador de prueba'),
+    );
     const fractionation = createMockFractionationApi();
     let batch = await fractionation.start([units[0].id]);
-    expect((await api().list()).units.find((item) => item.id === units[0].id)?.status).toBe('En laboratorio');
+    expect((await api().list()).units.find((item) => item.id === units[0].id)?.status).toBe('En fraccionamiento');
     batch = await reviewBatch(fractionation, batch);
     await fractionation.finalize(batch);
     const children = (await api().list()).units.filter((unit) => unit.id.startsWith(`${units[0].id}-`));
     expect(children).toHaveLength(2);
-    expect(children.every((unit) => unit.status === 'Cuarentena' && !unit.sealId && !unit.qualityIssues.length)).toBe(
-      true,
-    );
+    expect(
+      children.every((unit) => unit.status === 'Sello pendiente' && !unit.sealId && !unit.qualityIssues.length),
+    ).toBe(true);
   });
   it('failed storage writes cannot leave partial seals or stock exits', async () => {
     const units = await ready();
@@ -246,7 +295,7 @@ describe('mock inventory state transitions and retained traceability', () => {
     writeProcessingState(() => sessionStorage, state);
     const before = sessionStorage.getItem(processingStorageKey);
     const current = (await api().list()).units.find((unit) => unit.id === 'BB-SELLO-DEMO-001');
-    expect(current?.screeningResult).toBe('reactive');
+    expect(current?.screeningResult).toBe('inProgress');
     expect(current?.qualityIssues).toContain('inventoryExpiryInvalid');
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });
@@ -301,14 +350,14 @@ describe('mock inventory state transitions and retained traceability', () => {
     const units = (await api().list()).units;
     expect(units.find((unit) => unit.id === 'BB-TX-DEMO-001')).toMatchObject({
       status: 'Cuarentena',
-      screeningResult: 'reactive',
+      screeningResult: 'inProgress',
     });
     expect(units.find((unit) => unit.id === 'BB-TX-DEMO-002')).toMatchObject({
-      status: 'Cuarentena',
+      status: 'Sello pendiente',
       qualityIssues: expect.arrayContaining(['inventoryExpiryInvalid']),
     });
     expect(units.find((unit) => unit.id === 'BB-TX-DEMO-003')).toMatchObject({
-      status: 'Cuarentena',
+      status: 'Sello pendiente',
       sealId: 'Q-PENDING-DEMO',
     });
     expect(units.filter((unit) => unit.id.startsWith('BB-TX-DEMO-') && unit.status === 'APTO')).toHaveLength(17);
@@ -322,13 +371,13 @@ describe('mock inventory state transitions and retained traceability', () => {
     await inventory.dispose(disposalOperation([disposed]));
     const fractions = createMockFractionationApi();
     let batch = await fractions.start(['BB-TX-DEMO-011']);
-    expect((await api().list()).units.find((unit) => unit.id === 'BB-TX-DEMO-011')?.status).toBe('En laboratorio');
+    expect((await api().list()).units.find((unit) => unit.id === 'BB-TX-DEMO-011')?.status).toBe('En fraccionamiento');
     batch = await reviewBatch(fractions, batch);
     await fractions.finalize(batch);
     const current = (await api().list()).units;
     expect(current.some((unit) => ['BB-TX-DEMO-001', 'BB-TX-DEMO-011'].includes(unit.id))).toBe(false);
     const children = current.filter((unit) => unit.id.startsWith('BB-TX-DEMO-011-'));
     expect(children).toHaveLength(2);
-    expect(children.every((unit) => unit.status === 'Cuarentena' && !unit.sealId)).toBe(true);
+    expect(children.every((unit) => unit.status === 'Sello pendiente' && !unit.sealId)).toBe(true);
   });
 });

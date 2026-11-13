@@ -1,3 +1,4 @@
+import { inventoryUnitSealCode } from '../../inventory/inventory-rules';
 import { Button, Checkbox, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react';
 import { ArrowRight, Printer } from '@carbon/react/icons';
 import { useRef, useState } from 'react';
@@ -164,7 +165,7 @@ export function CompatibilityWorkflow({
                         {item.unit.id} · {item.unit.bloodGroup}
                       </p>
                       <p>
-                        {t('txSeal')}: {item.unit.sealId}/{item.unit.id}
+                        {t('txSeal')}: {inventoryUnitSealCode(item.unit)}
                       </p>
                     </div>
                     <div className={styles.result}>

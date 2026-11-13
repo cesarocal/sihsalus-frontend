@@ -1,10 +1,15 @@
-import type { InventoryOperation, InventoryWorkspace } from '../sections/inventory/inventory.types';
+import type {
+  InventoryOperation,
+  InventoryWorkspace,
+  QualitySealReprintRequest,
+} from '../sections/inventory/inventory.types';
 
 export interface InventoryApi {
   list(): Promise<InventoryWorkspace>;
   saveDraft(operation: InventoryOperation): Promise<InventoryOperation>;
   prepareSeal(operation: InventoryOperation): Promise<InventoryOperation>;
-  requestSealPrint(operation: InventoryOperation): Promise<InventoryOperation>;
+  requestSealPrint(operation: InventoryOperation, operator: string): Promise<InventoryOperation>;
+  requestSealReprint(operation: InventoryOperation, request: QualitySealReprintRequest): Promise<InventoryOperation>;
   confirmSeal(operation: InventoryOperation): Promise<InventoryOperation>;
   dispose(operation: InventoryOperation): Promise<InventoryOperation>;
 }
@@ -15,6 +20,7 @@ export const inventoryEndpoints = {
   draft: '/ws/rest/v1/bloodbank/inventory/operations/:uuid',
   prepareSeal: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/prepare-seal',
   requestPrint: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/request-print',
+  requestReprint: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/request-reprint',
   confirmSeal: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/confirm-seal',
   dispose: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/dispose',
 } as const;
@@ -26,6 +32,7 @@ export const openmrsInventoryApi: InventoryApi = {
   saveDraft: unavailable,
   prepareSeal: unavailable,
   requestSealPrint: unavailable,
+  requestSealReprint: unavailable,
   confirmSeal: unavailable,
   dispose: unavailable,
 };

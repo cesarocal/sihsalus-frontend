@@ -18,7 +18,7 @@ un aviso y permite quitar los filtros. El guard existente sigue siendo necesario
   no mezcla grupos, unidades ni códigos en un pool.
   **Fraccionar** en Acciones inicia solo esa fila, independientemente de la
   selección del lote; **Deseleccionar** limpia la selección, no los filtros.
-- Al iniciar se guarda el proceso y sus orígenes pasan a **En laboratorio**.
+- Al iniciar se guarda el proceso y sus orígenes pasan a **En fraccionamiento**.
   Cerrar no devuelve automáticamente esas unidades al almacén: **Retomar
   fraccionamiento** conserva el proceso y evita iniciar otro sobre el mismo origen.
 - **Fraccionamiento**. El responsable se toma de la sesión al abrir el flujo

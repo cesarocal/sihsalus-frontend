@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import { printDocument } from '../../shared/print-document';
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
-import { DisposalAct, QualitySeals } from './inventory-documents.component';
+import { DisposalAct, QualitySealReprintHistory, QualitySeals } from './inventory-documents.component';
 import type { InventoryOperation } from './inventory.types';
 import { inventoryDisplayDate } from './inventory-rules';
 import shared from '../applicant-selection/selection.scss';
@@ -28,7 +28,7 @@ export function InventoryHistory({
 }: {
   operations: InventoryOperation[];
   onClose: () => void;
-  onResume: (operation: InventoryOperation) => void;
+  onResume: (operation: InventoryOperation, reprint?: boolean) => void;
   t: ProcessingTranslate;
 }) {
   const [search, setSearch] = useState('');
@@ -72,7 +72,10 @@ export function InventoryHistory({
               </Button>
               {printFailed && <InlineNotification hideCloseButton kind="error" title={t('printFailed')} />}
               {detail.kind === 'qualitySeal' ? (
-                <QualitySeals operation={detail} t={t} />
+                <>
+                  <QualitySeals operation={detail} t={t} />
+                  <QualitySealReprintHistory operation={detail} t={t} />
+                </>
               ) : (
                 <DisposalAct operation={detail} t={t} />
               )}
@@ -148,6 +151,15 @@ export function InventoryHistory({
           )}
         </FractionationContent>
       </ModalBody>
+      {detail?.kind === 'qualitySeal' && detail.stage === 'completed' && (
+        <ModalFooter className={`${shared.footer} ${styles.printFooter}`}>
+          <div>
+            <Button kind="ghost" renderIcon={Printer} onClick={() => onResume(detail, true)}>
+              {t('inventoryReprintTitle')}
+            </Button>
+          </div>
+        </ModalFooter>
+      )}
       {detail?.kind === 'disposal' && detail.stage === 'completed' && (
         <ModalFooter className={`${shared.footer} ${styles.printFooter}`}>
           <div>

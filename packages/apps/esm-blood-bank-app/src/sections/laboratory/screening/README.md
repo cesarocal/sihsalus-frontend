@@ -27,6 +27,11 @@ registro clínico ni una calificación biológica de producción.
 - Recepción, siete pruebas con trazabilidad del reactivo y validación reutilizan
   el flujo existente. Validar retira la muestra de la cola y la incorpora al
   historial de su origen, sin liberar una unidad ni diagnosticar una infección.
+- Resultados y repetición muestran un reloj de solo lectura. Al guardar los
+  resultados se fija la fecha y hora de la prueba. Para muestras de extracción,
+  los resultados reactivos iniciales pasan a repetición junto con los
+  indeterminados. Inventario usa el resultado reactivo de una repetición
+  validada para marcar la unidad como **No apta**.
 
 El acceso de Inicio `?screening=<id>` revalida el ID exacto y exige una muestra
 pendiente/en proceso de un origen reconocido. Abre el mismo formulario y activa

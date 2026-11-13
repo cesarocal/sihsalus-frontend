@@ -2,6 +2,8 @@ import type { InventoryStore } from '../sections/inventory/inventory.types';
 import type { ProcessingState } from './mock-processing-store';
 import { transferUnitState } from './mock-transfers-store';
 import { transfusionUnitState } from './mock-transfusions-store';
+import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
+import { globalScreeningResult } from '../sections/laboratory/screening/screening-rules';
 
 /** Same atomic session-storage document as extraction, screening and fractionation. */
 export function inventoryStore(state: ProcessingState): InventoryStore {
@@ -46,4 +48,23 @@ export function inventoryBlocksFractionation(state: ProcessingState, code: strin
         (op.kind === 'qualitySeal' ? ['ready', 'printRequested'].includes(op.stage) : op.stage === 'completed'),
     )
   );
+}
+
+export function screeningBlocksFractionation(state: ProcessingState, originalCode: string) {
+  const collection = state.collections.find((item) => item.unitCode === originalCode);
+  if (!collection) return false;
+  return state.screenings.some((panel) => {
+    if (
+      panel.status !== 'validated' ||
+      panel.collectionId !== collection.id ||
+      panel.unitCode !== originalCode ||
+      (panel.origin && (panel.origin.type !== 'postExtraction' || panel.origin.collectionId !== collection.id))
+    )
+      return false;
+    const current = consolidatedScreening(panel);
+    return (
+      globalScreeningResult(current) === 'reactive' ||
+      (current.additionalTest?.result === 'reactive' && !current.additionalTest.cmvIgGConceptUuid)
+    );
+  });
 }

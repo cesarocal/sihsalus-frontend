@@ -20,7 +20,7 @@ import type { BloodBankApi } from '../../api';
 import { moduleName } from '../../constants';
 import { ProcessingPage, useProcessingData } from '../../shared/processing-page.component';
 import type { InventoryUnit } from '../inventory/inventory.types';
-import { canSeal, inventoryDisplayDate } from '../inventory/inventory-rules';
+import { inventoryDisplayDate } from '../inventory/inventory-rules';
 import { eligibleSource } from '../laboratory/fractionation/fractionation-rules';
 import { screeningCategory } from '../laboratory/screening/screening-rules';
 import { screeningQueueStatus } from '../laboratory/screening/screening-repeat-rules';
@@ -200,7 +200,7 @@ function InventoryCards({ source, days, t }: { source: InventorySource | null; d
             <Card
               label={t('sealPending')}
               description={t('sealPendingHelp')}
-              count={units.filter(canSeal).length}
+              count={units.filter((unit) => unit.status === 'Sello pendiente').length}
               to={dashboardLink('/inventory', { category: 'seal' })}
               t={t}
             />

@@ -132,6 +132,22 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
     panel.result = reactive ? 'reactive' : 'nonReactive';
     panel.status = 'validated';
     panel.completedSteps = ['reception', 'results', 'validation'];
+    if (reactive) {
+      panel.repeatRounds = [
+        {
+          id: `${panel.id}-R2`,
+          number: 2,
+          previousReportId: panel.id,
+          revision: 1,
+          status: 'validated',
+          results: { hiv: 'reactive' },
+          performedOn: `${date}T11:30`,
+          performedBy: panel.performedBy,
+          validatedAt: panel.validatedAt,
+          validatedBy: panel.validatedBy,
+        },
+      ];
+    }
     const unit: FractionationUnit = {
       id: code,
       code,
@@ -147,7 +163,11 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
         sedimentingAgent: '',
         collectionService: collection.label.service,
         processingService: '',
-        storageTemperature: 'DEMO',
+        storageTemperature: ['wholeBlood', 'redCells'].includes(component)
+          ? '1–6 °C'
+          : component === 'platelets'
+            ? '20–24 °C'
+            : '≤ −18 °C',
         expiresAt: expiry,
         bloodGroup,
         antibodies: '',

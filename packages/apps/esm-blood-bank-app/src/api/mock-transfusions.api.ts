@@ -1,3 +1,4 @@
+import { inventoryUnitSealCode } from '../sections/inventory/inventory-rules';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
 import type {
   TransfusionRequest,
@@ -261,7 +262,7 @@ export function createMockTransfusionsApi(
           requestId: id,
           orderNumber: request.order.number,
           unitCode: assignment.unit.id,
-          seal: `${assignment.unit.sealId}/${assignment.unit.id}`,
+          seal: inventoryUnitSealCode(assignment.unit),
           component: assignment.unit.componentType,
           patientName: request.order.patientName,
           historyNumber: request.order.historyNumber,

@@ -20,7 +20,7 @@ import { consolidatedScreening } from '../sections/laboratory/screening/screenin
 import type { InventorySummary } from '../types/blood-bank.types';
 import { observationsExceedLimit } from '../shared/text-field-contracts';
 import type { FractionationApi } from './fractionation.api';
-import { inventoryBlocksFractionation } from './mock-inventory-store';
+import { inventoryBlocksFractionation, screeningBlocksFractionation } from './mock-inventory-store';
 import {
   readProcessingState,
   writeProcessingState,
@@ -169,8 +169,7 @@ export function fractionationInventory(state: ProcessingState): InventorySummary
       volume: unit.volume,
       expiresAt: unit.label.expiresAt || '—',
       location: unit.location,
-      status:
-        unit.state === 'inLaboratory' ? 'En laboratorio' : unit.state === 'available' ? 'Disponible' : 'Cuarentena',
+      status: unit.state === 'inLaboratory' ? 'En fraccionamiento' : 'Cuarentena',
     }));
 }
 
@@ -278,7 +277,11 @@ export function createMockFractionationApi(
       const { state, store } = load();
       return structuredClone({
         ...store,
-        units: store.units.filter((unit) => !inventoryBlocksFractionation(state, unit.code)),
+        units: store.units.filter(
+          (unit) =>
+            !inventoryBlocksFractionation(state, unit.code) &&
+            !screeningBlocksFractionation(state, unit.originalWholeBloodCode),
+        ),
       });
     },
     async start(sourceIds) {
@@ -288,7 +291,11 @@ export function createMockFractionationApi(
       const sources = sourceIds.map((id) => store.units.find((unit) => unit.id === id));
       if (
         sources.some(
-          (source) => !source || !eligibleSource(source) || inventoryBlocksFractionation(state, source.code),
+          (source) =>
+            !source ||
+            !eligibleSource(source) ||
+            inventoryBlocksFractionation(state, source.code) ||
+            screeningBlocksFractionation(state, source.originalWholeBloodCode),
         ) ||
         new Set(sources.map((source) => source?.component)).size !== 1
       )

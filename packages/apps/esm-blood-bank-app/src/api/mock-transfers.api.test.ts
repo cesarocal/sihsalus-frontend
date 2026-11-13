@@ -19,7 +19,7 @@ async function readyUnits() {
     ['BB-SELLO-DEMO-001', 'BB-SELLO-DEMO-003'].includes(unit.id),
   );
   const prepared = await inventory.prepareSeal(sealOperation(units));
-  const requested = await inventory.requestSealPrint(prepared);
+  const requested = await inventory.requestSealPrint(prepared, 'Operador de prueba');
   await inventory.confirmSeal(requested);
   return units.map((unit) => unit.id);
 }
@@ -67,7 +67,7 @@ describe('transfer requests, stock commitments and administrative logbook', () =
     expect(
       workspace.units
         .filter((unit) => unit.id.startsWith('BB-SELLO-DEMO-'))
-        .every((unit) => unit.status === 'Cuarentena' && !unit.sealId),
+        .every((unit) => ['Sello pendiente', 'No apta'].includes(unit.status) && !unit.sealId),
     ).toBe(true);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });

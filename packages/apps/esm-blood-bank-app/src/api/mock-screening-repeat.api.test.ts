@@ -128,14 +128,30 @@ describe('screening repetitions', () => {
     const inventory = createMockInventoryApi();
     const unit = async () => (await inventory.list()).units.find((item) => item.id === initial.unitCode);
     expect(initial.result).toBe('nonReactive');
-    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'inconclusive' });
+    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'inProgress' });
     const ready = await screening.saveScreeningRepeat(
       initial.id,
       input(draft(initial), { additional: 'nonReactive' }),
       'results',
     );
-    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'inconclusive' });
+    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'inProgress' });
     await screening.saveScreeningRepeat(initial.id, input(ready, { additional: 'nonReactive' }), 'validation');
-    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'nonReactive' });
+    expect(await unit()).toMatchObject({ status: 'Sello pendiente', screeningResult: 'nonReactive' });
+  });
+  it.each([
+    ['reactive', 'No apta'],
+    ['nonReactive', 'Sello pendiente'],
+  ] as const)('uses the validated repeat result %s to determine the unit status', async (result, status) => {
+    const { screening, initial } = await initialReport((record) => {
+      record.tests.hiv.result = 'reactive';
+    });
+    const inventory = createMockInventoryApi();
+    const unit = async () => (await inventory.list()).units.find((item) => item.id === initial.unitCode);
+    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'inProgress' });
+    const outcomes = { hiv: result };
+    const ready = await screening.saveScreeningRepeat(initial.id, input(draft(initial), outcomes), 'results');
+    expect(await unit()).toMatchObject({ status: 'Cuarentena', screeningResult: 'inProgress' });
+    await screening.saveScreeningRepeat(initial.id, input(ready, outcomes), 'validation');
+    expect(await unit()).toMatchObject({ status, screeningResult: result });
   });
 });

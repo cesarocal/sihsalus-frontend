@@ -7,6 +7,7 @@ import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
 import { notifySuccess } from '../../../shared/notify-success';
+import { useLiveClock } from '../../../shared/use-live-clock';
 import styles from '../../applicant-selection/selection.scss';
 import { printScreeningAnalysis } from './screening-analysis-document.component';
 import { ScreeningIdentity, ScreeningReport } from './screening-report.component';
@@ -49,6 +50,7 @@ export function ScreeningWorkflow({
   const receptionSaved = storedRecord.completedSteps.includes('reception');
   const record = receptionSaved || finalized ? storedRecord : { ...storedRecord, receivedBy: operatorName };
   const locked = finalized || (step === 0 && receptionSaved);
+  const clock = useLiveClock(step === 1 && !locked);
   const stage = screeningSteps[step];
   const change = (next: ScreeningRecord) => {
     setRecord(next);
@@ -226,8 +228,7 @@ export function ScreeningWorkflow({
               <TextInput
                 id="screening-performedOn"
                 labelText={t('performedOn')}
-                value={formatScreeningCollectionTime(record.performedOn)}
-                helperText={locked ? undefined : t('screeningPerformedOnHelp')}
+                value={formatScreeningCollectionTime(locked ? record.performedOn : localDateTime(clock))}
                 invalid={errors.includes('performedOn')}
                 invalidText={t('requiredFields')}
                 readOnly

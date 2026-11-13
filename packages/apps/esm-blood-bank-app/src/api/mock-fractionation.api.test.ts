@@ -48,7 +48,9 @@ describe('atomic synthetic fractionation and inventory', () => {
     const instance = api();
     const batch = await instance.start(['PFC-2026-002', 'PFC-2026-003']);
     expect(batch.sources).toHaveLength(2);
-    expect((await mockBloodBankApi.getInventory()).filter((unit) => unit.status === 'En laboratorio')).toHaveLength(2);
+    expect((await mockBloodBankApi.getInventory()).filter((unit) => unit.status === 'En fraccionamiento')).toHaveLength(
+      2,
+    );
     await expect(instance.start(['PFC-2026-002'])).rejects.toThrow('FRACTIONATION_INVALID_SELECTION');
   });
   it('rejects oversized fractionation observations before saving or producing units', async () => {

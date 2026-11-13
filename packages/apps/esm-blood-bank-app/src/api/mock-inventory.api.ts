@@ -1,7 +1,17 @@
 import { inventoryMock } from '../mocks/blood-bank.mock';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
-import type { InventoryOperation, InventoryUnit, InventoryWorkspace } from '../sections/inventory/inventory.types';
-import { inventoryExpiry, validateInventoryOperation } from '../sections/inventory/inventory-rules';
+import type {
+  InventoryOperation,
+  InventoryUnit,
+  InventoryWorkspace,
+  QualitySealLabel,
+} from '../sections/inventory/inventory.types';
+import {
+  canReprintSeal,
+  inventoryExpiry,
+  qualitySealCode,
+  validateInventoryOperation,
+} from '../sections/inventory/inventory-rules';
 import {
   globalScreeningResult,
   localDateTime,
@@ -9,6 +19,7 @@ import {
 } from '../sections/laboratory/screening/screening-rules';
 import {
   consolidatedScreening,
+  hasConfirmedReactiveScreening,
   pendingScreeningRepeatTests,
 } from '../sections/laboratory/screening/screening-repeat-rules';
 import type { InventorySummary } from '../types/blood-bank.types';
@@ -45,6 +56,48 @@ const summary = (unit: InventorySummary): InventorySummary => ({
   location: unit.location,
   status: unit.status,
 });
+// Operational state is checked against current stock, including for drafts from older sessions.
+function sameUnit(current: InventorySummary, previous: InventorySummary) {
+  return JSON.stringify(summary({ ...current, status: previous.status })) === JSON.stringify(summary(previous));
+}
+function originalScreenings(state: ProcessingState, originalCode: string) {
+  const origin = state.collections.find((collection) => collection.unitCode === originalCode);
+  if (!origin) return [];
+  return state.screenings.filter(
+    (panel) =>
+      panel.unitCode === originalCode &&
+      panel.collectionId === origin.id &&
+      (!panel.origin || (panel.origin.type === 'postExtraction' && panel.origin.collectionId === origin.id)),
+  );
+}
+function sealLabels(
+  state: ProcessingState,
+  workspace: InventoryWorkspace,
+  op: InventoryOperation,
+): Record<string, QualitySealLabel> {
+  const fractions = fractionationStore(state).units;
+  return Object.fromEntries(
+    op.units.map((unit, index) => {
+      const fraction = fractions.find((candidate) => candidate.code === unit.id);
+      const originalCode = workspace.units.find((candidate) => candidate.id === unit.id)?.originalCode ?? unit.id;
+      const cmv = originalScreenings(state, originalCode)
+        .filter((panel) => panel.status === 'validated' && panel.additionalTest?.cmvIgGConceptUuid)
+        .map((panel) => consolidatedScreening(panel))
+        .sort((a, b) => (b.validatedAt ?? '').localeCompare(a.validatedAt ?? ''))[0]?.additionalTest?.result;
+      return [
+        unit.id,
+        {
+          code: op.id.startsWith('SC-')
+            ? `${op.id}-${String(index + 1).padStart(2, '0')}`
+            : qualitySealCode(op, unit.id),
+          originalCode,
+          ...(fraction ? { details: { ...fraction.label, ...(cmv ? { cmvIgGResult: cmv } : {}) } } : {}),
+          lowVolume: fraction?.component === 'lowVolumeRedCells',
+        },
+      ];
+    }),
+  );
+}
 /** Canonical stock projection shared by getInventory and the inventory workflows. */
 export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
   state = withInventoryFixtures(state);
@@ -81,16 +134,7 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
       );
       const fixtureSealId = state.fixtureQualitySeals?.[unit.id];
       const originalCode = fractions.find((item) => item.code === unit.id)?.originalWholeBloodCode ?? unit.id;
-      const originalPanels = state.screenings.filter(
-        (panel) =>
-          panel.unitCode === originalCode &&
-          panel.collectionId &&
-          (!panel.origin ||
-            (panel.origin.type === 'postExtraction' && panel.origin.collectionId === panel.collectionId)) &&
-          state.collections.some(
-            (collection) => collection.id === panel.collectionId && collection.unitCode === originalCode,
-          ),
-      );
+      const originalPanels = originalScreenings(state, originalCode);
       const repeatPending = originalPanels.some((panel) => pendingScreeningRepeatTests(panel).length > 0);
       const panels = originalPanels.map((panel) => consolidatedScreening(panel));
       const qualityIssues: string[] = [];
@@ -112,16 +156,21 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
         panels.some((panel) => panel.result !== 'nonReactive' || globalScreeningResult(panel) !== 'nonReactive')
       )
         qualityIssues.push('inventoryScreeningUnsafe');
-      const screeningResult = qualityIssues.includes('inventoryScreeningPending')
-        ? 'pending'
-        : panels.some((panel) => panel.result === 'reactive' || globalScreeningResult(panel) === 'reactive')
-          ? 'reactive'
-          : repeatPending ||
-              panels.some((panel) => panel.result === 'inconclusive' || globalScreeningResult(panel) === 'inconclusive')
-            ? 'inconclusive'
-            : qualityIssues.includes('inventoryScreeningUnsafe')
-              ? 'pending'
-              : 'nonReactive';
+      const confirmedReactive =
+        !qualityIssues.includes('inventoryScreeningPending') && originalPanels.some(hasConfirmedReactiveScreening);
+      let screeningResult: InventoryUnit['screeningResult'] = 'pending';
+      if (confirmedReactive) screeningResult = 'reactive';
+      else if (repeatPending || originalPanels.some((panel) => panel.status === 'inProgress'))
+        screeningResult = 'inProgress';
+      else if (!qualityIssues.includes('inventoryScreeningPending')) {
+        if (panels.some((panel) => panel.result === 'reactive' || globalScreeningResult(panel) === 'reactive'))
+          screeningResult = 'reactive';
+        else if (
+          panels.some((panel) => panel.result === 'inconclusive' || globalScreeningResult(panel) === 'inconclusive')
+        )
+          screeningResult = 'inconclusive';
+        else if (!qualityIssues.includes('inventoryScreeningUnsafe')) screeningResult = 'nonReactive';
+      }
       const expiry = inventoryExpiry(unit.expiresAt);
       if (
         !expiry ||
@@ -131,28 +180,29 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
         qualityIssues.push('inventoryExpiryInvalid');
       if (!/^(A|B|AB|O)[+−-]$/.test(unit.bloodGroup) || !unit.component.trim() || !unit.location.trim())
         qualityIssues.push('inventoryIdentityIncomplete');
+      let status = unit.status;
+      if (status === 'Cuarentena') {
+        if (confirmedReactive) status = 'No apta';
+        else if (screeningResult === 'nonReactive')
+          status = seal?.stage === 'completed' || fixtureSealId ? 'APTO' : 'Sello pendiente';
+      }
+      const transfusion = transfusionUnitState(state, unit.id);
+      const transfer = transferUnitState(state, unit.id);
+      if (transfusion === 'testing') status = 'En pruebas de compatibilidad';
+      else if (transfusion === 'reserved') status = 'Reservados para transfusión';
+      else if (transfer === 'prepared') status = 'Por transferir';
       return {
         ...summary(unit),
-        status:
-          transfusionUnitState(state, unit.id) === 'testing'
-            ? 'En pruebas de compatibilidad'
-            : transfusionUnitState(state, unit.id) === 'reserved'
-              ? 'Reservados para transfusión'
-              : transferUnitState(state, unit.id) === 'prepared'
-                ? 'Por transferir'
-                : repeatPending && unit.status !== 'En laboratorio'
-                  ? 'Cuarentena'
-                  : (seal?.stage === 'completed' || !!fixtureSealId) && unit.status !== 'En laboratorio'
-                    ? 'APTO'
-                    : unit.status,
+        status,
         originalCode,
         screeningResult,
         qualityIssues,
-        ...(seal || fixtureSealId ? { sealId: seal?.id ?? fixtureSealId } : {}),
-        canDispose:
-          !transferUnitState(state, unit.id) &&
-          !transfusionUnitState(state, unit.id) &&
-          !['En laboratorio', 'Reservada'].includes(unit.status),
+        ...(seal
+          ? { sealId: seal.id, sealCode: qualitySealCode(seal, unit.id) }
+          : fixtureSealId
+            ? { sealId: fixtureSealId }
+            : {}),
+        canDispose: !transfer && !transfusion && !['En fraccionamiento', 'Reservada'].includes(unit.status),
       };
     });
   if (new Set(units.map((unit) => unit.id)).size !== units.length) throw new Error('INVALID_INVENTORY_IDENTITY');
@@ -191,33 +241,33 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
       throw new Error('INVALID_INVENTORY_SELECTION');
     const units = input.units.map((selected) => {
       const current = workspace.units.find((unit) => unit.id === selected.id);
-      if (!current || JSON.stringify(summary(current)) !== JSON.stringify(summary(selected)))
-        throw new Error('INVENTORY_CONFLICT');
+      if (!current || !sameUnit(current, selected)) throw new Error('INVENTORY_CONFLICT');
       return summary(current);
     });
-    const prefix = input.kind === 'qualitySeal' ? 'Q' : 'E';
+    const sequence = String(workspace.operations.length + 1).padStart(5, '0');
     return {
       ...(previous ?? input),
       ...structuredClone(mutable(input)),
       units,
       causes: Object.fromEntries(units.map((unit) => [unit.id, input.causes[unit.id] ?? ''])),
-      id: previous?.id ?? `${prefix}-DEMO-${String(workspace.operations.length + 1).padStart(5, '0')}`,
+      id: previous?.id ?? (input.kind === 'qualitySeal' ? `SC-${sequence}` : `E-DEMO-${sequence}`),
       revision: previous?.revision ?? 0,
       stage: 'draft',
       requestedAt: null,
       completedAt: null,
       outcome: undefined,
+      sealLabels: undefined,
+      sealReprints: undefined,
     };
   }
   function eligible(op: InventoryOperation, workspace: InventoryWorkspace) {
     if (validateInventoryOperation(op).length) throw new Error('INVALID_INVENTORY_FIELDS');
     for (const selected of op.units) {
       const current = workspace.units.find((unit) => unit.id === selected.id);
-      if (!current || JSON.stringify(summary(current)) !== JSON.stringify(summary(selected)))
-        throw new Error('INVENTORY_CONFLICT');
+      if (!current || !sameUnit(current, selected)) throw new Error('INVENTORY_CONFLICT');
       if (
         op.kind === 'qualitySeal'
-          ? current.status !== 'Cuarentena' ||
+          ? current.status !== 'Sello pendiente' ||
             current.qualityIssues.length ||
             (current.sealId && current.sealId !== op.id)
           : !current.canDispose
@@ -229,6 +279,7 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
     input: InventoryOperation,
     action: 'ready' | 'printRequested' | 'completed',
     kind: InventoryOperation['kind'],
+    operator?: string,
   ) {
     const { state, workspace, store } = load();
     const stored = workspace.operations.find((op) => op.id === input.id);
@@ -245,7 +296,16 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
     op.stage = action;
     op.revision += 1;
     op.updatedAt = new Date().toISOString();
-    if (action === 'printRequested') op.requestedAt = op.updatedAt;
+    if (kind === 'qualitySeal' && (action === 'ready' || action === 'printRequested'))
+      op.sealLabels = sealLabels(state, workspace, op);
+    if (action === 'printRequested') {
+      if (!operator?.trim()) throw new Error('INVENTORY_OPERATOR_REQUIRED');
+      op.requestedAt = op.updatedAt;
+      const now = localDateTime();
+      op.date = now.slice(0, 10);
+      op.time = now.slice(11);
+      op.serviceResponsible = operator.trim();
+    }
     if (action === 'completed') {
       op.completedAt = op.updatedAt;
       op.outcome = kind === 'qualitySeal' ? 'APTO' : 'ELIMINADAS';
@@ -269,8 +329,42 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
     async prepareSeal(input) {
       return transition(input, 'ready', 'qualitySeal');
     },
-    async requestSealPrint(input) {
-      return transition(input, 'printRequested', 'qualitySeal');
+    async requestSealPrint(input, operator) {
+      return transition(input, 'printRequested', 'qualitySeal', operator);
+    },
+    async requestSealReprint(input, { unitIds, reason, operator }) {
+      const { state, workspace, store } = load();
+      const op = prepare(input, workspace);
+      if (
+        op.kind !== 'qualitySeal' ||
+        !['printRequested', 'completed'].includes(op.stage) ||
+        !reason.trim() ||
+        !operator.trim() ||
+        !unitIds.length ||
+        new Set(unitIds).size !== unitIds.length ||
+        unitIds.some(
+          (id) =>
+            !op.units.some((unit) => unit.id === id) ||
+            !workspace.units.some((unit) => unit.id === id && canReprintSeal(op, unit)),
+        )
+      )
+        throw new Error('INVENTORY_REPRINT_NOT_ELIGIBLE');
+      const previous = op.sealReprints ?? [];
+      const now = new Date().toISOString();
+      op.sealLabels ??= sealLabels(state, workspace, op);
+      op.sealReprints = [
+        ...previous,
+        {
+          number: previous.length + 1,
+          unitIds,
+          reason: reason.trim(),
+          operator: operator.trim(),
+          requestedAt: now,
+        },
+      ];
+      op.revision += 1;
+      op.updatedAt = now;
+      return persist(state, store, op);
     },
     async confirmSeal(input) {
       return transition(input, 'completed', 'qualitySeal');

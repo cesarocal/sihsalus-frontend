@@ -5,10 +5,11 @@ import { isDisposalCause } from './disposal-causes';
 import type { InventoryOperation, InventoryUnit } from './inventory.types';
 
 export const inventoryStatusKey: Record<InventorySummary['status'], string> = {
-  Disponible: 'inventoryAvailable',
   Reservada: 'inventoryReserved',
   Cuarentena: 'quarantine',
-  'En laboratorio': 'fractionationInLab',
+  'En fraccionamiento': 'fractionationInLab',
+  'Sello pendiente': 'inventorySealPending',
+  'No apta': 'inventoryUnsuitable',
   APTO: 'inventorySuitable',
   'Por transferir': 'inventoryPendingTransfer',
   'En pruebas de compatibilidad': 'inventoryCompatibilityTesting',
@@ -58,9 +59,24 @@ export function inventoryDisplayDate(value: string): string {
 export function canSeal(unit: InventoryUnit) {
   return (
     unit.screeningResult === 'nonReactive' &&
-    unit.status === 'Cuarentena' &&
+    unit.status === 'Sello pendiente' &&
     !unit.sealId &&
     unit.qualityIssues.length === 0
+  );
+}
+export function qualitySealCode(operation: InventoryOperation, unitId: string) {
+  return operation.sealLabels?.[unitId]?.code ?? `${operation.id}/${unitId}`;
+}
+export function inventoryUnitSealCode(unit: InventoryUnit) {
+  return unit.sealCode ?? (unit.sealId ? `${unit.sealId}/${unit.id}` : '');
+}
+export function canReprintSeal(operation: InventoryOperation, unit: InventoryUnit) {
+  return (
+    operation.kind === 'qualitySeal' &&
+    (operation.stage === 'printRequested' || operation.stage === 'completed') &&
+    unit.sealId === operation.id &&
+    unit.status === (operation.stage === 'completed' ? 'APTO' : 'Sello pendiente') &&
+    !unit.qualityIssues.length
   );
 }
 export function validateInventoryOperation(operation: InventoryOperation, selectionOnly = false): string[] {

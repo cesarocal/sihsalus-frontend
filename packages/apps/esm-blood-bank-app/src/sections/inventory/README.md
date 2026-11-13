@@ -7,7 +7,7 @@ login, barra lateral global, privilegios del backend ni tablas de OpenMRS.
 ## Pantalla y flujos
 
 - Cabecera estándar con `StockManagementPictogram`, ubicación y hora. Fondo
-  blanco, métricas, búsqueda por código/origen/componente/ubicación, filtros
+  blanco, métricas, búsqueda por código/origen/componente, filtros
   combinados de componente, grupo y estado, y paginación Carbon. A la derecha
   de Estado, una escoba pequeña permite limpiar la búsqueda y todos los filtros,
   incluidos los aplicados desde Inicio. No se muestra el mensaje de filtros de Inicio;
@@ -15,21 +15,29 @@ login, barra lateral global, privilegios del backend ni tablas de OpenMRS.
 - Selección múltiple y Deseleccionar. Seleccionar resultados filtrados aparece
   solo dentro de los popups, no en el listado principal.
   Sello de calidad y Eliminar unidades abren sin selección o precargan las
-  filas seleccionadas. El popup de sello muestra solo tamizaje validado no
-  reactivo y solo incluye esas unidades de la selección previa; un texto explica
-  este alcance. No modifica la selección del proceso de eliminación.
-  La columna Tamizaje resume No reactiva/Reactiva/Indeterminada/Pendiente;
-  se retiró la columna explicativa Verificación para sello. Las demás
-  restricciones siguen bloqueando la selección y se revalidan en el adaptador.
+  filas seleccionadas. El popup de sello muestra solo unidades en **Sello pendiente**
+  y omite el filtro de estado. Las unidades con verificaciones incompletas o
+  un sello asignado quedan deshabilitadas. La ubicación se conserva como dato
+  interno. La columna Tamizaje muestra **En proceso** durante el registro o una
+  repetición pendiente. Un resultado reactivo confirmado cambia el estado a
+  **No apta**. Un tamizaje validado no reactivo deja la unidad en **Sello pendiente**
+  hasta confirmar su sello.
 - Sello de calidad: selección, responsable, fecha/hora y tres comprobaciones
-  manuales. Solo admite cuarentena sin sello, identidad/ubicación/vencimiento
+  manuales. La fecha y hora avanzan hasta solicitar la primera impresión y el
+  responsable se obtiene de la sesión. Solo admite Sello pendiente sin sello,
+  identidad/ubicación/vencimiento
   válidos y tamizaje vinculado a la extracción original, validado y no reactivo
   en todas las pruebas. Seguimiento o aféresis sin unidad vinculada no autorizan
   sellos. Los derivados consultan la unidad original.
-- Impresión: un sello por unidad en una única solicitud. Se reserva el proceso
-  antes de imprimir; no se puede reasignar ni reimprimir desde el historial.
-  Las unidades siguen en cuarentena hasta confirmar explícitamente la impresión
-  correcta y aceptar el cambio a `APTO`.
+- Impresión: la primera solicitud requiere confirmar el aviso de una copia por
+  unidad. Ante un fallo se puede reimprimir solo las unidades seleccionadas,
+  conservando el código. El registro de cada reintento conserva fecha y hora,
+  persona, número, justificación y unidades. Se puede iniciar desde el flujo
+  pendiente o desde el historial de un sello finalizado con unidades aptas.
+  La confirmación física de los sellos cambia las unidades a `APTO`.
+  La etiqueta muestra el logo de Santa Clotilde, ABO/Rh, código y datos del
+  componente final. Se conservan los identificadores de las unidades y los
+  códigos de sello ya emitidos.
 - Eliminar unidades: tres pasos, Seleccionar unidades → Causas de eliminación
   (una opción del desplegable por unidad, fecha/hora, personas presentes y
   responsables del servicio/Epidemiología) → Revisión del acta `EG010-FR02`.
@@ -139,12 +147,10 @@ distribución del formato, no se afirma aprobación institucional ni equivalenci
 documental. Los borradores impresos se identifican como pendientes de registro.
 
 El navegador no verifica impresión física: cancelar y `afterprint` no prueban
-éxito. Se controla una solicitud por proceso en esta pestaña; no se impiden
-copias adicionales, copias de un PDF ni duplicados en otra sesión. Si falla o
-cancela, no confirmar: queda pendiente y se puede retomar su confirmación, no
-su impresión. Reimpresión supervisada/cancelación auditada requieren otro
-contrato. `sessionStorage` se pierde al cerrar la pestaña; no sustituye la base
-de datos ni el archivo clínico.
+éxito. Se conserva la primera solicitud y se registra cada reintento en esta
+pestaña. Si falla o se cancela, se puede reimprimir con justificación y confirmar
+después de inspeccionar la etiqueta. `sessionStorage` se pierde al cerrar la
+pestaña; la persistencia clínica y la auditoría entre sesiones dependen del OMOD.
 
 ## Backend y validación pendientes
 

@@ -34,10 +34,11 @@ export interface InventorySummary {
   expiresAt: string;
   location: string;
   status:
-    | 'Disponible'
     | 'Reservada'
     | 'Cuarentena'
-    | 'En laboratorio'
+    | 'En fraccionamiento'
+    | 'Sello pendiente'
+    | 'No apta'
     | 'APTO'
     | 'Por transferir'
     | 'En pruebas de compatibilidad'
