@@ -1,3 +1,4 @@
+import { formatListDate } from '../../shared/format-list-date';
 import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import {
   Button,
@@ -310,7 +311,7 @@ export function ApplicantSelectionPage({
                       {visible.map((a) => (
                         <TableRow key={a.id}>
                           <TableCell>{a.number}</TableCell>
-                          <TableCell>{a.admission.date}</TableCell>
+                          <TableCell>{formatListDate(a.admission.date)}</TableCell>
                           <TableCell>
                             {`${a.personal.familyName}, ${a.personal.givenName}`.replace(/^,\s*/, '') ||
                               t('personalPending')}

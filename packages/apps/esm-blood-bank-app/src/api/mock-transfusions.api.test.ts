@@ -30,11 +30,12 @@ async function sampled(number = 1, api = createMockTransfusionsApi()) {
     reviewVerified: true,
     consentVerified: true,
   });
+  const collectedAt = localDateTime();
   return api.saveSample(reviewed.id, reviewed.revision, {
     ...reviewed.draft.sample,
-    collectedAt: localDateTime(),
+    collectedAt,
     collectedBy: 'Extracción DEMO',
-    identityVerified: true,
+    printRequestedAt: collectedAt,
   });
 }
 async function assigned(api = createMockTransfusionsApi()) {
@@ -153,9 +154,18 @@ describe('regular transfusion attention and compatibility shared stock', () => {
         identityVerified: true,
       }),
     ).rejects.toThrow('INVALID_RECIPIENT_SAMPLE');
+    const collectedAt = localDateTime();
+    await expect(
+      api.saveSample(reviewed.id, reviewed.revision, {
+        ...reviewed.draft.sample,
+        collectedAt,
+        identityVerified: true,
+      }),
+    ).rejects.toThrow('INVALID_RECIPIENT_SAMPLE');
     const saved = await api.saveSample(reviewed.id, reviewed.revision, {
       ...reviewed.draft.sample,
-      identityVerified: true,
+      collectedAt,
+      printRequestedAt: collectedAt,
     });
     expect(saved.sample?.collectedBy).toBe('Borrador DEMO');
     expect(saved.status).toBe('sampleReady');
@@ -171,15 +181,18 @@ describe('regular transfusion attention and compatibility shared stock', () => {
       reviewVerified: true,
       consentVerified: true,
     });
-    for (const patch of [{ historyNumber: 'WRONG' }, { collectedAt: '2027-01-01T12:00' }])
+    for (const patch of [{ historyNumber: 'WRONG' }, { collectedAt: '2099-01-01T12:00' }]) {
+      const collectedAt = patch.collectedAt ?? localDateTime();
       await expect(
         api.saveSample(reviewed.id, reviewed.revision, {
           ...reviewed.draft.sample,
           collectedBy: 'DEMO',
-          identityVerified: true,
+          collectedAt,
+          printRequestedAt: collectedAt,
           ...patch,
         }),
       ).rejects.toThrow('INVALID_RECIPIENT_SAMPLE');
+    }
     expect((await api.list()).requests[0].sample).toBeNull();
   });
   it('requires exact quantities per component and creates only whole-blood/red-cell unit samples', async () => {

@@ -39,9 +39,14 @@ vez para evitar reapertura al refrescar; recargar la URL vuelve a validarla.
 | Reasignar faltantes                         | En pruebas de compatibilidad                                | Solo unidades nuevas en pruebas; aprobadas anteriores permanecen reservadas |
 | Confirmar entrega                           | Entregada; solicitante ATENDIDA                             | Entregadas y fuera del inventario activo                                    |
 
-Guardar al salir conserva únicamente borradores: imprimir la etiqueta no crea
-la muestra canónica y solo Continuar desde su etapa la registra. Mover filas entre
-los dos bloques tampoco reserva stock hasta confirmar la asignación. Guardar un
+El responsable de la atención y quien registra una toma nueva se obtienen de la
+persona vinculada a la sesión al abrir Atender. Las revisiones y muestras guardadas
+conservan su autor. **Imprimir y extraer muestra** toma la fecha y hora y habilita
+Continuar al solicitar la impresión. Continuar registra la muestra y salir con
+guardado conserva el borrador. Reimprimir conserva el instante de la toma.
+El autorrelleno depende de `user.person.display` en la sesión de OpenMRS, incluso
+para cuentas sin acceso general a fichas de personas.
+Mover filas entre los dos bloques tampoco reserva stock hasta confirmar la asignación. Guardar un
 resultado parcial no libera ni reserva unidades. La X permite Seguir editando o
 Salir, con guardado opcional marcado por defecto; los errores conservan la edición.
 
@@ -53,11 +58,15 @@ Las asignaciones aprobadas aparecen bloqueadas al reemplazar las rechazadas.
 Todos los intentos y resultados anteriores permanecen trazables y ninguna unidad
 ya probada para esa solicitud se ofrece nuevamente.
 
-El selector usa tablas Carbon con todas las filas, sin paginación, dentro de dos
-bloques de igual altura y scroll independiente. Sus cabeceras permanecen visibles
-al desplazarse; la región puede enfocarse y recorrerse con teclado. Las flechas
-son botones pequeños solo con icono, con nombres accesibles y tooltip. El progreso
-y título se compactan en todas las etapas de atención, reemplazo y entrega, y en
+Los hemocomponentes solicitados se muestran entre el detalle y los antecedentes,
+con la bolsa ilustrada de Fraccionamiento y la cantidad requerida. El selector
+usa dos tablas Carbon de igual altura, con scroll independiente y sin paginación.
+Cada fila tiene una flecha con nombre accesible para asignar o devolver la unidad.
+Los indicadores cuentan las unidades faltantes por hemocomponente, consideran
+las unidades ya aprobadas y cambian a verde al completar la cantidad exacta.
+El checkbox de verificación está en el pie izquierdo. La selección conserva
+el requisito de coincidencia exacta de ABO/Rh.
+El progreso y título se compactan en todas las etapas de atención, reemplazo y entrega, y en
 el procesamiento de Compatibilidad. La opción del modal propio permanece
 desactivada por defecto para los demás flujos del ESM.
 

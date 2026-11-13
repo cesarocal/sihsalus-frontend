@@ -1,3 +1,4 @@
+import { formatListDate } from '../../shared/format-list-date';
 import {
   Button,
   ComposedModal,
@@ -66,7 +67,7 @@ export function FollowUpPage({ kind, api }: { kind: FollowUpKind; api: FollowUpA
         id: c.id,
         cells: [
           c.id,
-          c.createdAt.slice(0, 10).split('-').reverse().join('/'),
+          historicTable ? c.createdAt.slice(0, 10).split('-').reverse().join('/') : formatListDate(c.createdAt),
           c.detection.person.name || t('draftCase'),
           c.detection.test || '—',
           c.subjects.length,

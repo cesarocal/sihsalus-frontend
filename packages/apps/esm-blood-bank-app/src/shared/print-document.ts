@@ -16,7 +16,13 @@ export const processingPrintCss = `
   [data-blood-group] strong { font-size: 32pt; line-height: 1; }
   [data-manual-volume] { display: inline-block; width: 32mm; border-bottom: 1px solid; margin-right: 4pt; }
 `;
-export function printDocument(content: ReactNode, title: string, onError?: () => void, css = processingPrintCss) {
+export function printDocument(
+  content: ReactNode,
+  title: string,
+  onError?: () => void,
+  css = processingPrintCss,
+  onPrintRequested?: () => void,
+) {
   // Use the shell's shared client renderer. A dev server renderer can depend on
   // React debug internals that the production shell does not provide.
   // The detached tree contains only our presentational print components.
@@ -39,10 +45,12 @@ export function printDocument(content: ReactNode, title: string, onError?: () =>
     if (target?.isConnected) target.focus({ preventScroll: true });
   };
   const frame = document.createElement('iframe');
+  let printStarted = false;
   frame.title = title;
   frame.style.cssText = 'position:fixed;width:0;height:0;border:0;';
   frame.onload = () => {
     if (!frame.isConnected) return;
+    printStarted = true;
     frame.contentWindow?.addEventListener(
       'afterprint',
       () => {
@@ -55,6 +63,7 @@ export function printDocument(content: ReactNode, title: string, onError?: () =>
       if (!frame.contentWindow) throw new Error('PRINT_WINDOW_UNAVAILABLE');
       frame.contentWindow.focus();
       frame.contentWindow.print();
+      onPrintRequested?.();
     } catch (error) {
       if (onError) onError();
       else throw error;
@@ -65,5 +74,11 @@ export function printDocument(content: ReactNode, title: string, onError?: () =>
   const language = document.documentElement.lang === 'en' ? 'en' : 'es';
   frame.srcdoc = `<!doctype html><html lang="${language}"><head><meta charset="utf-8"><style>${css}</style></head><body>${markup}</body></html>`;
   document.body.appendChild(frame);
-  setTimeout(() => frame.remove(), 120000);
+  setTimeout(() => {
+    frame.remove();
+    if (onPrintRequested && !printStarted) {
+      restoreFocus();
+      onError?.();
+    }
+  }, 120000);
 }

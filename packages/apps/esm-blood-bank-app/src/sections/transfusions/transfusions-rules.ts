@@ -89,7 +89,7 @@ export function sampleValid(sample: RecipientSample, order: TransfusionOrder): b
     sample.historyNumber === order.historyNumber &&
     !!sample.code &&
     !!sample.collectedBy.trim() &&
-    sample.identityVerified &&
+    (sample.printRequestedAt === sample.collectedAt || sample.identityVerified === true) &&
     Number.isFinite(age) &&
     age >= 0 &&
     age <= 3

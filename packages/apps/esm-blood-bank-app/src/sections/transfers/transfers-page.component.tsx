@@ -1,3 +1,4 @@
+import { formatListDate } from '../../shared/format-list-date';
 import { Button, Search, Select, SelectItem, Tab, TabList, TabPanel, TabPanels, Tabs, Tag } from '@carbon/react';
 import { Add, RecentlyViewed } from '@carbon/react/icons';
 import { useCallback, useState } from 'react';
@@ -9,7 +10,6 @@ import {
   useProcessingData,
 } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
-import { inventoryDisplayDate } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import styles from './transfers.scss';
 import type { TransferDirection, TransferRequest } from './transfers.types';
@@ -129,7 +129,7 @@ export function TransfersPage({ api }: { api: TransfersApi }) {
             id: item.id,
             cells: [
               item.data.office || item.id,
-              inventoryDisplayDate(item.data.date),
+              formatListDate(item.data.date),
               institutionOf(item),
               item.data.patientName,
               item.data.items

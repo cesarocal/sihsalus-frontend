@@ -1,3 +1,4 @@
+import { formatListDate } from '../../shared/format-list-date';
 import { Button, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { List } from '@carbon/react/icons';
 import { useState } from 'react';
@@ -12,7 +13,7 @@ import {
 } from '../../shared/processing-page.component';
 import { donorDetailPath } from '../../constants';
 import { DonorRegistry } from './donor-registry.component';
-import { donorStatusKey, formatDonorDate } from './donor-utils';
+import { donorStatusKey } from './donor-utils';
 import styles from '../applicant-selection/selection.scss';
 
 export function DonorsPage({ api }: { api: BloodBankApi }) {
@@ -98,7 +99,7 @@ export function DonorsPage({ api }: { api: BloodBankApi }) {
                   donor.documentNumber,
                   donor.fullName,
                   donor.bloodGroup,
-                  formatDonorDate(donor.lastDonationDate),
+                  formatListDate(donor.lastDonationDate),
                   <Tag
                     key="status"
                     type={donor.status === 'Apto' ? 'green' : donor.status === 'Diferido' ? 'magenta' : 'blue'}

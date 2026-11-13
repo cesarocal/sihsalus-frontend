@@ -1,3 +1,4 @@
+import { formatListDate } from '../../../shared/format-list-date';
 import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import { Button, Checkbox, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { Fork, RecentlyViewed } from '@carbon/react/icons';
@@ -234,7 +235,7 @@ export function FractionationPage({ api, shortcut }: { api: FractionationApi; sh
               t(componentDefinitions[unit.component].key),
               unit.label.bloodGroup || '—',
               unit.volume,
-              unit.collectedAt,
+              formatListDate(unit.collectedAt),
               unit.location,
               <Tag key="state" type={unit.state === 'inLaboratory' ? 'blue' : 'gray'}>
                 {t(unit.state === 'inLaboratory' ? 'fractionationInLab' : 'quarantine')}

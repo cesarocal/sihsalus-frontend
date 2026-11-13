@@ -46,7 +46,9 @@ export interface RecipientSample {
   historyNumber: string;
   collectedAt: string;
   collectedBy: string;
-  identityVerified: boolean;
+  printRequestedAt?: string;
+  /** Previously registered samples used a separate confirmation. */
+  identityVerified?: boolean;
 }
 export interface TransfusionDraft {
   reviewer: string;

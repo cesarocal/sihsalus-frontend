@@ -1,4 +1,3 @@
-import { localDateTime } from '../sections/laboratory/screening/screening-rules';
 import type { TransfusionRequest } from '../sections/transfusions/transfusions.types';
 
 /** Orders already received; no real patients, provider UUIDs or medical-order writes. */
@@ -75,9 +74,8 @@ export function transfusionRequestsMock(): TransfusionRequest[] {
         sample: {
           code: `M-REC-${code}`,
           historyNumber: `HC-TX-DEMO-${number}`,
-          collectedAt: localDateTime(),
+          collectedAt: '',
           collectedBy: '',
-          identityVerified: false,
         },
         collectorName: '',
         collectorDocument: '',

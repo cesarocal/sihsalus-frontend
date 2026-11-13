@@ -46,7 +46,7 @@
 }
 .picker {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: layout.$spacing-05;
   align-items: stretch;
   margin-block: layout.$spacing-05;
@@ -89,24 +89,43 @@
     z-index: 1;
     background: $ui-03;
   }
-  th:first-child {
-    inline-size: 3.5rem;
-  }
-  th:nth-child(4) {
-    inline-size: 5rem;
-  }
   th:last-child {
-    inline-size: 7rem;
+    inline-size: 4.5rem;
   }
   td {
     overflow-wrap: anywhere;
   }
 }
-.moveActions {
-  display: flex;
-  flex-direction: column;
+.reviewChecks {
+  display: grid;
+  gap: layout.$spacing-03;
+  > :first-child {
+    margin-block-end: layout.$spacing-04;
+  }
+}
+.componentCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
   gap: layout.$spacing-04;
-  align-self: center;
+  list-style: none;
+}
+.componentCard {
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-04;
+  border: 1px solid $ui-03;
+  padding: layout.$spacing-04;
+  overflow-wrap: anywhere;
+  svg {
+    flex-shrink: 0;
+  }
+  &[data-complete] {
+    background-color: colors.$green-10;
+    border-color: colors.$green-50;
+  }
+}
+.componentQuantity {
+  @include type.type-style("heading-03");
 }
 .notice {
   margin-block: layout.$spacing-05;
@@ -135,6 +154,8 @@
 }
 .printFooter:global(.cds--modal-footer) > div:first-child {
   margin-inline-end: auto;
+  align-items: center;
+  max-inline-size: 100%;
 }
 .modal :global(.cds--modal-container) {
   width: min(90vw, 85rem);
@@ -169,8 +190,7 @@
   .picker {
     grid-template-columns: minmax(0, 1fr);
   }
-  .moveActions {
-    flex-direction: row;
+  .printFooter:global(.cds--modal-footer) {
     flex-wrap: wrap;
   }
   .responsive :global(.cds--pagination),

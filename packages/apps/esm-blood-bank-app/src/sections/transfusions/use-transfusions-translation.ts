@@ -8,10 +8,10 @@ export function useTransfusionsTranslation() {
   const { t } = useTranslation(moduleName);
   const common = useProcessingTranslation();
   return useCallback(
-    (key: string) =>
+    (key: string, values?: Record<string, string>) =>
       key in spanish.transfusion
-        ? String(t(`transfusion.${key}`, (spanish.transfusion as Record<string, string>)[key]))
-        : common(key),
+        ? String(t(`transfusion.${key}`, (spanish.transfusion as Record<string, string>)[key], values))
+        : common(key, values),
     [t, common],
   );
 }

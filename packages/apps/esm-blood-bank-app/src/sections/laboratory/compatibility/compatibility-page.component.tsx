@@ -1,7 +1,7 @@
+import { formatListDate } from '../../../shared/format-list-date';
 import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import { Button, InlineNotification, Search } from '@carbon/react';
 import { RecentlyViewed } from '@carbon/react/icons';
-import { formatDatetime } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TransfusionsApi } from '../../../api/transfusions.api';
 import {
@@ -114,7 +114,7 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
               t(priorityKeys[request.order.priority]),
               request.order.patientName,
               round.sample.code,
-              formatDatetime(new Date(round.createdAt), { noToday: true }),
+              formatListDate(round.createdAt),
               Object.keys(round.results).length,
               <Button key="process" kind="ghost" size="sm" onClick={() => setActive({ request, round })}>
                 {t('txProcessTests')}

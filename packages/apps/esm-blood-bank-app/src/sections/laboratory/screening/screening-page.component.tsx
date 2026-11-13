@@ -1,3 +1,4 @@
+import { formatListDate } from '../../../shared/format-list-date';
 import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import {
   Button,
@@ -27,12 +28,7 @@ import { ScreeningRepeatWorkflow } from './screening-repeat-workflow.component';
 import { screeningQueueStatus, screeningRepeatDraft } from './screening-repeat-rules';
 import { ScreeningHistory } from './screening-history.component';
 import { ApheresisSampleWorkflow } from './apheresis-sample-workflow.component';
-import {
-  formatScreeningCollectionTime,
-  matchesScreeningSearch,
-  screeningCategory,
-  screeningOriginLabel,
-} from './screening-rules';
+import { matchesScreeningSearch, screeningCategory, screeningOriginLabel } from './screening-rules';
 import type { ScreeningCategory, ScreeningRecord } from './screening.types';
 import styles from '../../applicant-selection/selection.scss';
 import screeningStyles from './screening.scss';
@@ -161,7 +157,7 @@ export function ScreeningPage({ api, shortcut }: { api: ScreeningApi; shortcut?:
               (record.origin?.type === 'followUp' ? record.origin.followUpId : '—'),
             record.applicantName,
             record.documentNumber,
-            formatScreeningCollectionTime(record.collectedOn),
+            formatListDate(record.collectedOn),
             <Tag key="status" type={status === 'pending' ? 'gray' : 'blue'}>
               {t(status)}
             </Tag>,

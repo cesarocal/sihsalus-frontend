@@ -7,6 +7,7 @@ import english from '../../../translations/en.json';
 import spanish from '../../../translations/es.json';
 import { createMockTransfusionsApi } from '../../api/mock-transfusions.api';
 import { openmrsTransfusionsApi } from '../../api/transfusions.api';
+import { formatListDate } from '../../shared/format-list-date';
 import { printDocument } from '../../shared/print-document';
 import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustration.component';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
@@ -20,7 +21,11 @@ import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
 
 vi.mock('@openmrs/esm-framework', () => ({
-  useSession: () => ({ sessionLocation: { display: 'Hospital DEMO' } }),
+  useSession: () => ({
+    authenticated: true,
+    user: { person: { preferredName: { givenName: 'Rosa', familyName: 'Calderón' } } },
+    sessionLocation: { display: 'Hospital DEMO' },
+  }),
   formatDatetime: () => '16 oct 2026, 12:00',
   showSnackbar: vi.fn(),
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
@@ -28,8 +33,12 @@ vi.mock('@openmrs/esm-framework', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
 vi.mock('../../shared/print-document', () => ({ printDocument: vi.fn() }));
-const t = (key: string) =>
-  (spanish.transfusion as Record<string, string>)[key] ?? (spanish.processing as Record<string, string>)[key] ?? key;
+const t = (key: string, values?: Record<string, string>) =>
+  (
+    (spanish.transfusion as Record<string, string>)[key] ??
+    (spanish.processing as Record<string, string>)[key] ??
+    key
+  ).replace(/\{\{(\w+)\}\}/g, (match, name: string) => values?.[name] ?? match);
 const code = (number: number) => `BB-TX-DEMO-${String(number).padStart(3, '0')}`;
 async function prepared() {
   const api = createMockTransfusionsApi();
@@ -40,11 +49,12 @@ async function prepared() {
     consentVerified: true,
     reviewer: 'Atención DEMO',
   });
+  const collectedAt = localDateTime();
   const request = await api.saveSample(reviewed.id, reviewed.revision, {
     ...reviewed.draft.sample,
-    collectedAt: localDateTime(),
+    collectedAt,
     collectedBy: 'Extracción DEMO',
-    identityVerified: true,
+    printRequestedAt: collectedAt,
   });
   return { api, request, units: (await api.list()).units };
 }
@@ -80,6 +90,11 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     sessionStorage.clear();
     vi.clearAllMocks();
   });
+  it('formats list dates with abbreviated months and only includes a stored time', () => {
+    expect(formatListDate('2026-11-12T15:35')).toBe('12 nov 2026, 15:35');
+    expect(formatListDate('12/11/2026')).toBe('12 nov 2026');
+    expect(formatListDate('2026-02-30')).toBe('—');
+  });
   it('sorts urgency then date, filters and leaves urgent actions unavailable', async () => {
     render(<TransfusionsPage api={createMockTransfusionsApi()} />);
     expect(await screen.findAllByRole('button', { name: t('txAttend') })).toHaveLength(3);
@@ -98,19 +113,32 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
       screen.getByRole('dialog', { name: `${t('txRequestTitle')} · ${request.order.number}` }),
     ).toBeInTheDocument();
     expect(screen.getByText('UNIDAD-PASADA-DEMO')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(t('txReviewer')), { target: { value: 'Responsable DEMO' } });
+    const requested = screen.getByRole('region', { name: t('txRequirement') });
+    expect(within(requested).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(requested).getByText('×2')).toBeInTheDocument();
+    expect(screen.getByLabelText(t('txReviewer'))).toHaveValue('Rosa Calderón');
+    expect(screen.getByLabelText(t('txReviewer'))).toHaveAttribute('readonly');
     fireEvent.click(screen.getByRole('checkbox', { name: t('txReviewCheck') }));
     fireEvent.click(screen.getByRole('checkbox', { name: t('txConsentCheck') }));
     fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
-    fireEvent.click(await screen.findByRole('button', { name: t('txPrintSample') }));
-    expect(printDocument).toHaveBeenCalledOnce();
+    const print = await screen.findByRole('button', { name: t('txPrintSample') });
+    expect(screen.getByRole('button', { name: t('txContinue') })).toBeDisabled();
+    expect(screen.getByLabelText(t('txRecipientName'))).toHaveValue(request.order.patientName);
+    expect(screen.getByLabelText(t('txCollectedBy'))).toHaveValue('Rosa Calderón');
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, onError) => onError?.());
+    fireEvent.click(print);
+    expect(screen.getByRole('button', { name: t('txContinue') })).toBeDisabled();
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, _onError, _css, onPrint) => onPrint?.());
+    fireEvent.click(print);
+    expect(printDocument).toHaveBeenCalledTimes(2);
     expect((await api.list()).requests[0].sample).toBeNull();
     expect(screen.getByLabelText(t('sampleCode'))).toHaveAttribute('readonly');
-    fireEvent.change(screen.getByLabelText(t('txCollectedBy')), { target: { value: 'Extracción DEMO' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: t('txSampleIdentity') }));
     fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
     expect(await screen.findByRole('table', { name: t('txCandidates') })).toBeInTheDocument();
-    expect((await api.list()).requests[0].sample?.collectedBy).toBe('Extracción DEMO');
+    const saved = (await api.list()).requests[0];
+    expect(saved.sample?.collectedBy).toBe('Rosa Calderón');
+    expect(saved.sample?.printRequestedAt).toBe(saved.sample?.collectedAt);
+    expect(saved.draft.reviewer).toBe('Rosa Calderón');
   });
   it('moves candidate units in both directions before committing a selection', async () => {
     const { request, units } = await prepared();
@@ -128,12 +156,16 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     }
     render(<Picker />);
     const left = screen.getByRole('table', { name: t('txCandidates') });
-    fireEvent.click(within(left).getByRole('checkbox', { name: `${t('txSelect')} ${code(1)}` }));
-    fireEvent.click(screen.getByRole('button', { name: t('txAddUnits') }));
+    fireEvent.click(within(left).getByRole('button', { name: t('txAddUnit', { unit: code(1) }) }));
     const right = screen.getByRole('table', { name: t('txAssigned') });
     expect(within(right).getByText(code(1))).toBeInTheDocument();
-    fireEvent.click(within(right).getByRole('checkbox', { name: `${t('txSelect')} ${code(1)}` }));
-    fireEvent.click(screen.getByRole('button', { name: t('txReturnUnits') }));
+    const cards = screen.getByRole('region', { name: t('txRequirement') });
+    const redCells = within(cards).getAllByRole('listitem')[0];
+    expect(redCells).toHaveTextContent('×1');
+    fireEvent.click(within(left).getByRole('button', { name: t('txAddUnit', { unit: code(2) }) }));
+    expect(redCells).toHaveAttribute('data-complete', 'true');
+    fireEvent.click(within(right).getByRole('button', { name: t('txReturnUnit', { unit: code(1) }) }));
+    expect(redCells).not.toHaveAttribute('data-complete');
     expect(within(right).queryByText(code(1))).not.toBeInTheDocument();
     expect(within(left).getByText(code(1))).toBeInTheDocument();
   });
@@ -141,7 +173,10 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const { request, units } = await prepared();
     const source = units.find((unit) => unit.id === code(1));
     if (!source) throw new Error('MISSING_FIXTURE');
-    const additional = Array.from({ length: 12 }, (_, index) => ({ ...source, id: `BB-UI-DEMO-${index}` }));
+    const additional = Array.from({ length: 12 }, (_, index) => ({
+      ...source,
+      id: `BB-UI-DEMO-${index}`,
+    }));
     render(
       <TransfusionUnitPicker
         request={request}
@@ -152,16 +187,17 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
       />,
     );
     const table = screen.getByRole('table', { name: t('txCandidates') });
-    expect(within(table).getAllByRole('checkbox')).toHaveLength(17);
+    expect(within(table).getAllByRole('button')).toHaveLength(17);
+    expect(within(table).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'ABO/Rh' })).toBeInTheDocument();
+    expect(within(table).getAllByText('O POSITIVO (+)')).toHaveLength(17);
     expect(within(table).getByText('BB-UI-DEMO-11')).toBeInTheDocument();
     expect(screen.queryByText(t('itemsPerPage'))).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    for (const key of ['txAddUnits', 'txReturnUnits']) {
-      const button = screen.getByRole('button', { name: t(key) });
-      expect(button).toHaveClass('cds--btn--icon-only');
-      expect(button.querySelector('svg')).toBeTruthy();
-      expect(button.textContent?.trim()).toBe('');
-    }
+    const button = within(table).getByRole('button', { name: t('txAddUnit', { unit: code(1) }) });
+    expect(button).toHaveClass('cds--btn--icon-only');
+    expect(button.querySelector('svg')).toBeTruthy();
+    expect(button.textContent?.trim()).toBe('');
     expect(screen.getByText(t('txCandidateHelp'))).not.toHaveTextContent(/prototipo|prototype/i);
   });
   it('shows one recipient–unit pair per pending red-cell sample and requires all results before confirmation', async () => {
@@ -234,14 +270,15 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const request = (await api.list()).requests[0];
     const closed = vi.fn();
     render(<TransfusionWorkflow initial={request} units={[]} api={api} onSaved={vi.fn()} onClose={closed} t={t} />);
-    fireEvent.change(screen.getByLabelText(t('txReviewer')), { target: { value: 'Borrador DEMO' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txReviewCheck') }));
     fireEvent.click(screen.getByRole('button', { name: t('close') }));
     const exit = screen.getByRole('dialog', { name: t('exitTitle') });
     expect(within(exit).getByRole('button', { name: t('keepEditing') })).toBeEnabled();
     fireEvent.click(within(exit).getByRole('button', { name: new RegExp(`${t('leave')}$`) }));
     await waitFor(() => expect(closed).toHaveBeenCalledOnce());
     expect((await api.list()).requests[0].sample).toBeNull();
-    expect((await api.list()).requests[0].draft.reviewer).toBe('Borrador DEMO');
+    expect((await api.list()).requests[0].draft.reviewer).toBe('Rosa Calderón');
+    expect((await api.list()).requests[0].draft.reviewVerified).toBe(true);
   });
   it('renders secure failure and retry in both entry points when backend capability is missing', async () => {
     const page = render(<TransfusionsPage api={openmrsTransfusionsApi} />);
@@ -328,10 +365,12 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
       reviewVerified: true,
       consentVerified: true,
     });
+    const collectedAt = localDateTime();
     const request = await api.saveSample(reviewed.id, reviewed.revision, {
       ...reviewed.draft.sample,
       collectedBy: 'Extracción DEMO',
-      identityVerified: true,
+      collectedAt,
+      printRequestedAt: collectedAt,
     });
     request.draft.selectedUnitIds = [code(13)];
     request.draft.selectionVerified = true;

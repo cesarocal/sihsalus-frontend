@@ -21,11 +21,12 @@ async function prepareCompatibilityRound() {
     reviewVerified: true,
     consentVerified: true,
   });
+  const collectedAt = localDateTime();
   const sampled = await api.saveSample(reviewed.id, reviewed.revision, {
     ...reviewed.draft.sample,
-    collectedAt: localDateTime(),
+    collectedAt,
     collectedBy: 'Extracción DEMO',
-    identityVerified: true,
+    printRequestedAt: collectedAt,
   });
   return api.assign(sampled.id, sampled.revision, ['BB-TX-DEMO-001', 'BB-TX-DEMO-002', 'BB-TX-DEMO-011'], true);
 }

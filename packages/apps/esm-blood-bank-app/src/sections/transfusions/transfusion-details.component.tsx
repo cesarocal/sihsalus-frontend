@@ -3,6 +3,7 @@ import type { ProcessingTranslate } from '../../shared/processing-page.component
 import { ProcessingTable } from '../../shared/processing-page.component';
 import { inventoryDisplayDate } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { TransfusionComponentCards } from './transfusion-component-cards.component';
 import styles from './transfusions.scss';
 import type { TransfusionRequest } from './transfusions.types';
 import { priorityKeys, transfusionStatusKeys } from './transfusions-rules';
@@ -11,10 +12,12 @@ export function TransfusionDetails({
   request,
   t,
   history = false,
+  componentCards = false,
 }: {
   request: TransfusionRequest;
   t: ProcessingTranslate;
   history?: boolean;
+  componentCards?: boolean;
 }) {
   const order = request.order;
   const details = {
@@ -55,11 +58,14 @@ export function TransfusionDetails({
             </div>
           ))}
         </dl>
-        <p>
-          {t('txRequirement')}:{' '}
-          {order.items.map((item) => `${item.quantity} × ${t(componentDefinitions[item.component].key)}`).join('; ')}
-        </p>
+        {!componentCards && (
+          <p>
+            {t('txRequirement')}:{' '}
+            {order.items.map((item) => `${item.quantity} × ${t(componentDefinitions[item.component].key)}`).join('; ')}
+          </p>
+        )}
       </section>
+      {componentCards && <TransfusionComponentCards order={order} t={t} />}
       {history && (
         <section className={styles.panel}>
           <h4>{t('txPatientHistory')}</h4>

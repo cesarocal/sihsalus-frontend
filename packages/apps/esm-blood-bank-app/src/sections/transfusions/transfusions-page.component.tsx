@@ -1,6 +1,6 @@
+import { formatListDate } from '../../shared/format-list-date';
 import { Button, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { RecentlyViewed } from '@carbon/react/icons';
-import { formatDatetime } from '@openmrs/esm-framework';
 import { useCallback, useState } from 'react';
 import type { TransfusionsApi } from '../../api/transfusions.api';
 import {
@@ -135,7 +135,7 @@ export function TransfusionsPage({ api }: { api: TransfusionsApi }) {
               <Tag key="priority" type={item.order.priority === 'scheduled' ? 'blue' : 'red'}>
                 {t(priorityKeys[item.order.priority])}
               </Tag>,
-              formatDatetime(new Date(item.order.requestedAt), { noToday: true }),
+              formatListDate(item.order.requestedAt),
               item.order.patientName,
               item.order.historyNumber,
               item.order.bloodGroup,

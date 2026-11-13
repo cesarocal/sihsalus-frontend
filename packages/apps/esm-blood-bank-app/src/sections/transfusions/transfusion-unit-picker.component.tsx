@@ -1,6 +1,5 @@
 import {
   Button,
-  Checkbox,
   Search,
   Table,
   TableBody,
@@ -13,10 +12,11 @@ import {
 } from '@carbon/react';
 import { ArrowLeft, ArrowRight } from '@carbon/react/icons';
 import { useState } from 'react';
+import { formatListDate } from '../../shared/format-list-date';
 import { normalizeSearch, type ProcessingTranslate } from '../../shared/processing-page.component';
-import { inventoryDisplayDate } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import type { TransferUnit } from '../transfers/transfers.types';
+import { TransfusionComponentCards } from './transfusion-component-cards.component';
 import styles from './transfusions.scss';
 import type { TransfusionRequest } from './transfusions.types';
 import { lockedAssignments, transfusionCandidate } from './transfusions-rules';
@@ -35,71 +35,79 @@ export function TransfusionUnitPicker({
   t: ProcessingTranslate;
 }) {
   const [search, setSearch] = useState('');
-  const [left, setLeft] = useState<string[]>([]);
-  const [right, setRight] = useState<string[]>([]);
   const selected = request.draft.selectedUnitIds;
   const locked = lockedAssignments(request).map((item) => item.unit);
+  const assigned = [...locked, ...units.filter((unit) => selected.includes(unit.id))];
   const candidates = units.filter((unit) => transfusionCandidate(unit, request));
+  const available = candidates.filter(
+    (unit) =>
+      !selected.includes(unit.id) &&
+      normalizeSearch(`${unit.id} ${unit.component} ${unit.bloodGroup}`).includes(normalizeSearch(search)),
+  );
   const table = (side: 'left' | 'right') => {
-    const list =
-      side === 'left'
-        ? candidates.filter(
-            (unit) =>
-              !selected.includes(unit.id) &&
-              normalizeSearch(`${unit.id} ${unit.component} ${unit.bloodGroup}`).includes(normalizeSearch(search)),
-          )
-        : [
-            ...locked,
-            ...selected
-              .map((id) => units.find((unit) => unit.id === id))
-              .filter((unit): unit is TransferUnit => !!unit),
-          ];
-    const title = t(side === 'left' ? 'txCandidates' : 'txAssigned');
-    const columns = ['txSelect', 'inventoryUnitNumber', 'fractionationComponent', 'bloodGroup', 'inventoryExpiration'];
+    const incoming = side === 'left';
+    const list = incoming ? available : assigned;
+    const title = t(incoming ? 'txCandidates' : 'txAssigned');
+    const columns = [
+      'inventoryUnitNumber',
+      'fractionationComponent',
+      'bloodGroupShort',
+      'inventoryExpiration',
+      'actions',
+    ];
     return (
       <TableContainer className={styles.unitTableScroll} role="region" aria-label={title} tabIndex={0}>
         <Table useZebraStyles size="md" aria-label={title}>
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableHeader key={column} aria-label={column === 'txSelect' ? t(column) : undefined}>
-                  {column !== 'txSelect' && t(column)}
-                </TableHeader>
+                <TableHeader key={column}>{t(column)}</TableHeader>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {list.map((unit) => (
-              <TableRow key={unit.id}>
-                <TableCell>
-                  <Checkbox
-                    key="select"
-                    id={`tx-${side}-${unit.id}`}
-                    hideLabel
-                    labelText={`${t('txSelect')} ${unit.id}`}
-                    disabled={busy || (side === 'right' && locked.some((item) => item.id === unit.id))}
-                    checked={(side === 'left' ? left : right).includes(unit.id)}
-                    onChange={(_event, { checked }) => {
-                      const setter = side === 'left' ? setLeft : setRight;
-                      setter((previous) =>
-                        checked ? [...previous, unit.id] : previous.filter((id) => id !== unit.id),
-                      );
-                    }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <span>
-                    {unit.id}
-                    {locked.some((item) => item.id === unit.id) && <Tag type="purple">{t('txLocked')}</Tag>}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {unit.componentType ? t(componentDefinitions[unit.componentType].key) : unit.component}
-                </TableCell>
-                <TableCell>{unit.bloodGroup}</TableCell>
-                <TableCell>{inventoryDisplayDate(unit.expiresAt)}</TableCell>
-              </TableRow>
-            ))}
+            {list.map((unit) => {
+              const isLocked = locked.some((item) => item.id === unit.id);
+              const requirement = request.order.items.find((item) => item.component === unit.componentType);
+              const quantityMet =
+                !!requirement &&
+                assigned.filter((item) => item.componentType === unit.componentType).length >= requirement.quantity;
+              const action = t(incoming ? 'txAddUnit' : 'txReturnUnit', { unit: unit.id });
+              const group = /^(AB|A|B|O)\s*([+−-])$/.exec(unit.bloodGroup);
+              return (
+                <TableRow key={unit.id}>
+                  <TableCell>
+                    <span>
+                      {unit.id}
+                      {isLocked && <Tag type="purple">{t('txLocked')}</Tag>}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {unit.componentType ? t(componentDefinitions[unit.componentType].key) : unit.component}
+                  </TableCell>
+                  <TableCell>
+                    {group
+                      ? `${group[1]} ${t(group[2] === '+' ? 'labelRhPositive' : 'labelRhNegative')} (${group[2] === '+' ? '+' : '-'})`
+                      : unit.bloodGroup}
+                  </TableCell>
+                  <TableCell>{formatListDate(unit.expiresAt)}</TableCell>
+                  <TableCell>
+                    <Button
+                      kind="ghost"
+                      size="sm"
+                      renderIcon={incoming ? ArrowRight : ArrowLeft}
+                      hasIconOnly
+                      iconDescription={action}
+                      aria-label={action}
+                      disabled={busy || (incoming ? quantityMet : isLocked)}
+                      onClick={() =>
+                        onChange(incoming ? [...selected, unit.id] : selected.filter((id) => id !== unit.id))
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {!list.length && (
               <TableRow>
                 <TableCell colSpan={columns.length}>{t(side === 'left' ? 'txNoCandidates' : 'txNoAssigned')}</TableCell>
@@ -113,12 +121,7 @@ export function TransfusionUnitPicker({
   return (
     <>
       <p className={styles.notice}>{t('txCandidateHelp')}</p>
-      <p>
-        {t('txRequirement')}:{' '}
-        {request.order.items
-          .map((item) => `${item.quantity} × ${t(componentDefinitions[item.component].key)}`)
-          .join('; ')}
-      </p>
+      <TransfusionComponentCards order={request.order} assigned={assigned} t={t} />
       <div className={styles.picker}>
         <section className={`${styles.panel} ${styles.pickerPanel}`}>
           <div className={styles.pickerHeader}>
@@ -135,34 +138,6 @@ export function TransfusionUnitPicker({
           </div>
           {table('left')}
         </section>
-        <div className={styles.moveActions}>
-          <Button
-            kind="tertiary"
-            size="sm"
-            renderIcon={ArrowRight}
-            hasIconOnly
-            iconDescription={t('txAddUnits')}
-            aria-label={t('txAddUnits')}
-            disabled={busy || !left.length}
-            onClick={() => {
-              onChange([...new Set([...selected, ...left.filter((id) => candidates.some((unit) => unit.id === id))])]);
-              setLeft([]);
-            }}
-          />
-          <Button
-            kind="tertiary"
-            size="sm"
-            renderIcon={ArrowLeft}
-            hasIconOnly
-            iconDescription={t('txReturnUnits')}
-            aria-label={t('txReturnUnits')}
-            disabled={busy || !right.length}
-            onClick={() => {
-              onChange(selected.filter((id) => !right.includes(id)));
-              setRight([]);
-            }}
-          />
-        </div>
         <section className={`${styles.panel} ${styles.pickerPanel}`}>
           <div className={styles.pickerHeader}>
             <h4>{t('txAssigned')}</h4>

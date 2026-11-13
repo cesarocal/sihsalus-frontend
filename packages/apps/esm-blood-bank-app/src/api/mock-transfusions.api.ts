@@ -100,7 +100,11 @@ export function createMockTransfusionsApi(
     async saveSample(id, revision, sample) {
       const { state, store } = load();
       const request = current(store, id, revision, ['reviewed']);
-      if (sample.code !== `M-REC-${request.order.number}` || !sampleValid(sample, request.order))
+      if (
+        sample.code !== `M-REC-${request.order.number}` ||
+        sample.printRequestedAt !== sample.collectedAt ||
+        !sampleValid(sample, request.order)
+      )
         throw new Error('INVALID_RECIPIENT_SAMPLE');
       request.sample = structuredClone(sample);
       request.draft.sample = structuredClone(sample);

@@ -1,5 +1,6 @@
 import { Button, Checkbox, TextInput } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
+import { useSession } from '@openmrs/esm-framework';
 import { useRef, useState } from 'react';
 import type { TransfusionsApi } from '../../api/transfusions.api';
 import { notifySuccess } from '../../shared/notify-success';
@@ -45,11 +46,25 @@ export function TransfusionWorkflow({
   const [step, setStep] = useState(initial.status === 'reviewed' ? 1 : initial.status === 'sampleReady' ? 2 : 0);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [printingSample, setPrintingSample] = useState(false);
   const [failed, setFailed] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<'assign' | 'deliver' | null>(null);
   const inFlight = useRef(false);
-  const draft = request.draft;
+  const { authenticated, user } = useSession();
+  const person = authenticated ? user?.person : undefined;
+  const name = person?.preferredName;
+  const [operator] = useState(
+    () =>
+      [name?.givenName, name?.middleName, name?.familyName, name?.familyName2]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(' ') ||
+      name?.display?.trim() ||
+      person?.display?.trim() ||
+      '',
+  );
+  const draft = request.status === 'pending' ? { ...request.draft, reviewer: operator } : request.draft;
   const change = (patch: Partial<TransfusionDraft>) => {
     setRequest({ ...request, draft: { ...draft, ...patch } });
     setDirty(true);
@@ -83,6 +98,10 @@ export function TransfusionWorkflow({
       : ('failed' as const);
   };
   const selectionStep = !delivery && !readOnly && step === steps.length - 1;
+  const sampleStep = step === 1 && !delivery && !replacement;
+  const sample = request.sample ?? draft.sample;
+  const sampleReady =
+    !!request.sample || (sample.printRequestedAt === sample.collectedAt && sampleValid(sample, request.order));
   const selectedUnits = units.filter((unit) => draft.selectedUnitIds.includes(unit.id));
   const assignmentEffects = [
     selectedUnits.some((unit) => needsCrossmatch(unit.componentType)) && t('txAssignTestsEffect'),
@@ -130,7 +149,7 @@ export function TransfusionWorkflow({
         setStep(2);
         return;
       }
-      if (!sampleValid(draft.sample, request.order)) {
+      if (!sampleReady) {
         setErrors(['txSampleRequired']);
         return;
       }
@@ -140,17 +159,38 @@ export function TransfusionWorkflow({
   const print = () => {
     setFailed('');
     try {
-      printDocument(
-        step === 1 && !delivery && !replacement ? (
-          <TransfusionLabels request={request} sample={draft.sample} t={t} />
-        ) : (
-          <CompatibilityReport request={request} t={t} print />
-        ),
-        t('txPrint'),
-        () => setFailed('printFailed'),
+      printDocument(<CompatibilityReport request={request} t={t} print />, t('txPrint'), () =>
+        setFailed('printFailed'),
       );
     } catch {
       setFailed('printFailed');
+    }
+  };
+  const printSample = () => {
+    if (printingSample || (!sampleReady && !operator)) return;
+    setFailed('');
+    setPrintingSample(true);
+    const collectedAt = new Date().toISOString();
+    const sampleToPrint = sampleReady
+      ? sample
+      : { ...sample, collectedAt, collectedBy: operator, printRequestedAt: collectedAt };
+    const onError = () => {
+      setFailed('printFailed');
+      setPrintingSample(false);
+    };
+    try {
+      printDocument(
+        <TransfusionLabels request={request} sample={sampleToPrint} t={t} />,
+        t('txPrintSample'),
+        onError,
+        undefined,
+        () => {
+          if (!sampleReady) change({ sample: sampleToPrint });
+          setPrintingSample(false);
+        },
+      );
+    } catch {
+      onError();
     }
   };
   return (
@@ -161,7 +201,7 @@ export function TransfusionWorkflow({
         step={step}
         completed={steps.slice(0, step)}
         finalized={readOnly}
-        saving={saving}
+        saving={saving || printingSample}
         errors={errors}
         failed={failed}
         saveErrorText={t('txSaveFailed')}
@@ -176,21 +216,36 @@ export function TransfusionWorkflow({
           setErrors([]);
         }}
         advanceLabel={t(delivery && step === 1 ? 'txDeliver' : 'txContinue')}
-        advanceDisabled={selectionStep && !selectionComplete(request, units)}
+        advanceDisabled={
+          (selectionStep && !selectionComplete(request, units)) ||
+          (sampleStep && !sampleReady) ||
+          (step === 0 && request.status === 'pending' && !operator)
+        }
         footerClassName={styles.printFooter}
         compactHeader
+        hideStepHeading={selectionStep}
         extraActions={
-          ((step === 1 && !delivery && !replacement) || ((delivery || readOnly || replacement) && step === 0)) && (
-            <Button
-              kind="tertiary"
-              className={styles.printButton}
-              size="sm"
-              renderIcon={Printer}
+          selectionStep ? (
+            <Checkbox
+              id="tx-selection-check"
+              labelText={t('txSelectionCheck')}
+              checked={draft.selectionVerified}
               disabled={saving}
-              onClick={print}
-            >
-              {t(step === 1 && !delivery && !replacement ? 'txPrintSample' : 'txPrintResults')}
-            </Button>
+              onChange={(_e, { checked }) => change({ selectionVerified: checked })}
+            />
+          ) : (
+            (sampleStep || ((delivery || readOnly || replacement) && step === 0)) && (
+              <Button
+                kind="tertiary"
+                className={styles.printButton}
+                size="sm"
+                renderIcon={Printer}
+                disabled={saving || printingSample || (sampleStep && !operator && !sampleReady)}
+                onClick={sampleStep ? printSample : print}
+              >
+                {t(sampleStep ? (sampleReady ? 'txReprintSample' : 'txPrintSample') : 'txPrintResults')}
+              </Button>
+            )
           )
         }
         t={t}
@@ -198,22 +253,13 @@ export function TransfusionWorkflow({
         <div className={styles.responsive}>
           <FractionationContent>
             {selectionStep ? (
-              <>
-                <TransfusionUnitPicker
-                  request={request}
-                  units={units}
-                  busy={saving}
-                  onChange={(ids) => change({ selectedUnitIds: ids, selectionVerified: false })}
-                  t={t}
-                />
-                <Checkbox
-                  id="tx-selection-check"
-                  labelText={t('txSelectionCheck')}
-                  checked={draft.selectionVerified}
-                  disabled={saving}
-                  onChange={(_e, { checked }) => change({ selectionVerified: checked })}
-                />
-              </>
+              <TransfusionUnitPicker
+                request={request}
+                units={units}
+                busy={saving}
+                onChange={(ids) => change({ selectedUnitIds: ids, selectionVerified: false })}
+                t={t}
+              />
             ) : delivery && step === 1 ? (
               <>
                 <div className={styles.fields}>
@@ -248,7 +294,7 @@ export function TransfusionWorkflow({
                   onChange={(_e, { checked }) => change({ releaseVerified: checked })}
                 />
               </>
-            ) : step === 1 && !delivery && !replacement ? (
+            ) : sampleStep ? (
               <>
                 <div className={styles.fields}>
                   <TextInput id="tx-sample-code" labelText={t('sampleCode')} value={draft.sample.code} readOnly />
@@ -259,44 +305,41 @@ export function TransfusionWorkflow({
                     readOnly
                   />
                   <TextInput
-                    id="tx-sample-collected"
-                    type="datetime-local"
-                    labelText={t('collectedOn')}
-                    value={draft.sample.collectedAt}
-                    disabled={saving || !!request.sample}
-                    onChange={(e) => change({ sample: { ...draft.sample, collectedAt: e.target.value } })}
+                    id="tx-sample-recipient"
+                    labelText={t('txRecipientName')}
+                    value={request.order.patientName}
+                    readOnly
                   />
                   <TextInput
                     id="tx-sample-operator"
                     labelText={t('txCollectedBy')}
-                    value={draft.sample.collectedBy}
-                    disabled={saving || !!request.sample}
-                    onChange={(e) => change({ sample: { ...draft.sample, collectedBy: e.target.value } })}
+                    value={sampleReady ? sample.collectedBy : operator}
+                    readOnly
+                    invalid={!sampleReady && !operator}
+                    invalidText={t('txOperatorUnavailable')}
                   />
                 </div>
-                <p>{request.order.patientName}</p>
                 <p>{t('txSampleSaveHelp')}</p>
-                <Checkbox
-                  id="tx-sample-identity"
-                  labelText={t('txSampleIdentity')}
-                  disabled={saving || !!request.sample}
-                  checked={draft.sample.identityVerified}
-                  onChange={(_e, { checked }) => change({ sample: { ...draft.sample, identityVerified: checked } })}
-                />
               </>
             ) : (
               <>
-                <TransfusionDetails request={request} t={t} history />
+                <TransfusionDetails
+                  request={request}
+                  t={t}
+                  history
+                  componentCards={!delivery && !readOnly && !replacement}
+                />
                 {delivery || readOnly || replacement ? (
                   <CompatibilityReport request={request} t={t} />
                 ) : (
-                  <>
+                  <div className={styles.reviewChecks}>
                     <TextInput
                       id="tx-reviewer"
                       labelText={t('txReviewer')}
                       value={draft.reviewer}
-                      disabled={saving || request.status !== 'pending'}
-                      onChange={(e) => change({ reviewer: e.target.value })}
+                      readOnly
+                      invalid={request.status === 'pending' && !operator}
+                      invalidText={t('txOperatorUnavailable')}
                     />
                     <Checkbox
                       id="tx-review-check"
@@ -312,7 +355,7 @@ export function TransfusionWorkflow({
                       disabled={saving || request.status !== 'pending'}
                       onChange={(_e, { checked }) => change({ consentVerified: checked })}
                     />
-                  </>
+                  </div>
                 )}
               </>
             )}

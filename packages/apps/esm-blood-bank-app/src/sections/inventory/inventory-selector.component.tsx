@@ -1,3 +1,4 @@
+import { formatListDate } from '../../shared/format-list-date';
 import { Button, Checkbox, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { Clean, WarningAlt } from '@carbon/react/icons';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -216,7 +217,7 @@ export function InventorySelector({
               unit.bloodGroup || '—',
               ...(!kind ? [unit.volume || '—'] : []),
               <div key="expiration">
-                {inventoryDisplayDate(unit.expiresAt)}
+                {kind ? inventoryDisplayDate(unit.expiresAt) : formatListDate(unit.expiresAt)}
                 {expiring && (
                   <span className={styles.expiryWarning}>
                     <WarningAlt size={16} aria-hidden="true" />
