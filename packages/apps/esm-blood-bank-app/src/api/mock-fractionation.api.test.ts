@@ -317,20 +317,44 @@ describe('fractionation tree and quality boundaries', () => {
     suggested = suggestFractionationExpirations(batch);
     expect(finalNodes(suggested).map((node) => node.label.expiresAt)).toEqual(['2026-12-24T00:00', '2099-01-01T12:00']);
   });
-  it('blocks the general multi-component path for low-volume collection in a 450 mL bag', async () => {
+  it('cannot advance a previously saved multi-component draft for a low-volume source', async () => {
     const instance = createMockFractionationApi();
     const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
     const batch = plannedBatch(await instance.start([unit?.id ?? '']));
     batch.sources[0].volume = '350';
-    expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationLowVolume');
+    expect(validTree(batch)).toBe(true);
+    expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationLowVolumeBranchRequired');
+    expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationLowVolumeVerificationRequired');
   });
-  it('requires nominal bag capacity for the existing low-volume check', async () => {
+  it.each(['300', '350', '400'])('produces one quarantined low-volume red-cell unit at %s mL', async (volume) => {
+    const state = readProcessingState(() => sessionStorage);
+    const record = state.collections.find((item) => item.unitStatus === 'quarantine');
+    if (!record) throw new Error('SYNTHETIC_COLLECTION_MISSING');
+    record.extractedVolume = volume;
+    delete record.label.plannedVolume;
+    writeProcessingState(() => sessionStorage, state);
     const instance = createMockFractionationApi();
-    const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
-    const batch = plannedBatch(await instance.start([unit?.id ?? '']));
-    Object.assign(batch.sources[0], { volume: '350', nominalVolume: '' });
-    expect(validateFractionation(batch, 'fractionationPlan')).toContain('fractionationNominalVolumeUnavailable');
-    batch.sources[0].volume = '420';
-    expect(validateFractionation(batch, 'fractionationPlan')).not.toContain('fractionationNominalVolumeUnavailable');
+    const initial = await instance.start([record.unitCode]);
+    const [root] = initial.nodes;
+    expect(() => splitNode(initial, root.id, 0)).toThrow('INVALID_FRACTIONATION_TREE');
+    const verified = { ...initial, lowVolumeConfirmedSourceIds: [record.unitCode] };
+    expect(() => splitNode(verified, root.id, 1)).toThrow('INVALID_FRACTIONATION_TREE');
+    const planned = plannedBatch(verified);
+    expect(validTree({ ...planned, lowVolumeConfirmedSourceIds: [] })).toBe(false);
+    await expect(instance.save({ ...planned, lowVolumeConfirmedSourceIds: [] })).rejects.toThrow(
+      'INVALID_FRACTIONATION_TREE',
+    );
+    const batch = await reviewBatch(instance, planned);
+    const result = finalNodes(batch)[0];
+    expect(result.component).toBe('lowVolumeRedCells');
+    await instance.finalize(batch);
+    const { units } = await instance.list();
+    expect(units.find((unit) => unit.id === record.unitCode)?.state).toBe('fractionated');
+    expect(units.filter((unit) => unit.parentId === record.unitCode)).toEqual([
+      expect.objectContaining({ code: `${record.unitCode}-GRBV`, state: 'quarantine', volume: '100' }),
+    ]);
+    expect(fractionationInventory(readProcessingState(() => sessionStorage))).toContainEqual(
+      expect.objectContaining({ id: result.code, component: 'Glóbulos Rojos de Bajo Volumen' }),
+    );
   });
 });

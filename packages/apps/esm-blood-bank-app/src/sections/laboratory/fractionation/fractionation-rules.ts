@@ -32,6 +32,13 @@ export const componentDefinitions: Record<
     fill: 0.65,
     temperature: '1–6 °C',
   },
+  lowVolumeRedCells: {
+    key: 'componentLowVolumeRedCells',
+    suffix: 'GRBV',
+    color: '#da1e28',
+    fill: 0.42,
+    temperature: '1–6 °C',
+  },
   plateletRichPlasma: {
     key: 'componentPRP',
     suffix: 'PRP',
@@ -90,7 +97,7 @@ export const componentDefinitions: Record<
   },
 };
 
-export const separationOptions: Partial<Record<ComponentType, ComponentType[][]>> = {
+const separationOptions: Partial<Record<ComponentType, ComponentType[][]>> = {
   wholeBlood: [
     ['redCells', 'liquidPlasma'],
     ['wholeBlood', 'pediatricFraction'],
@@ -101,6 +108,16 @@ export const separationOptions: Partial<Record<ComponentType, ComponentType[][]>
   ],
   freshFrozenPlasma: [['cryoprecipitate', 'cryoReducedPlasma']],
 };
+
+const lowVolumeSeparation: ComponentType[][] = [['lowVolumeRedCells']];
+export const needsLowVolumeVerification = (unit: FractionationUnit) =>
+  unit.component === 'wholeBlood' && Number(unit.volume) >= 300 && Number(unit.volume) <= 400;
+
+export function nodeSeparationOptions(node: FractionationNode, source: FractionationUnit) {
+  if (isFractionationRemainder(node)) return undefined;
+  if (needsLowVolumeVerification(source)) return node.parentId === null ? lowVolumeSeparation : undefined;
+  return separationOptions[node.component];
+}
 
 export const positiveVolume = (value: string) =>
   /^\d+(\.\d{1,2})?$/.test(value) && Number(value) > 0 && Number(value) <= 999999.99;
@@ -157,8 +174,11 @@ export function splitNode(batch: FractionationBatch, id: string, option: number 
   }
   next.nodes = next.nodes.filter((item) => item.id === id || !descendants.has(item.id));
   if (option !== null) {
-    const components = separationOptions[node.component]?.[option];
-    if (!components) throw new Error('INVALID_FRACTIONATION_TREE');
+    const source = batch.sources.find((item) => item.id === node.sourceId);
+    if (!source) throw new Error('INVALID_FRACTIONATION_TREE');
+    const components = nodeSeparationOptions(node, source)?.[option];
+    if (!components || (needsLowVolumeVerification(source) && !batch.lowVolumeConfirmedSourceIds?.includes(source.id)))
+      throw new Error('INVALID_FRACTIONATION_TREE');
     next.nodes.push(
       ...components.map((component) => ({
         id: `${id}:${component}`,
@@ -194,12 +214,19 @@ export const isFractionationRemainder = (node: FractionationNode) =>
 const childCode = (parent: FractionationNode, component: ComponentType) =>
   component === 'wholeBlood' ? parent.code : `${parent.code}-${componentDefinitions[component].suffix}`;
 
-function validChildren(node: FractionationNode, children: FractionationNode[]) {
+function validChildren(
+  node: FractionationNode,
+  children: FractionationNode[],
+  source: FractionationUnit,
+  lowVolumeConfirmed: boolean,
+) {
   if (!children.length) return true;
   if (isFractionationRemainder(node)) return false;
   const options = separationOptions[node.component] ?? [];
   // Keep previously stored PRP branches valid under their original component identity.
   const allowed = node.component === 'wholeBlood' ? [...options, ['redCells', 'plateletRichPlasma']] : options;
+  if (children.some((child) => child.component === 'lowVolumeRedCells'))
+    return node.parentId === null && needsLowVolumeVerification(source) && lowVolumeConfirmed && children.length === 1;
   return allowed.some(
     (option) =>
       option.length === children.length &&
@@ -219,6 +246,15 @@ export function validTree(batch: FractionationBatch): boolean {
   )
     return false;
   const ids = new Set(batch.nodes.map((node) => node.id));
+  const lowVolumeConfirmations = batch.lowVolumeConfirmedSourceIds ?? [];
+  if (
+    !Array.isArray(lowVolumeConfirmations) ||
+    new Set(lowVolumeConfirmations).size !== lowVolumeConfirmations.length ||
+    lowVolumeConfirmations.some((id) =>
+      !batch.sources.some((source) => source.id === id && needsLowVolumeVerification(source)),
+    )
+  )
+    return false;
   const distinctUnits = batch.nodes.filter((node) => !isFractionationRemainder(node));
   const codes = new Set(distinctUnits.map((node) => node.code));
   if (ids.size !== batch.nodes.length || codes.size !== distinctUnits.length) return false;
@@ -238,7 +274,7 @@ export function validTree(batch: FractionationBatch): boolean {
         if (reachable.has(node.id) || node.sourceId !== source.id) return false;
         reachable.add(node.id);
         const children = batch.nodes.filter((child) => child.parentId === node.id);
-        if (!validChildren(node, children)) return false;
+        if (!validChildren(node, children, source, lowVolumeConfirmations.includes(source.id))) return false;
         return children.every(
           (child) =>
             child.id === `${node.id}:${child.component}` &&
@@ -258,12 +294,15 @@ export function validateFractionation(batch: FractionationBatch, step: Fractiona
   if (!validTree(batch)) return ['fractionationInvalidTree'];
   if (!batch.operator.trim() || !batch.service.trim()) errors.add('fractionationProcessRequired');
   if (leaves.some((node) => node.parentId === null)) errors.add('fractionationFinishBranches');
-  // EG05-CC07 E7: the general multi-component flow does not implement low-volume red-cell preparation.
+  // EG05-CC07 E7: collected volume alone does not identify the anticoagulant configuration.
   for (const source of batch.sources) {
-    const volume = Number(source.volume);
-    if (source.component !== 'wholeBlood' || !(volume >= 300 && volume <= 400)) continue;
-    if (!positiveVolume(source.nominalVolume)) errors.add('fractionationNominalVolumeUnavailable');
-    else if (Number(source.nominalVolume) === 450) errors.add('fractionationLowVolume');
+    if (!needsLowVolumeVerification(source)) continue;
+    if (!batch.lowVolumeConfirmedSourceIds?.includes(source.id))
+      errors.add('fractionationLowVolumeVerificationRequired');
+    const results = leaves.filter((node) => node.sourceId === source.id);
+    if (results.some((node) => node.parentId !== null) &&
+        (results.length !== 1 || results[0].component !== 'lowVolumeRedCells'))
+      errors.add('fractionationLowVolumeBranchRequired');
   }
   if (end >= 1) {
     for (const node of leaves) {

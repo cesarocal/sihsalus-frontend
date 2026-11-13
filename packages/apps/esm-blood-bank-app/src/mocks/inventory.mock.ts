@@ -138,7 +138,6 @@ export function withInventoryFixtures(previous: ProcessingState): ProcessingStat
       originalWholeBloodCode: code,
       component,
       volume: '450',
-      nominalVolume: '450',
       collectedAt: date,
       location: collection.label.service,
       state: 'quarantine',

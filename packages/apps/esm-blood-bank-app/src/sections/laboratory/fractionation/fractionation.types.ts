@@ -1,6 +1,7 @@
 export type ComponentType =
   | 'wholeBlood'
   | 'redCells'
+  | 'lowVolumeRedCells'
   | 'plateletRichPlasma'
   | 'liquidPlasma'
   | 'pediatricFraction'
@@ -50,7 +51,6 @@ export interface FractionationUnit {
   originalWholeBloodCode: string;
   component: ComponentType;
   volume: string;
-  nominalVolume: string;
   collectedAt: string;
   location: string;
   state: UnitState;
@@ -76,6 +76,7 @@ export interface FractionationBatch {
   revision: number;
   sources: FractionationUnit[];
   nodes: FractionationNode[];
+  lowVolumeConfirmedSourceIds?: string[];
   completedSteps: FractionationStep[];
   status: 'inProgress' | 'completed';
   operator: string;

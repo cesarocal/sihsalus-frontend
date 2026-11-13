@@ -1,4 +1,4 @@
-import { Button, ComposedModal, ModalBody, ModalFooter, ModalHeader } from '@carbon/react';
+import { Button, ComposedModal, InlineNotification, ModalBody, ModalFooter, ModalHeader } from '@carbon/react';
 import { WarningAltFilled } from '@carbon/react/icons';
 import { useId, useLayoutEffect, useRef } from 'react';
 import styles from './warning-confirmation.scss';
@@ -9,6 +9,7 @@ export function WarningConfirmation({
   description,
   items,
   note,
+  error,
   cancelLabel,
   confirmLabel,
   closeLabel,
@@ -21,6 +22,7 @@ export function WarningConfirmation({
   description: string;
   items: string[];
   note: string;
+  error?: string;
   cancelLabel: string;
   confirmLabel: string;
   closeLabel: string;
@@ -78,6 +80,7 @@ export function WarningConfirmation({
           )}
           <p className={styles.note}>{note}</p>
         </div>
+        {error && <InlineNotification hideCloseButton kind="error" title={error} />}
       </ModalBody>
       <ModalFooter className={styles.footer}>
         <Button kind="secondary" size="sm" disabled={saving} onClick={cancel} data-modal-primary-focus>

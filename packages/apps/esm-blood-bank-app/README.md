@@ -155,6 +155,8 @@ La sangre total se divide en plasma líquido y glóbulos rojos, o conserva su
 código con menor volumen y genera una fracción pediátrica. Las etiquetas de
 los resultados dejan una línea para anotar el volumen a mano. El responsable se
 obtiene de la sesión y la caducidad sugerida se puede editar.
+Para sangre total de 300 a 400 mL, se verifica el anticoagulante de la bolsa
+antes de preparar exclusivamente glóbulos rojos de bajo volumen.
 Los catálogos de laboratorio se consultan en OpenMRS aun con persistencia mock.
 La configuración y el tratamiento de registros anteriores se documentan en
 [Fraccionamiento](src/sections/laboratory/fractionation/README.md).

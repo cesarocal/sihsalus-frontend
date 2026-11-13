@@ -28,7 +28,7 @@ export const comparePriority = (
   b: { priority: TransfusionPriority; date: string },
 ) => priority[a.priority] - priority[b.priority] || a.date.localeCompare(b.date);
 export const needsCrossmatch = (component: ComponentType | null) =>
-  component === 'wholeBlood' || component === 'redCells';
+  component === 'wholeBlood' || component === 'redCells' || component === 'lowVolumeRedCells';
 export const lockedAssignments = (request: TransfusionRequest) =>
   request.assignments.filter((item) => item.active && item.result !== 'pending');
 export function requestComplete(order: TransfusionOrder): boolean {

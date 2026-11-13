@@ -50,17 +50,17 @@ export function FractionationHistory({
     )
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
   return (
-    <ComposedModal
-      open
-      size="lg"
-      className={shared.workflow}
-      preventCloseOnClickOutside
-      aria-label={t('fractionationHistory')}
-      onClose={onClose}
-    >
-      <ModalHeader title={t('fractionationHistory')} iconDescription={t('close')} closeModal={onClose} />
-      <ModalBody>
-        <FractionationContent>
+    <FractionationContent>
+      <ComposedModal
+        open
+        size="lg"
+        className={shared.workflow}
+        preventCloseOnClickOutside
+        aria-label={t('fractionationHistory')}
+        onClose={onClose}
+      >
+        <ModalHeader title={t('fractionationHistory')} iconDescription={t('close')} closeModal={onClose} />
+        <ModalBody>
           {detail ? (
             <>
               <Button
@@ -138,30 +138,30 @@ export function FractionationHistory({
               />
             </>
           )}
-        </FractionationContent>
-      </ModalBody>
-      {detail?.status === 'completed' && (
-        <ModalFooter className={shared.footer}>
-          <div>
-            <Button
-              kind="tertiary"
-              renderIcon={Printer}
-              onClick={() => {
-                try {
-                  printDocument(<FractionationLabels batch={detail} print t={t} />, t('fractionationPrint'), () =>
-                    setPrintFailed(true),
-                  );
-                  setPrintFailed(false);
-                } catch {
-                  setPrintFailed(true);
-                }
-              }}
-            >
-              {t('fractionationPrint')}
-            </Button>
-          </div>
-        </ModalFooter>
-      )}
-    </ComposedModal>
+        </ModalBody>
+        {detail?.status === 'completed' && (
+          <ModalFooter className={shared.footer}>
+            <div>
+              <Button
+                kind="tertiary"
+                renderIcon={Printer}
+                onClick={() => {
+                  try {
+                    printDocument(<FractionationLabels batch={detail} print t={t} />, t('fractionationPrint'), () =>
+                      setPrintFailed(true),
+                    );
+                    setPrintFailed(false);
+                  } catch {
+                    setPrintFailed(true);
+                  }
+                }}
+              >
+                {t('fractionationPrint')}
+              </Button>
+            </div>
+          </ModalFooter>
+        )}
+      </ComposedModal>
+    </FractionationContent>
   );
 }

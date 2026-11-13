@@ -9,8 +9,8 @@ import { openmrsFractionationApi } from '../../../api/fractionation.api';
 import { FractionationPage } from './fractionation-page.component';
 import { FractionationWorkflow } from './fractionation-workflow.component';
 import { FractionationLabels } from './fractionation-documents.component';
-import { finalNodes } from './fractionation-rules';
-import { reviewBatch } from './fractionation-test-fixtures';
+import { finalNodes, splitNode } from './fractionation-rules';
+import { labeledBatch, plannedBatch, reviewBatch } from './fractionation-test-fixtures';
 import { printDocument } from '../../../shared/print-document';
 
 vi.mock('@openmrs/esm-framework', () => ({
@@ -176,7 +176,10 @@ describe('fractionation UI', () => {
     fireEvent.click(screen.getByLabelText(t('fractionationFinalChecked')));
     fireEvent.click(screen.getByRole('button', { name: t('fractionationFinish') }));
     const warning = screen.getByRole('dialog', { name: t('fractionationFinalWarning') });
-    expect(within(warning).getByText(t('fractionationFinalWarningHelp'))).toBeInTheDocument();
+    expect(within(warning).getByText(t('fractionationConfirmNoRelease'))).toBeInTheDocument();
+    expect(within(warning).getByText(t('fractionationConfirmSourceExit'))).toBeInTheDocument();
+    expect(within(warning).getByText(t('fractionationConfirmQuarantine'))).toBeInTheDocument();
+    expect(warning.querySelector('svg[data-warning-icon]')).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: t('fractionationFinalWarning') })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: t('exitTitle') })).not.toBeInTheDocument();
@@ -194,6 +197,49 @@ describe('fractionation UI', () => {
     expect(showSnackbar).toHaveBeenCalledWith(
       expect.objectContaining({ title: t('fractionationFinalized'), timeoutInMs: 5000 }),
     );
+  });
+  it('requires bag verification and offers only low-volume red cells', async () => {
+    const api = createMockFractionationApi();
+    const source = (await api.list()).units.find((unit) => unit.component === 'wholeBlood');
+    if (!source) throw new Error('Missing synthetic whole-blood fixture');
+    const initial = await api.start([source.id]);
+    initial.sources[0].volume = '350';
+    initial.nodes[0].volume = '350';
+    render(<FractionationWorkflow initial={initial} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
+    const divide = screen.getByRole('button', { name: `${t('fractionationSeparateLowVolume')} - ${source.code}` });
+    expect(divide).toBeDisabled();
+    expect(screen.queryByText(t('fractionationSeparatePlasma'))).not.toBeInTheDocument();
+    expect(screen.queryByText(t('fractionationSeparatePediatric'))).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: t('fractionationVerifyLowVolumeBag') }));
+    fireEvent.click(divide);
+    expect(screen.getByText(`${source.code}-GRBV`)).toBeInTheDocument();
+    expect(divide).toBeDisabled();
+  });
+  it('shows a manual item 17 line even when the final volume is recorded', async () => {
+    const api = createMockFractionationApi();
+    const source = (await api.list()).units.find((unit) => unit.component === 'wholeBlood');
+    if (!source) throw new Error('Missing synthetic whole-blood fixture');
+    const initial = await api.start([source.id]);
+    initial.sources[0].volume = '350';
+    initial.lowVolumeConfirmedSourceIds = [source.id];
+    const batch = splitNode(initial, initial.nodes[0].id, 0);
+    finalNodes(batch)[0].volume = '187';
+    const { container } = render(<FractionationLabels batch={batch} print t={t} />);
+    const item17 = container.querySelector('[data-low-volume-label]');
+    expect(item17).toHaveTextContent('Unidad de bajo volumen mL de Glóbulos Rojos');
+    expect(item17?.querySelector('[data-manual-volume]')).toBeEmptyDOMElement();
+    expect(item17).not.toHaveTextContent('187');
+    expect(container.querySelectorAll('[data-manual-volume]')).toHaveLength(1);
+  });
+  it('hides label printing only during final volume entry', async () => {
+    const api = createMockFractionationApi();
+    let batch = await api.save(plannedBatch(await api.start(['PFC-2026-002'])), 'fractionationPlan');
+    batch = await api.save(labeledBatch(batch), 'fractionationLabels');
+    render(<FractionationWorkflow initial={batch} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
+    expect(screen.queryByRole('button', { name: t('fractionationPrint') })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('previous') }));
+    await screen.findAllByRole('option', { name: '1–6 °C' });
+    expect(screen.getByRole('button', { name: t('fractionationPrint') })).toBeInTheDocument();
   });
   it('keeps searchable history read-only, closes only with header X and prints final labels with an icon', async () => {
     const api = createMockFractionationApi();

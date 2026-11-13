@@ -121,6 +121,9 @@
     text-align: start;
   }
 }
+.bagVerification {
+  margin-block-end: layout.$spacing-04;
+}
 .labelCard {
   margin-block: layout.$spacing-05;
   border: 1px solid $ui-03;
@@ -137,8 +140,12 @@
 .review > dl {
   margin: 0;
 }
-.confirmation :global(.cds--modal-footer) {
-  justify-content: flex-end;
+.componentDetails :global(.cds--accordion__content) {
+  padding-inline: layout.$spacing-04;
+  > article {
+    max-inline-size: 44rem;
+    margin-inline: auto;
+  }
 }
 
 @media (max-width: 42rem) {

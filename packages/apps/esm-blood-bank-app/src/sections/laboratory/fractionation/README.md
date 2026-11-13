@@ -28,6 +28,9 @@ un aviso y permite quitar los filtros. El guard existente sigue siendo necesario
   rojos y plasma líquido o una fracción pediátrica y el remanente con el código
   original. PFC produce factor antihemofílico crioprecipitado y plasma con
   crioprecipitado reducido.
+  Para sangre total de 300 a 400 mL se confirma por unidad que el
+  anticoagulante se calculó para 450 ± 45 mL. La única división disponible
+  produce glóbulos rojos de bajo volumen.
   Una división bloquea todas las opciones de ese nodo hasta **Deshacer división**;
   al deshacer se eliminan sus descendientes y desaparece ese botón.
 - **Imprimir etiquetas**. Incluye temperatura, vencimiento editable, ABO y Rh
@@ -38,7 +41,9 @@ un aviso y permite quitar los filtros. El guard existente sigue siendo necesario
   etiqueta nuevamente. Los informes de procesos finalizados son históricos.
 - **Completar datos (mL)**: volumen final positivo por componente. Se controla
   el balance por origen. Inventario muestra el volumen registrado y las
-  etiquetas reimpresas conservan la línea para rotularlo a mano.
+  etiquetas impresas desde Etiquetas, Revisión o Historial conservan la línea
+  para rotularlo a mano. En glóbulos rojos de bajo volumen se usa la expresión
+  del ítem 17 de EG05-TB01.
 - **Revisión**: árbol, datos del proceso, resultados y confirmación de integridad,
   aspecto y etiquetas actualizadas. La advertencia final exige aceptación antes
   de registrar la salida de los orígenes como **Fraccionados** y el ingreso de
@@ -96,7 +101,7 @@ Mapeo de `criterios_calidad.md` y capturas facilitadas por el usuario:
 | EG05-CC07 E12                       | Dos resultados del PFC: crioprecipitado y plasma con crioprecipitado reducido.                                                                                                            |
 | EG05-TB01, columna Componente Final | Nombre, código, soluciones, agente si aplica, volumen, servicios, temperatura, caducidad, ABO/Rh, anticuerpos salvo crioprecipitado, instrucciones y expresiones condicionales heredadas. |
 | EG05-CC07 A/B y EG05-TB02           | Caducidad editable, sugerida para condiciones conocidas y circuito cerrado. El personal registra la caducidad aplicable si hubo apertura u otras condiciones.                             |
-| EG05-CC07 E7                        | El flujo general bloquea sangre total de 300–400 mL en bolsa nominal de 450 mL; la preparación específica de GR de bajo volumen queda pendiente.                                          |
+| EG05-CC07 E7                        | Sangre total de 300 a 400 mL con anticoagulante verificado para 450 ± 45 mL produce exclusivamente glóbulos rojos de bajo volumen.                                                        |
 | EG05-CC09                           | Revisión manual de bolsas/etiquetas y cuarentena; no equivale a liberación transfusional ni sello de calidad.                                                                             |
 
 Este mapeo **no demuestra cumplimiento normativo ni valida indicaciones
@@ -118,7 +123,7 @@ Se heredan las expresiones de donante voluntario, leucocitos reducidos y uso
 autólogo con receptor cuando constan en el origen. No se inventan resultados
 CMV, anticuerpos, riesgos biológicos, remuneración, reducciones de leucocitos o
 sellos a partir de un tamizaje pendiente. Casos especiales sin información
-verificada, GR de bajo volumen, pools, componentes industriales, descartes,
+verificada, pools, componentes industriales, descartes,
 cancelación formal, distribución y liberación necesitan flujos posteriores.
 Las etiquetas llevan marca de datos ficticios y no implementan códigos ISBT 128,
 impresoras validadas, archivo PDF ni recuento/auditoría real de impresión.

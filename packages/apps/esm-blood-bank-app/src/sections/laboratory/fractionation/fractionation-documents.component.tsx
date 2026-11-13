@@ -34,7 +34,7 @@ export function FractionationLabels({
             fractionationCode: node.code,
             fractionationOrigin: source?.originalWholeBloodCode,
             fractionationSource: source?.code,
-            fractionationVolume: !print && actual ? node.volume : '',
+            fractionationVolume: !print && actual && node.component !== 'lowVolumeRedCells' ? node.volume : '',
             anticoagulant: label.anticoagulant,
             preservative: label.preservative,
             sedimentingAgent: label.sedimentingAgent,
@@ -78,7 +78,7 @@ export function FractionationLabels({
                       </dd>
                     </div>
                   ))}
-                {print && (
+                {print && node.component !== 'lowVolumeRedCells' && (
                   <div>
                     <dt>{t('fractionationVolume')}</dt>
                     <dd>
@@ -87,6 +87,12 @@ export function FractionationLabels({
                   </div>
                 )}
               </dl>
+              {node.component === 'lowVolumeRedCells' && (print || actual) && (
+                <p data-low-volume-label>
+                  {t('fractionationLowVolumeLabel')} {print ? <span data-manual-volume aria-hidden="true" /> : node.volume}{' '}
+                  {t('fractionationLowVolumeLabelUnit')}
+                </p>
+              )}
               {label.voluntary && <p>{t('fractionationVoluntary')}</p>}
               {label.remunerated && <p>{t('fractionationRemunerated')}</p>}
               {label.leukocytesReduced && <p>{t('leukocytesReduced')}</p>}
@@ -160,7 +166,7 @@ export function FractionationReview({ batch, t }: { batch: FractionationBatch; t
           </tbody>
         </table>
       </div>
-      <Accordion>
+      <Accordion className={styles.componentDetails}>
         {finalNodes(batch)
           .filter((node) => node.parentId !== null)
           .map((node) => (

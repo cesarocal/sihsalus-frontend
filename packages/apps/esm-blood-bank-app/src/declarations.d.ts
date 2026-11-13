@@ -4,6 +4,11 @@ declare module '*.scss' {
 }
 declare module '*.css';
 
+declare module '*.png' {
+  const url: string;
+  export default url;
+}
+
 declare namespace NodeJS {
   interface Require {
     context(directory: string, useSubdirectories?: boolean, regExp?: RegExp, mode?: string): unknown;

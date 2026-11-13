@@ -1,10 +1,6 @@
 import {
   Button,
   Checkbox,
-  ComposedModal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
   Select,
   SelectItem,
   TextInput,
@@ -17,6 +13,7 @@ import { notifySuccess } from '../../../shared/notify-success';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import { useProcessingData, type ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
+import { WarningConfirmation } from '../../../shared/warning-confirmation.component';
 import { FractionationLabels, FractionationReview } from './fractionation-documents.component';
 import { FractionationContent } from './fractionation-content.component';
 import {
@@ -87,6 +84,10 @@ export function FractionationWorkflow({
     ),
   };
   const leaves = finalNodes(batch);
+  const hasRemainder = leaves.some(isFractionationRemainder);
+  const allSourcesRetained = batch.sources.every((source) =>
+    leaves.some((node) => node.sourceId === source.id && isFractionationRemainder(node)),
+  );
   const change = (next: FractionationBatch) => {
     setBatch(next);
     setDirty(true);
@@ -230,44 +231,44 @@ export function FractionationWorkflow({
   };
   return (
     <>
-      <ProcessingModal
-        title={`${t('fractionationTitle')} - ${batch.id}`}
-        compactHeader
-        hideStepHeading
-        steps={fractionationSteps}
-        step={step}
-        completed={batch.completedSteps}
-        finalized={false}
-        closeDisabled={confirm}
-        saving={saving}
-        errors={errors}
-        failed={failed}
-        saveErrorText={t('fractionationSaveFailed')}
-        onClose={onClose}
-        onSaveBeforeExit={async () => (!dirty ? 'unchanged' : (await save()) ? 'saved' : 'failed')}
-        onPrevious={() => {
-          setStep((value) => value - 1);
-          setErrors([]);
-          setFailed('');
-        }}
-        onAdvance={() => {
-          if (step < 3) {
-            void save(true);
-            return;
+      <FractionationContent>
+        <ProcessingModal
+          title={`${t('fractionationTitle')} - ${batch.id}`}
+          compactHeader
+          hideStepHeading
+          steps={fractionationSteps}
+          step={step}
+          completed={batch.completedSteps}
+          finalized={false}
+          closeDisabled={confirm}
+          saving={saving}
+          errors={errors}
+          failed={failed}
+          saveErrorText={t('fractionationSaveFailed')}
+          onClose={onClose}
+          onSaveBeforeExit={async () => (!dirty ? 'unchanged' : (await save()) ? 'saved' : 'failed')}
+          onPrevious={() => {
+            setStep((value) => value - 1);
+            setErrors([]);
+            setFailed('');
+          }}
+          onAdvance={() => {
+            if (step < 3) {
+              void save(true);
+              return;
+            }
+            if (canSave(true)) setConfirm(true);
+          }}
+          advanceLabel={t(step === 3 ? 'fractionationFinish' : 'next')}
+          t={t}
+          extraActions={
+            (step === 1 || step === 3) && (
+              <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={print}>
+                {t('fractionationPrint')}
+              </Button>
+            )
           }
-          if (canSave(true)) setConfirm(true);
-        }}
-        advanceLabel={t(step === 3 ? 'fractionationFinish' : 'next')}
-        t={t}
-        extraActions={
-          step > 0 && (
-            <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={print}>
-              {t('fractionationPrint')}
-            </Button>
-          )
-        }
-      >
-        <FractionationContent>
+        >
           {step === 0 && (
             <>
               <div className={shared.fields}>
@@ -302,6 +303,16 @@ export function FractionationWorkflow({
                 t={t}
                 disabled={saving}
                 onSplit={(id, option) => change(suggestFractionationExpirations(splitNode(batch, id, option)))}
+                onVerifyLowVolume={(sourceId, checked) => {
+                  const otherSources = (batch.lowVolumeConfirmedSourceIds ?? []).filter((id) => id !== sourceId);
+                  change({
+                    ...batch,
+                    lowVolumeConfirmedSourceIds: checked ? [...otherSources, sourceId] : otherSources,
+                    completedSteps: [],
+                    labelsVerified: false,
+                    finalChecks: false,
+                  });
+                }}
               />
             </>
           )}
@@ -407,64 +418,43 @@ export function FractionationWorkflow({
               />
             </>
           )}
-        </FractionationContent>
-      </ProcessingModal>
+        </ProcessingModal>
+      </FractionationContent>
       {confirm && (
-        <ComposedModal
-          open
-          size="sm"
-          preventCloseOnClickOutside
-          className={styles.confirmation}
-          aria-label={t('fractionationFinalWarning')}
-          onClose={() => {
-            if (!saving) setConfirm(false);
+        <WarningConfirmation
+          title={t('fractionationFinalWarning')}
+          description={t('fractionationConfirmStockChanges')}
+          items={[
+            ...(hasRemainder ? [t('fractionationConfirmRemainder')] : []),
+            ...(!allSourcesRetained ? [t('fractionationConfirmSourceExit')] : []),
+            t('fractionationConfirmQuarantine'),
+          ]}
+          note={t('fractionationConfirmNoRelease')}
+          error={failed ? t(failed) : undefined}
+          cancelLabel={t('fractionationKeepReviewing')}
+          confirmLabel={t(saving ? 'saving' : 'fractionationConfirm')}
+          closeLabel={t('close')}
+          saving={saving}
+          onCancel={() => {
+            setConfirm(false);
+            setFailed('');
           }}
-        >
-          <ModalHeader
-            title={t('fractionationFinalWarning')}
-            iconDescription={t('close')}
-            closeModal={() => {
-              if (!saving) setConfirm(false);
-            }}
-          />
-          <ModalBody>
-            <p>
-              {t(
-                leaves.some(isFractionationRemainder)
-                  ? 'fractionationFinalPediatricWarningHelp'
-                  : 'fractionationFinalWarningHelp',
-              )}
-            </p>
-            {failed && <p role="alert">{t(failed)}</p>}
-          </ModalBody>
-          <ModalFooter className={shared.footer}>
-            <div>
-              <Button kind="secondary" disabled={saving} onClick={() => setConfirm(false)}>
-                {t('fractionationKeepReviewing')}
-              </Button>
-              <Button
-                disabled={saving}
-                onClick={async () => {
-                  if (saving) return;
-                  setSaving(true);
-                  setFailed('');
-                  try {
-                    await api.finalize(batch);
-                    notifySuccess(t('fractionationFinalized'));
-                    onSaved();
-                    onClose();
-                  } catch {
-                    setFailed('fractionationSaveFailed');
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                {saving ? t('saving') : t('fractionationConfirm')}
-              </Button>
-            </div>
-          </ModalFooter>
-        </ComposedModal>
+          onConfirm={async () => {
+            if (saving) return;
+            setSaving(true);
+            setFailed('');
+            try {
+              await api.finalize(batch);
+              notifySuccess(t('fractionationFinalized'));
+              onSaved();
+              onClose();
+            } catch {
+              setFailed('fractionationSaveFailed');
+            } finally {
+              setSaving(false);
+            }
+          }}
+        />
       )}
     </>
   );

@@ -18,12 +18,13 @@ export function FractionationContent({ children }: { children: ReactNode }) {
         pointerFocus.current = false;
       }}
       onBlurCapture={(event) => {
-        // Only internal pointer focus skips centering. Keyboard navigation and the
-        // modal's outside focus trap still bubble to Carbon normally.
+        // Keep the clicked target in place, including when focus comes from the
+        // modal footer. Keyboard navigation and the outside focus trap still bubble.
         if (
           pointerFocus.current &&
-          event.relatedTarget instanceof Node &&
-          event.currentTarget.contains(event.relatedTarget)
+          event.relatedTarget instanceof Element &&
+          event.relatedTarget.closest('.cds--modal-content') &&
+          event.target.closest('[role="dialog"]') === event.relatedTarget.closest('[role="dialog"]')
         )
           event.stopPropagation();
       }}

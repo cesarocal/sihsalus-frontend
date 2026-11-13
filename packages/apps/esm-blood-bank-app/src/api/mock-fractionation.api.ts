@@ -114,7 +114,6 @@ export function fractionationStore(state: ProcessingState): FractionationStore {
       originalWholeBloodCode: record.unitCode,
       component: 'wholeBlood',
       volume: record.extractedVolume,
-      nominalVolume: record.label.plannedVolume ?? '',
       collectedAt: record.registry.date,
       location: record.label.service,
       state: 'quarantine',
@@ -142,7 +141,6 @@ export function fractionationStore(state: ProcessingState): FractionationStore {
       originalWholeBloodCode: `ST-DEMO-00${number}`,
       component: 'freshFrozenPlasma',
       volume: '250',
-      nominalVolume: '250',
       collectedAt: '2026-09-20',
       location: 'Congelador 02 (DEMO)',
       state: 'quarantine',
@@ -178,6 +176,7 @@ export function fractionationInventory(state: ProcessingState): InventorySummary
 
 const mutable = (batch: FractionationBatch) => ({
   nodes: batch.nodes,
+  lowVolumeConfirmedSourceIds: batch.lowVolumeConfirmedSourceIds,
   operator: batch.operator,
   service: batch.service,
   system: batch.system,
@@ -190,6 +189,7 @@ const plan = (batch: FractionationBatch) =>
     operator: batch.operator,
     service: batch.service,
     system: batch.system,
+    lowVolumeConfirmedSourceIds: batch.lowVolumeConfirmedSourceIds ?? [],
     nodes: batch.nodes.map(({ id, sourceId, parentId, component, code }) => ({
       id,
       sourceId,
@@ -361,7 +361,6 @@ export function createMockFractionationApi(
           originalWholeBloodCode: source.originalWholeBloodCode,
           component: node.component,
           volume: isFinal ? node.volume : '',
-          nominalVolume: '',
           collectedAt: source.collectedAt,
           location: next.service,
           state: isFinal ? 'quarantine' : 'fractionated',

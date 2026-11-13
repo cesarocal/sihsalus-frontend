@@ -678,13 +678,30 @@ describe('collection and screening screens', () => {
     const certificate = renderToStaticMarkup(<DonationCertificateDocument record={record} t={t} />);
     expect(certificate).toContain('NO ACREDITA');
     expect(certificate).not.toContain(t('printPrototype'));
-    expect(certificate).toContain('la Sra. &lt;script&gt;unsafe&lt;/script&gt;');
-    expect(certificate).toContain('donó una unidad de Paquete globular');
+    expect(certificate).toContain('la Sra.');
+    expect(certificate).not.toContain('<script>unsafe');
+    expect(certificate).toContain('&lt;script&gt;unsafe&lt;/script&gt;');
+    expect(certificate).toContain('Donó una unidad de Paquete globular');
     expect(certificate).toContain('☒ Donación por reposición');
     expect(certificate).toContain('Paciente de prueba');
     expect(certificate).toContain('11/11/2026');
-    expect(certificate).toContain('21/11/2026');
+    expect(certificate).toContain('<b data-certificate-results-date="true">21/11/2026</b>');
+    expect(certificate).toContain('data-certificate-masthead');
+    expect(certificate).not.toContain('{{date}}');
     expect(certificate).toContain('Iquitos, 11 de noviembre del 2026');
     expect(certificate).toContain('Firma del donante');
+  });
+  it('prints the reduced-leukocytes statement only on a qualifying unit label', () => {
+    const record = newCollection(applicationsMock()[2]);
+    expect(renderToStaticMarkup(<CollectionLabelDocument record={record} print t={t} />)).not.toContain(
+      'Leucocitos reducidos',
+    );
+    record.label.leukocytesReduced = true;
+    expect(renderToStaticMarkup(<CollectionLabelDocument record={record} print t={t} />)).toContain(
+      '<p>Leucocitos reducidos</p>',
+    );
+    expect(renderToStaticMarkup(<CollectionLabelDocument record={record} sample print t={t} />)).not.toContain(
+      'Leucocitos reducidos',
+    );
   });
 });

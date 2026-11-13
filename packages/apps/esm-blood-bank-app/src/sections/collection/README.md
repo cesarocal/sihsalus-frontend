@@ -61,7 +61,9 @@ Con guardado mock y los tres UUID vacíos, el flujo usa un catálogo de demostra
 
 La muestra postextracción se genera como **Sangre** en **Tubo** en el mock, conservando los datos de muestras previas. El OMOD deberá asignar los conceptos de tipo y recipiente y acordar dónde persistir el texto de conservación, dado que el DDL propone una referencia a concepto para ese dato.
 
-Los registros históricos conservan el volumen aproximado. Para las nuevas extracciones, Fraccionamiento requiere conocer la capacidad nominal de la bolsa cuando la validación de bajo volumen depende de ese dato. Al integrar el OMOD, el responsable debe identificarse a partir de la sesión autenticada del servidor.
+Los registros históricos conservan el volumen aproximado. Fraccionamiento usa el volumen recolectado y, para sangre total de 300 a 400 mL, pide confirmar el anticoagulante de la bolsa. Al integrar el OMOD, el responsable debe identificarse a partir de la sesión autenticada del servidor.
+
+La constancia usa el membrete del formato facilitado por el Hospital Santa Clotilde, con los dos logotipos del documento y el número de postulante destacado. La fecha de recojo se imprime como texto de calendario en `dd/mm/aaaa`.
 
 Completa e Incompleta usan valores locales. Su mapeo a conceptos de OpenMRS queda pendiente de la integración del OMOD.
 

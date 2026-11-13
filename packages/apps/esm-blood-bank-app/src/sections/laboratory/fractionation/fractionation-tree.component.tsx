@@ -1,8 +1,8 @@
-import { Button, Tag } from '@carbon/react';
+import { Button, Checkbox, Tag } from '@carbon/react';
 import { Fork } from '@carbon/react/icons';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
-import { componentDefinitions, isFractionationRemainder, separationOptions } from './fractionation-rules';
-import type { ComponentType, FractionationBatch, FractionationNode } from './fractionation.types';
+import { componentDefinitions, needsLowVolumeVerification, nodeSeparationOptions } from './fractionation-rules';
+import type { ComponentType, FractionationBatch, FractionationNode, FractionationUnit } from './fractionation.types';
 import styles from './fractionation.scss';
 
 /** Code-native pictogram: illustrative fill only; text carries component identity, not color alone. */
@@ -26,25 +26,42 @@ export function ComponentBag({ component }: { component: ComponentType }) {
 export function FractionationTree({
   batch,
   onSplit,
+  onVerifyLowVolume,
   disabled = false,
   t,
 }: {
   batch: FractionationBatch;
   onSplit?: (id: string, option: number | null) => void;
+  onVerifyLowVolume?: (sourceId: string, checked: boolean) => void;
   disabled?: boolean;
   t: ProcessingTranslate;
 }) {
-  const renderNode = (node: FractionationNode) => {
+  const renderNode = (node: FractionationNode, source: FractionationUnit) => {
     const children = batch.nodes.filter((item) => item.parentId === node.id);
-    const options = isFractionationRemainder(node) ? undefined : separationOptions[node.component];
+    const options = nodeSeparationOptions(node, source);
+    const lowVolume = node.parentId === null && needsLowVolumeVerification(source);
+    const verified = batch.lowVolumeConfirmedSourceIds?.includes(source.id);
     const actions =
-      node.component === 'wholeBlood'
-        ? ['fractionationSeparatePlasma', 'fractionationSeparatePediatric']
-        : node.component === 'plateletRichPlasma'
-          ? ['fractionationUsePFC', 'fractionationUsePlasma24']
-          : ['fractionationSplit'];
+      lowVolume
+        ? ['fractionationSeparateLowVolume']
+        : node.component === 'wholeBlood'
+          ? ['fractionationSeparatePlasma', 'fractionationSeparatePediatric']
+          : node.component === 'plateletRichPlasma'
+            ? ['fractionationUsePFC', 'fractionationUsePlasma24']
+            : ['fractionationSplit'];
     return (
       <li key={node.id}>
+        {lowVolume && onVerifyLowVolume && (
+          <div className={styles.bagVerification}>
+            <Checkbox
+              id={`${node.id}-verify-anticoagulant`}
+              labelText={t('fractionationVerifyLowVolumeBag')}
+              checked={Boolean(verified)}
+              disabled={disabled || children.length > 0}
+              onChange={(_event, { checked }) => onVerifyLowVolume(source.id, checked)}
+            />
+          </div>
+        )}
         <div className={styles.node}>
           <ComponentBag component={node.component} />
           <div className={styles.nodeIdentity}>
@@ -65,7 +82,7 @@ export function FractionationTree({
                   size="sm"
                   kind="tertiary"
                   renderIcon={Fork}
-                  disabled={disabled || children.length > 0}
+                  disabled={disabled || children.length > 0 || (lowVolume && !verified)}
                   onClick={() => onSplit(node.id, index)}
                   aria-label={`${t(action)} - ${node.code}`}
                 >
@@ -80,7 +97,7 @@ export function FractionationTree({
             </div>
           )}
         </div>
-        {!!children.length && <ul>{children.map(renderNode)}</ul>}
+        {!!children.length && <ul>{children.map((child) => renderNode(child, source))}</ul>}
       </li>
     );
   };
@@ -96,7 +113,9 @@ export function FractionationTree({
             {source.label.bloodGroup || '—'}
           </p>
           <ul className={styles.tree}>
-            {batch.nodes.filter((node) => node.sourceId === source.id && node.parentId === null).map(renderNode)}
+            {batch.nodes
+              .filter((node) => node.sourceId === source.id && node.parentId === null)
+              .map((node) => renderNode(node, source))}
           </ul>
         </section>
       ))}

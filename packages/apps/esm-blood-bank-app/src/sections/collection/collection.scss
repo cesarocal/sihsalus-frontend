@@ -1,5 +1,6 @@
 @use "@carbon/layout";
 @use "@carbon/themes";
+@use "@carbon/type";
 
 .quarantineNotice:global(.cds--inline-notification) {
   inline-size: 100%;
@@ -8,17 +9,50 @@
 }
 
 .certificate {
+  max-inline-size: 48rem;
+  margin: layout.$spacing-05 auto 0;
+  overflow-wrap: anywhere;
+
+  p {
+    margin-block-end: layout.$spacing-03;
+  }
+
+  [data-certificate-masthead] {
+    display: grid;
+    grid-template-columns: minmax(0, 4rem) minmax(0, 1fr) minmax(0, 5rem);
+    align-items: center;
+    gap: layout.$spacing-04;
+    padding-block-end: layout.$spacing-04;
+    border-block-end: 2px solid themes.$text-primary;
+
+    img {
+      inline-size: 100%;
+      block-size: auto;
+    }
+
+    strong {
+      display: block;
+      @include type.type-style("heading-compact-01");
+    }
+
+    p {
+      @include type.type-style("body-compact-01");
+      margin: 0;
+    }
+  }
+
   [data-certificate-header] {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
+    align-items: center;
     gap: layout.$spacing-04;
-    text-align: start;
-    margin-block-end: layout.$spacing-05;
+    margin-block: layout.$spacing-05;
 
     h2 {
+      flex: 1 1 auto;
       margin: 0;
+      text-decoration: underline;
+      text-transform: uppercase;
     }
   }
 
@@ -35,24 +69,53 @@
     }
   }
 
-  [data-donation-types] {
+  [data-certificate-donor] {
+    display: block;
+    padding-block: layout.$spacing-02;
+    border-block-end: 1px solid themes.$text-primary;
+  }
+
+  [data-donation-types],
+  [data-certificate-identity],
+  [data-certificate-consent] {
     display: flex;
     flex-wrap: wrap;
     gap: layout.$spacing-03 layout.$spacing-06;
-    margin-block: layout.$spacing-05;
   }
 
-  [data-certificate-issue-date] {
-    margin-block-start: layout.$spacing-05;
-    text-align: end;
+  [data-certificate-record] {
+    margin-block: layout.$spacing-04;
+    gap: layout.$spacing-02 layout.$spacing-05;
+
+    > div {
+      display: flex;
+      flex-wrap: wrap;
+      column-gap: layout.$spacing-02;
+    }
+
+    dd {
+      margin: 0;
+    }
   }
 
   [data-certificate-signature] {
     max-inline-size: 100%;
     inline-size: 14rem;
     margin-block: layout.$spacing-08 layout.$spacing-05;
-    margin-inline-start: auto;
     border-block-start: 1px solid themes.$text-primary;
+    text-align: center;
+  }
+
+  [data-certificate-results-date] {
+    display: inline-block;
+    padding-inline: layout.$spacing-03;
+    border-block-end: 1px solid themes.$text-primary;
+  }
+
+  [data-certificate-motto] {
+    margin-block-start: layout.$spacing-05;
+    font-style: italic;
+    font-weight: 600;
     text-align: center;
   }
 }

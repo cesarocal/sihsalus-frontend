@@ -6,6 +6,8 @@ import type { CollectionRecord } from './collection.types';
 import styles from '../applicant-selection/selection.scss';
 import { formatDonorDate } from '../donors/donor-utils';
 import collectionStyles from './collection.scss';
+import hospitalLogo from './hospital-santa-clotilde.png';
+import pangoLogo from './pango.png';
 
 export const collectionLabelPrintCss = `${processingPrintCss}
   [data-label] { box-sizing: border-box; break-inside: avoid; }
@@ -21,14 +23,34 @@ export const collectionLabelPrintCss = `${processingPrintCss}
 `;
 
 export const donationCertificatePrintCss = `${processingPrintCss}
-  @page { @bottom-left { content: ""; } }
-  [data-certificate-header] { display: flex; align-items: start; justify-content: space-between; gap: 12pt; }
-  [data-certificate-header] h2 { margin-top: 0; text-align: left; }
-  [data-applicant-number] { border: 1px solid #184e77; color: #184e77; padding: 6pt 9pt; text-align: center; }
-  [data-applicant-number] strong { display: block; overflow-wrap: anywhere; }
-  [data-donation-types] { display: flex; flex-wrap: wrap; gap: 6pt 18pt; }
-  [data-certificate-signature] { margin: 30pt 0 0 auto; width: 58mm; border-top: 1px solid currentColor; text-align: center; }
-  [data-certificate-issue-date] { text-align: right; }
+  @page { margin: 15mm 16mm; @bottom-left { content: ""; } }
+  [data-donation-certificate] { max-width: 170mm; line-height: 1.35; }
+  [data-donation-certificate] p { margin: 0 0 6pt; }
+  [data-certificate-masthead] {
+    display: grid; grid-template-columns: 21mm 1fr 27mm; gap: 3mm; align-items: center;
+    text-align: center; border-bottom: 2px solid currentColor; padding-bottom: 7pt;
+  }
+  [data-certificate-masthead] img { width: 100%; height: auto; display: block; }
+  [data-certificate-masthead] p { margin: 0; font-size: 8pt; }
+  [data-certificate-masthead] strong { display: block; font-size: 11pt; }
+  [data-certificate-header] { display: flex; align-items: center; gap: 6pt; margin: 10pt 0 12pt; }
+  [data-certificate-header] h2 { flex: 1; margin: 0; text-decoration: underline; text-transform: uppercase; }
+  [data-applicant-number] { border: 1.5pt solid #184e77; color: #184e77; padding: 4pt 8pt; text-align: center; font-size: 8pt; }
+  [data-applicant-number] strong { display: block; font-size: 13pt; overflow-wrap: anywhere; }
+  [data-certificate-donor] { display: block; padding: 3pt 0; border-bottom: 1px solid; }
+  [data-certificate-identity], [data-donation-types], [data-certificate-consent] { display: flex; flex-wrap: wrap; gap: 5pt 14pt; }
+  [data-donation-certificate] [data-certificate-identity] { margin-top: 8pt; }
+  [data-donation-certificate] [data-donation-types] { margin-block: 8pt; }
+  [data-certificate-record] { grid-template-columns: 1.4fr 1fr; gap: 4pt 12pt; margin: 8pt 0; }
+  [data-certificate-record] div { display: flex; flex-wrap: wrap; gap: 0 4pt; }
+  [data-certificate-record] dd { margin: 0; }
+  [data-donation-certificate] [data-certificate-signature] {
+    margin: 26pt auto 12pt 0; width: 58mm; border-top: 1px solid; text-align: center;
+  }
+  [data-certificate-note] { margin-top: 10pt; }
+  [data-certificate-note] strong { display: block; margin-bottom: 4pt; }
+  [data-certificate-results-date] { display: inline-block; min-width: 26mm; padding-inline: 3pt; border-bottom: 1px solid; text-align: center; }
+  [data-donation-certificate] [data-certificate-motto] { margin-top: 10pt; text-align: center; font-weight: bold; font-style: italic; }
 `;
 
 export function CollectionIdentity({ record, t }: { record: CollectionRecord; t: ProcessingTranslate }) {
@@ -138,19 +160,30 @@ export function DonationCertificateDocument({ record, t }: { record: CollectionR
       })
     : '—';
   const resultsDate = formatDonorDate(certificate.resultsAvailableOn);
+  const title = t(sex === 'F' ? 'certificateMrs' : sex === 'M' ? 'certificateMr' : 'certificatePerson');
   const values = {
+    certificateApplicantCode: application.number,
     bagLot: registry.bagLot,
-    collectionDate: formatDonorDate(registry.date),
     bloodGroup: `${application.physical.bloodGroup}${application.physical.rh}`,
-    hemoglobin: application.physical.hemoglobin,
     hematocrit: application.physical.hematocrit,
-    certificatePatientName: donationType === 'replacement' ? beneficiaryName : '',
-    recipientName: donationType === 'autologous' ? label.recipientName : '',
-    emailConsent: certificate.emailConsent ? t(certificate.emailConsent) : '—',
-    email: certificate.emailConsent === 'yes' ? certificate.email : '',
+    collectionDate: formatDonorDate(registry.date),
+    hemoglobin: application.physical.hemoglobin,
   };
   return (
-    <article className={`${styles.report} ${collectionStyles.certificate}`}>
+    <article data-donation-certificate className={`${styles.report} ${collectionStyles.certificate}`}>
+      <header data-certificate-masthead>
+        <img src={hospitalLogo} width={185} height={185} alt="" />
+        <div>
+          <strong>{t('certificateHospital')}</strong>
+          <strong>{t('certificateHospitalName')}</strong>
+          <p>{t('certificateHospitalRegion')}</p>
+          <strong>{t('certificateHospitalMotto')}</strong>
+          <p>{t('certificateHospitalPartners')}</p>
+          <p>{t('certificateHospitalAddress')}</p>
+          <p>{t('certificateHospitalEmail')}</p>
+        </div>
+        <img src={pangoLogo} width={277} height={197} alt="" />
+      </header>
       <header data-certificate-header>
         <h2>{t('certificate')}</h2>
         <div data-applicant-number>
@@ -159,41 +192,45 @@ export function DonationCertificateDocument({ record, t }: { record: CollectionR
         </div>
       </header>
       <p>
-        {t('certificateIntro', {
-          title: t(sex === 'F' ? 'certificateMrs' : sex === 'M' ? 'certificateMr' : 'certificatePerson'),
-          name: fullName(application),
-          documentType,
-          documentNumber,
-          age: String(ageOnDate(application.personal.birthDate, registry.date) ?? '—'),
-          component: label.component,
-        })}
+        {t('certificateIntro', { title })}
+        <strong data-certificate-donor>{fullName(application)}</strong>
       </p>
+      <p data-certificate-identity>
+        <span>
+          {documentType} N.º {documentNumber}
+        </span>
+        <span>{t('certificateAge', { age: String(ageOnDate(application.personal.birthDate, registry.date) ?? '—') })}</span>
+      </p>
+      <p>{t('certificateDonationStatement', { component: label.component })}</p>
+      <dl data-certificate-record>
+        {Object.entries(values).map(([key, value]) => (
+          <div key={key}>
+            <dt>{t(key)}</dt>
+            <dd>{value || '—'}</dd>
+          </div>
+        ))}
+      </dl>
       <p data-donation-types>
-        <span>
-          {donationType === 'voluntary' ? '☒' : '☐'} {t('certificateVoluntary')}
-        </span>
-        <span>
-          {donationType === 'replacement' ? '☒' : '☐'} {t('replacement')}
-        </span>
+        <span>{donationType === 'voluntary' ? '☒' : '☐'} {t('certificateVoluntary')}</span>
+        <span>{donationType === 'replacement' ? '☒' : '☐'} {t('replacement')}</span>
         {donationType === 'autologous' && <span>☒ {t('autologous')}</span>}
       </p>
-      <dl>
-        {Object.entries(values)
-          .filter(([, value]) => value)
-          .map(([key, value]) => (
-            <div key={key}>
-              <dt>{t(key)}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-      </dl>
+      {donationType === 'replacement' && <p>{t('certificatePatientName')}: {beneficiaryName || '—'}</p>}
+      {donationType === 'autologous' && <p>{t('recipientName')}: {label.recipientName || '—'}</p>}
       <p data-certificate-issue-date>{issueDate}</p>
       <p data-certificate-signature>{t('certificateDonorSignature')}</p>
-      <footer>
-        <strong>{t('certificateNoteHeading')}</strong>
+      <section data-certificate-note aria-label={t('certificateNoteHeading')}>
+        <strong>{t('certificateNoteHeading').toUpperCase()}</strong>
         <p>{t('certificateNote')}</p>
-        <p>{t('certificateResultsDate', { date: resultsDate })}</p>
-      </footer>
+        <p>{t('certificateResultsDate')} <b data-certificate-results-date>{resultsDate}</b></p>
+        <p data-certificate-consent>
+          <span>{t('emailConsent')}</span>
+          <span>{certificate.emailConsent === 'yes' ? '☒' : '☐'} {t('yes')}</span>
+          <span>{certificate.emailConsent === 'no' ? '☒' : '☐'} {t('no')}</span>
+        </p>
+        {certificate.emailConsent === 'yes' && <p>{t('email')}: {certificate.email}</p>}
+      </section>
+      <p data-certificate-motto>{t('certificateMotto')}</p>
     </article>
   );
 }
