@@ -111,7 +111,7 @@ export function QualitySealReprintHistory({ operation, t }: { operation: Invento
               {[
                 'inventoryReprintNumber',
                 'inventoryDate',
-                'inventoryServiceResponsible',
+                'inventoryProcedureResponsible',
                 'inventoryUnits',
                 'inventoryReprintReason',
               ].map((key) => (

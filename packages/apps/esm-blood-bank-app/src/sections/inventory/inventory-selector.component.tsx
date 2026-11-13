@@ -1,5 +1,5 @@
 import { Button, Checkbox, Search, Select, SelectItem, Tag } from '@carbon/react';
-import { Clean } from '@carbon/react/icons';
+import { Clean, WarningAlt } from '@carbon/react/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { expiresSoon, type DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
@@ -7,6 +7,8 @@ import { canSeal, inventoryDisplayDate, inventoryStatusKey } from './inventory-r
 import type { InventoryOperation, InventoryUnit } from './inventory.types';
 import type { InventorySummary } from '../../types/blood-bank.types';
 import styles from './inventory.scss';
+
+const expiryWarningDays = 7;
 
 export function InventorySelector({
   units,
@@ -78,6 +80,7 @@ export function InventorySelector({
   );
   const eligible = (unit: InventoryUnit) => (kind === 'qualitySeal' ? canSeal(unit) : unit.canDispose);
   const visibleEligible = filtered.filter(eligible);
+  const now = Date.now();
   return (
     <>
       <div className={styles.toolbar}>
@@ -184,61 +187,76 @@ export function InventorySelector({
           'status',
           'inventoryScreeningResult',
         ]}
-        rows={filtered.map((unit) => ({
-          id: unit.id,
-          cells: [
-            <Checkbox
-              key="select"
-              id={`${prefix}-select-${unit.id}`}
-              hideLabel
-              labelText={`${t('fractionationSelect')} ${unit.id}`}
-              checked={selected.some((item) => item.id === unit.id)}
-              disabled={unavailable || (!eligible(unit) && !selected.some((item) => item.id === unit.id))}
-              onChange={(_event, { checked }) =>
-                onChange(
-                  checked
-                    ? [...selected.filter((item) => item.id !== unit.id), unit]
-                    : selected.filter((item) => item.id !== unit.id),
-                )
-              }
-            />,
-            unit.id,
-            unit.component,
-            unit.bloodGroup || '—',
-            ...(!kind ? [unit.volume || '—'] : []),
-            inventoryDisplayDate(unit.expiresAt),
-            <Tag
-              key="status"
-              type={
-                unit.status === 'APTO'
-                  ? 'green'
-                  : unit.status === 'En fraccionamiento'
-                    ? 'blue'
-                    : unit.status === 'Sello pendiente'
-                      ? 'warm-gray'
-                      : unit.status === 'No apta'
-                        ? 'red'
-                        : 'gray'
-              }
-            >
-              {t(inventoryStatusKey[unit.status])}
-            </Tag>,
-            <Tag
-              key="screening"
-              type={
-                unit.screeningResult === 'nonReactive'
-                  ? 'green'
-                  : unit.screeningResult === 'reactive'
-                    ? 'red'
-                    : unit.screeningResult === 'inProgress'
+        rows={filtered.map((unit) => {
+          const expiring =
+            !kind &&
+            expiresSoon(unit.expiresAt, expiryWarningDays) &&
+            (!unit.expiresAt.includes('T') || new Date(unit.expiresAt).getTime() > now);
+          return {
+            id: unit.id,
+            className: expiring ? styles.expiringRow : undefined,
+            cells: [
+              <Checkbox
+                key="select"
+                id={`${prefix}-select-${unit.id}`}
+                hideLabel
+                labelText={`${t('fractionationSelect')} ${unit.id}`}
+                checked={selected.some((item) => item.id === unit.id)}
+                disabled={unavailable || (!eligible(unit) && !selected.some((item) => item.id === unit.id))}
+                onChange={(_event, { checked }) =>
+                  onChange(
+                    checked
+                      ? [...selected.filter((item) => item.id !== unit.id), unit]
+                      : selected.filter((item) => item.id !== unit.id),
+                  )
+                }
+              />,
+              unit.id,
+              unit.component,
+              unit.bloodGroup || '—',
+              ...(!kind ? [unit.volume || '—'] : []),
+              <div key="expiration">
+                {inventoryDisplayDate(unit.expiresAt)}
+                {expiring && (
+                  <span className={styles.expiryWarning}>
+                    <WarningAlt size={16} aria-hidden="true" />
+                    {t('inventoryExpiringSoon')}
+                  </span>
+                )}
+              </div>,
+              <Tag
+                key="status"
+                type={
+                  unit.status === 'APTO'
+                    ? 'green'
+                    : unit.status === 'En fraccionamiento'
                       ? 'blue'
-                      : 'gray'
-              }
-            >
-              {t(`inventoryResult_${unit.screeningResult}`)}
-            </Tag>,
-          ],
-        }))}
+                      : unit.status === 'Sello pendiente'
+                        ? 'warm-gray'
+                        : unit.status === 'No apta'
+                          ? 'red'
+                          : 'gray'
+                }
+              >
+                {t(inventoryStatusKey[unit.status])}
+              </Tag>,
+              <Tag
+                key="screening"
+                type={
+                  unit.screeningResult === 'nonReactive'
+                    ? 'green'
+                    : unit.screeningResult === 'reactive'
+                      ? 'red'
+                      : unit.screeningResult === 'inProgress'
+                        ? 'blue'
+                        : 'gray'
+                }
+              >
+                {t(`inventoryResult_${unit.screeningResult}`)}
+              </Tag>,
+            ],
+          };
+        })}
         loading={loading}
         failed={failed}
         reload={reload}

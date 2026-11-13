@@ -1,8 +1,8 @@
-import { showSnackbar } from '@openmrs/esm-framework';
+import { type FetchResponse, openmrsFetch, showSnackbar } from '@openmrs/esm-framework';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import english from '../../../translations/en.json';
 import spanish from '../../../translations/es.json';
 import { mockBloodBankApi } from '../../api/mock-blood-bank.api';
@@ -15,12 +15,20 @@ import { newInventoryOperation } from './inventory-rules';
 import { disposalOperation, sealOperation, seedInventoryReadyUnits } from './inventory-test-fixtures';
 import { InventoryWorkflow } from './inventory-workflow.component';
 
+const sessionPerson = vi.hoisted(() => ({
+  uuid: 'operator-person',
+  display: 'Operador de prueba',
+  preferredName: undefined as { givenName: string; familyName: string } | undefined,
+}));
+
 vi.mock('@openmrs/esm-framework', () => ({
   useSession: () => ({
     authenticated: true,
-    user: { person: { display: 'Operador de prueba' } },
+    user: { username: 'operador.prueba', display: 'operador.prueba', person: sessionPerson },
     sessionLocation: { display: 'Hospital DEMO' },
   }),
+  openmrsFetch: vi.fn(),
+  restBaseUrl: '/ws/rest/v1',
   formatDatetime: () => '06 oct 2026, 12:00',
   showSnackbar: vi.fn(),
   StockManagementPictogram: () => <svg />,
@@ -31,6 +39,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
 }));
 vi.mock(import('../../shared/print-document'), async (original) => ({ ...(await original()), printDocument: vi.fn() }));
+vi.mock('./inventory.scss', () => ({ default: { expiringRow: 'expiringRow' } }));
 const t = (key: string) => (spanish.processing as Record<string, string>)[key] ?? key;
 const instance = () => ({
   ...mockBloodBankApi,
@@ -40,9 +49,90 @@ const instance = () => ({
 describe('inventory selection, seals and disposal UI', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    sessionPerson.display = 'Operador de prueba';
+    sessionPerson.preferredName = undefined;
+    vi.mocked(openmrsFetch).mockReset();
     vi.clearAllMocks();
     vi.mocked(printDocument).mockReset();
   });
+  it('uses the linked person’s given name and surname in the seal form', async () => {
+    sessionPerson.display = 'Rosa';
+    sessionPerson.preferredName = { givenName: 'Rosa', familyName: 'Calderón' };
+    render(<InventoryPage api={instance()} />);
+    await screen.findByRole('checkbox', { name: 'Seleccionar BB-SELLO-DEMO-001' });
+    fireEvent.click(screen.getByRole('button', { name: t('inventoryQualitySeal') }));
+    const responsible = screen.getByLabelText('Responsable del procedimiento');
+    expect(responsible).toHaveValue('Rosa Calderón');
+    expect(responsible).toHaveAttribute('readonly');
+    expect(openmrsFetch).not.toHaveBeenCalled();
+  });
+  it('fills the seal responsible from the linked person when the session omits the name', async () => {
+    sessionPerson.display = '';
+    const profile = { uuid: sessionPerson.uuid, display: 'Rosa Torres García' };
+    vi.mocked(openmrsFetch)
+      .mockRejectedValueOnce(new Error('temporary profile error'))
+      .mockResolvedValueOnce({ data: profile } as FetchResponse<typeof profile>);
+    render(<InventoryPage api={instance()} />);
+    await screen.findByRole('checkbox', { name: 'Seleccionar BB-SELLO-DEMO-001' });
+    fireEvent.click(screen.getByRole('button', { name: t('inventoryQualitySeal') }));
+    const modal = within(screen.getByRole('dialog'));
+    const responsible = modal.getByLabelText('Responsable del procedimiento');
+    expect(responsible).toHaveAttribute('readonly');
+    expect(responsible).toHaveValue('');
+    await modal.findByText(t('inventoryOperatorUnavailable'));
+    fireEvent.click(modal.getByRole('button', { name: t('retry') }));
+    await waitFor(() => expect(responsible).toHaveValue(profile.display));
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
+    expect(openmrsFetch).toHaveBeenLastCalledWith('/ws/rest/v1/person/operator-person?v=custom:(uuid,display)', {
+      rejectOnAuthFailure: true,
+    });
+  });
+  it('highlights inventory rows due from today through day seven and preserves their tags', async () => {
+    vi.setSystemTime(new Date(2026, 10, 13, 12));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const api = instance();
+    const workspace = await api.inventory.list();
+    const unit = workspace.units[0];
+    vi.spyOn(api.inventory, 'list').mockResolvedValue({
+      ...workspace,
+      units: [
+        { ...unit, id: 'EXPIRY-TODAY', expiresAt: '2026-11-13' },
+        {
+          ...unit,
+          id: 'EXPIRY-IN-7-DAYS',
+          expiresAt: '20/11/2026',
+          status: 'No apta',
+          screeningResult: 'reactive',
+        },
+        { ...unit, id: 'EXPIRY-IN-8-DAYS', expiresAt: '2026-11-21' },
+        { ...unit, id: 'EXPIRY-PAST', expiresAt: '2026-11-12' },
+        { ...unit, id: 'EXPIRY-PAST-HOUR', expiresAt: '2026-11-13T10:00' },
+        { ...unit, id: 'EXPIRY-UNKNOWN', expiresAt: '' },
+      ],
+    });
+    render(<InventoryPage api={api} />);
+
+    const today = await screen.findByRole('row', { name: /EXPIRY-TODAY/ });
+    const lastDay = screen.getByRole('row', { name: /EXPIRY-IN-7-DAYS/ });
+    for (const row of [today, lastDay]) {
+      expect(row).toHaveClass('expiringRow');
+      expect(within(row).getByText('Próxima a vencer')).toBeInTheDocument();
+    }
+    expect(within(lastDay).getByText('No apta').closest('.cds--tag')).toHaveClass('cds--tag--red');
+    expect(within(lastDay).getByText('Reactiva').closest('.cds--tag')).toHaveClass('cds--tag--red');
+    for (const id of ['EXPIRY-IN-8-DAYS', 'EXPIRY-PAST', 'EXPIRY-PAST-HOUR', 'EXPIRY-UNKNOWN']) {
+      const row = screen.getByRole('row', { name: new RegExp(`${id} `) });
+      expect(row).not.toHaveClass('expiringRow');
+      expect(within(row).queryByText('Próxima a vencer')).not.toBeInTheDocument();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: t('inventoryDispose') }));
+    const modal = within(screen.getByRole('dialog'));
+    expect(modal.getByRole('row', { name: /EXPIRY-TODAY/ })).not.toHaveClass('expiringRow');
+  });
+
   it('combines search, component/group/status filters, multi-selection and deselection', async () => {
     render(<InventoryPage api={instance()} />);
     fireEvent.change(screen.getByLabelText(t('search')), { target: { value: 'PFC' } });
@@ -170,7 +260,7 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(screen.getByRole('button', { name: t('inventoryConfirmPrinting') })).toBeDisabled();
     expect(screen.getByLabelText(t('inventoryDate'))).toHaveAttribute('readonly');
     expect(screen.getByLabelText(t('inventoryTime'))).toHaveAttribute('readonly');
-    expect(screen.getByLabelText(t('inventoryServiceResponsible'))).toHaveValue('Operador de prueba');
+    expect(screen.getByLabelText(t('inventoryProcedureResponsible'))).toHaveValue('Operador de prueba');
     fireEvent.click(print);
     let warning = screen.getByRole('dialog', { name: t('inventoryConfirmSealPrint') });
     fireEvent.click(within(warning).getByRole('button', { name: t('inventoryCancel') }));
@@ -504,6 +594,7 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(container.querySelectorAll('[data-blood-group]')).toHaveLength(2);
     expect(container).toHaveTextContent(prepared.sealLabels?.[units[0].id]?.code ?? '');
     expect(container).not.toHaveTextContent(t('inventoryServiceResponsible'));
+    expect(container).not.toHaveTextContent(t('inventoryProcedureResponsible'));
     unmount();
     render(
       <DisposalAct

@@ -109,7 +109,7 @@ export function InventoryHistory({
                   'inventoryOperationType',
                   'fractionationCode',
                   'inventoryDate',
-                  'inventoryServiceResponsible',
+                  'inventoryProcedureResponsible',
                   'status',
                   'actions',
                 ]}

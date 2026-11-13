@@ -10,9 +10,10 @@ import {
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
-import { useSession } from '@openmrs/esm-framework';
-import { useRef, useState } from 'react';
+import { openmrsFetch, restBaseUrl, useSession } from '@openmrs/esm-framework';
+import { useCallback, useRef, useState } from 'react';
 import type { InventoryApi } from '../../api/inventory.api';
+import { useApiData } from '../../api/use-api-data';
 import { notifySuccess } from '../../shared/notify-success';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
@@ -64,10 +65,37 @@ export function InventoryWorkflow({
   const [reprint, setReprint] = useState(openReprint);
   const requestInFlight = useRef(false);
   const { authenticated, user } = useSession();
-  const operator = authenticated ? (user?.person?.display?.trim() ?? '') : '';
   const isSeal = storedOperation.kind === 'qualitySeal';
   const finalized = storedOperation.stage === 'completed';
-  const clock = useLiveClock(isSeal && ['draft', 'ready'].includes(storedOperation.stage));
+  const person = authenticated ? user?.person : undefined;
+  const name = person?.preferredName;
+  const sessionName =
+    [name?.givenName, name?.middleName, name?.familyName, name?.familyName2]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ') ||
+    name?.display?.trim() ||
+    person?.display?.trim() ||
+    '';
+  const personUuid = person?.uuid;
+  const liveSeal = isSeal && (storedOperation.stage === 'draft' || storedOperation.stage === 'ready');
+  const lookupOperator = isSeal && !sessionName && Boolean(personUuid) && (liveSeal || reprint);
+  const [operatorLookupAttempt, setOperatorLookupAttempt] = useState(0);
+  const loadOperator = useCallback(async () => {
+    if (!personUuid) throw new Error('INVENTORY_OPERATOR_UNAVAILABLE');
+    const { data } = await openmrsFetch<{ uuid: string; display?: string }>(
+      `${restBaseUrl}/person/${encodeURIComponent(personUuid)}?v=custom:(uuid,display)`,
+      { rejectOnAuthFailure: true },
+    );
+    if (data?.uuid !== personUuid || !data.display?.trim()) throw new Error('INVENTORY_OPERATOR_UNAVAILABLE');
+    return data;
+  }, [personUuid]);
+  const operatorProfile = useApiData(lookupOperator ? loadOperator : null, operatorLookupAttempt);
+  const operator =
+    sessionName ||
+    (lookupOperator && operatorProfile.data?.uuid === personUuid ? (operatorProfile.data?.display?.trim() ?? '') : '');
+  const loadingOperator = lookupOperator && !operator && !operatorProfile.error;
+  const clock = useLiveClock(liveSeal);
   const currentTime = localDateTime(clock);
   const operation =
     isSeal && storedOperation.stage === 'draft'
@@ -114,7 +142,13 @@ export function InventoryWorkflow({
     return result ? ('saved' as const) : ('failed' as const);
   };
   const advance = async () => {
-    const missing = validateInventoryOperation(operation, !isSeal && step === 0);
+    const missing = validateInventoryOperation(operation, !isSeal && step === 0).map((field) =>
+      isSeal && field === 'inventoryResponsibleRequired'
+        ? loadingOperator
+          ? 'inventoryOperatorLoading'
+          : 'inventoryOperatorUnavailable'
+        : field,
+    );
     setErrors(missing);
     if (missing.length) return;
     if (step < steps.length - 1) {
@@ -149,7 +183,7 @@ export function InventoryWorkflow({
     renderSeals(requested);
   };
   const sealFields = () => {
-    const live = operation.stage === 'draft' || operation.stage === 'ready';
+    const live = liveSeal;
     return (
       <div className={styles.form}>
         <TextInput
@@ -166,10 +200,20 @@ export function InventoryWorkflow({
         />
         <TextInput
           id="inventory-serviceResponsible"
-          labelText={t('inventoryServiceResponsible')}
+          labelText={t('inventoryProcedureResponsible')}
           value={live ? operator : operation.serviceResponsible}
+          helperText={
+            live && !operator
+              ? t(loadingOperator ? 'inventoryOperatorLoading' : 'inventoryOperatorUnavailable')
+              : undefined
+          }
           readOnly
         />
+        {live && lookupOperator && !operator && operatorProfile.error && (
+          <Button kind="ghost" size="sm" onClick={() => setOperatorLookupAttempt((attempt) => attempt + 1)}>
+            {t('retry')}
+          </Button>
+        )}
       </div>
     );
   };
@@ -407,6 +451,12 @@ export function InventoryWorkflow({
           operation={operation}
           eligibleIds={reprintIds}
           operator={operator}
+          loadingOperator={loadingOperator}
+          onRetryOperator={
+            lookupOperator && operatorProfile.error
+              ? () => setOperatorLookupAttempt((attempt) => attempt + 1)
+              : undefined
+          }
           t={t}
           onClose={() => setReprint(false)}
           onPrint={async (unitIds, reason) => {

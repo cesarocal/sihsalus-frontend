@@ -19,6 +19,8 @@ export function QualitySealReprintDialog({
   operation,
   eligibleIds,
   operator,
+  loadingOperator = false,
+  onRetryOperator,
   onClose,
   onPrint,
   t,
@@ -26,6 +28,8 @@ export function QualitySealReprintDialog({
   operation: InventoryOperation;
   eligibleIds: string[];
   operator: string;
+  loadingOperator?: boolean;
+  onRetryOperator?: () => void;
   onClose: () => void;
   onPrint: (unitIds: string[], reason: string) => Promise<boolean>;
   t: ProcessingTranslate;
@@ -78,12 +82,18 @@ export function QualitySealReprintDialog({
           disabled={saving}
           onChange={(event) => setReason(event.target.value)}
         />
-        {(!operator || failed) && (
+        {loadingOperator && <p role="status">{t('inventoryOperatorLoading')}</p>}
+        {((!loadingOperator && !operator) || failed) && (
           <InlineNotification
             hideCloseButton
             kind="error"
             title={t(!operator ? 'inventoryOperatorUnavailable' : 'inventorySaveFailed')}
           />
+        )}
+        {!operator && !loadingOperator && onRetryOperator && (
+          <Button kind="ghost" size="sm" onClick={onRetryOperator}>
+            {t('retry')}
+          </Button>
         )}
       </ModalBody>
       <ModalFooter>

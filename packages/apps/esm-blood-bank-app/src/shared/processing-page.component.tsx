@@ -103,7 +103,7 @@ export function ProcessingTable({
 }: {
   title: string;
   columns: string[];
-  rows: { id: string; cells: ReactNode[] }[];
+  rows: { id: string; cells: ReactNode[]; className?: string }[];
   loading: boolean;
   failed: boolean;
   reload: () => void;
@@ -141,7 +141,7 @@ export function ProcessingTable({
             </TableHead>
             <TableBody>
               {rows.slice((activePage - 1) * pageSize, activePage * pageSize).map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className={row.className}>
                   {row.cells.map((cell, index) => (
                     <TableCell key={columns[index]}>{cell}</TableCell>
                   ))}

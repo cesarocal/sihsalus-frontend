@@ -1,3 +1,4 @@
+@use "@carbon/colors";
 @use "@carbon/layout";
 @use "@carbon/type";
 @use "@openmrs/esm-styleguide/src/vars" as *;
@@ -27,6 +28,26 @@
 .sealFilters {
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
 }
+
+// Set the color on the cells to override the application's zebra row styles.
+:global(.cds--data-table.cds--data-table--zebra) tbody tr.expiringRow:not([data-child-row]) {
+  > td {
+    background-color: colors.$orange-10;
+  }
+
+  &:hover > td {
+    background-color: colors.$orange-10-hover;
+  }
+}
+
+.expiryWarning {
+  @include type.type-style("label-01");
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-02;
+  color: colors.$orange-70;
+}
+
 .form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

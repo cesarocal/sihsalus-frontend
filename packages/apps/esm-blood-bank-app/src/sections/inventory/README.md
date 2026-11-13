@@ -24,7 +24,8 @@ login, barra lateral global, privilegios del backend ni tablas de OpenMRS.
   hasta confirmar su sello.
 - Sello de calidad: selección, responsable, fecha/hora y tres comprobaciones
   manuales. La fecha y hora avanzan hasta solicitar la primera impresión y el
-  responsable se obtiene de la sesión. Solo admite Sello pendiente sin sello,
+  responsable se obtiene de la persona vinculada a la sesión. Si el nombre no
+  viene en la sesión, se consulta esa persona por UUID en OpenMRS. Solo admite Sello pendiente sin sello,
   identidad/ubicación/vencimiento
   válidos y tamizaje vinculado a la extracción original, validado y no reactivo
   en todas las pruebas. Seguimiento o aféresis sin unidad vinculada no autorizan
