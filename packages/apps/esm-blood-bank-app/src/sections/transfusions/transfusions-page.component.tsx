@@ -10,6 +10,7 @@ import {
   useProcessingData,
 } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
+import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionHistory } from './transfusion-history.component';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import styles from './transfusions.scss';
@@ -138,7 +139,7 @@ export function TransfusionsPage({ api }: { api: TransfusionsApi }) {
               formatListDate(item.order.requestedAt),
               item.order.patientName,
               item.order.historyNumber,
-              item.order.bloodGroup,
+              transfusionBloodGroupLabel(item.order.bloodGroup, t),
               t(transfusionStatusKeys[item.status]),
               <Button
                 key="action"

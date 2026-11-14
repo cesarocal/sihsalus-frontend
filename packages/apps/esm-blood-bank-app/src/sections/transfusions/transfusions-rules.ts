@@ -28,7 +28,10 @@ export const comparePriority = (
   b: { priority: TransfusionPriority; date: string },
 ) => priority[a.priority] - priority[b.priority] || a.date.localeCompare(b.date);
 export const needsCrossmatch = (component: ComponentType | null) =>
-  component === 'wholeBlood' || component === 'redCells' || component === 'lowVolumeRedCells';
+  component === 'wholeBlood' ||
+  component === 'redCells' ||
+  component === 'lowVolumeRedCells' ||
+  component === 'pediatricFraction';
 export const lockedAssignments = (request: TransfusionRequest) =>
   request.assignments.filter((item) => item.active && item.result !== 'pending');
 export function requestComplete(order: TransfusionOrder): boolean {
@@ -46,7 +49,43 @@ export function requestComplete(order: TransfusionOrder): boolean {
     order.items.every((item) => Number.isSafeInteger(item.quantity) && item.quantity > 0)
   );
 }
-/** Conservative DEMO filter: same ABO/Rh only. Never an electronic crossmatch. */
+const bloodGroupPattern = /^(A|B|AB|O)([+−-])$/;
+const redCellDonors: Readonly<Record<string, readonly string[]>> = {
+  O: ['O'],
+  A: ['A', 'O'],
+  B: ['B', 'O'],
+  AB: ['AB', 'A', 'B', 'O'],
+};
+
+/** ABO/Rh screening for routine selection, separate from the crossmatch. */
+function componentGroupCompatible(component: ComponentType | null, donor: string, recipient: string) {
+  const from = bloodGroupPattern.exec(donor);
+  const to = bloodGroupPattern.exec(recipient);
+  if (!from || !to) return false;
+  const [, donorAbo, donorRh] = from;
+  const [, recipientAbo, recipientRh] = to;
+  const rhCompatible = recipientRh === '+' || donorRh !== '+';
+
+  switch (component) {
+    case 'redCells':
+    case 'lowVolumeRedCells':
+      return rhCompatible && redCellDonors[recipientAbo].includes(donorAbo);
+    case 'freshFrozenPlasma':
+    case 'liquidPlasma':
+    case 'plasma24':
+    case 'cryoReducedPlasma':
+    case 'cryoprecipitate':
+      return redCellDonors[donorAbo].includes(recipientAbo);
+    case 'wholeBlood':
+    case 'pediatricFraction': // Fractionation produces this from whole blood.
+    case 'platelets':
+    case 'plateletRichPlasma':
+      return donorAbo === recipientAbo && rhCompatible;
+    default:
+      return false;
+  }
+}
+
 export function transfusionCandidate(unit: TransferUnit, request: TransfusionRequest): boolean {
   const today = localDateTime().slice(0, 10);
   const expiry = inventoryExpiry(unit.expiresAt);
@@ -64,7 +103,7 @@ export function transfusionCandidate(unit: TransferUnit, request: TransfusionReq
     expiry >= collected &&
     expiry >= today &&
     (!unit.expiresAt.includes('T') || Date.parse(unit.expiresAt) > Date.now()) &&
-    unit.bloodGroup.replace('−', '-') === request.order.bloodGroup.replace('−', '-') &&
+    componentGroupCompatible(unit.componentType, unit.bloodGroup, request.order.bloodGroup) &&
     request.order.items.some((item) => item.component === unit.componentType) &&
     !request.assignments.some((item) => item.unit.id === unit.id)
   );

@@ -241,6 +241,7 @@ export function createMockTransfusionsApi(
         !request.order.items.every(
           (item) => assigned.filter((unit) => unit.unit.componentType === item.component).length === item.quantity,
         ) ||
+        assigned.some((item) => needsCrossmatch(item.unit.componentType) && item.result !== 'compatible') ||
         (assigned.some((item) => needsCrossmatch(item.unit.componentType)) &&
           (!request.sample || !sampleValid(request.sample, request.order)))
       )

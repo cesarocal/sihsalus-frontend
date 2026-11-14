@@ -66,12 +66,22 @@
   min-block-size: 6rem;
   margin-bottom: layout.$spacing-04;
 }
+.pickerHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: layout.$spacing-02;
+}
 .unitTableScroll {
   flex: 1;
   min-block-size: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
   :global(.cds--data-table-content) {
     overflow: visible;
   }
@@ -80,7 +90,6 @@
     outline-offset: -2px;
   }
   table {
-    min-inline-size: 32rem;
     table-layout: fixed;
   }
   :global(.cds--data-table) thead th {
@@ -89,11 +98,13 @@
     z-index: 1;
     background: $ui-03;
   }
-  th:last-child {
-    inline-size: 4.5rem;
+  th.actionColumn {
+    inline-size: 4rem;
   }
+  th,
   td {
     overflow-wrap: anywhere;
+    padding-inline: layout.$spacing-03;
   }
 }
 .reviewChecks {
@@ -114,15 +125,36 @@
   align-items: center;
   gap: layout.$spacing-04;
   border: 1px solid $ui-03;
+  block-size: 100%;
   padding: layout.$spacing-04;
   overflow-wrap: anywhere;
   svg {
     flex-shrink: 0;
   }
-  &[data-complete] {
-    background-color: colors.$green-10;
-    border-color: colors.$green-50;
+}
+.componentCards > li[data-complete] .componentCard {
+  background-color: colors.$green-10;
+  border-color: colors.$green-50;
+}
+.componentFilter {
+  display: block;
+  position: relative;
+  block-size: 100%;
+  cursor: pointer;
+  &:hover .componentCard {
+    border-color: colors.$blue-60;
   }
+  input:checked + .componentCard {
+    box-shadow: inset 0 0 0 2px colors.$blue-60;
+  }
+  input:focus-visible + .componentCard {
+    outline: 2px solid colors.$blue-60;
+    outline-offset: 2px;
+  }
+}
+.componentCardText {
+  display: grid;
+  min-inline-size: 0;
 }
 .componentQuantity {
   @include type.type-style("heading-03");

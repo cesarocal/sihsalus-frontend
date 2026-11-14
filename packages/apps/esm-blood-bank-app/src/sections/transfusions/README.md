@@ -50,10 +50,11 @@ Mover filas entre los dos bloques tampoco reserva stock hasta confirmar la asign
 resultado parcial no libera ni reserva unidades. La X permite Seguir editando o
 Salir, con guardado opcional marcado por defecto; los errores conservan la edición.
 
-Solo sangre total y paquete globular generan muestras de unidad/rondas cruzadas.
+Sangre total, glóbulos rojos y la fracción pediátrica de sangre total generan
+muestras de unidad y rondas cruzadas.
 Plasma y los demás componentes no reciben un resultado ficticio Compatible:
-se registra No requiere prueba cruzada en este flujo. Para solicitudes sin estos
-dos componentes, Compatible significa selección completada, no una prueba hecha.
+se registra No requiere prueba cruzada en este flujo. Para solicitudes sin
+componentes que requieran prueba cruzada, Compatible significa selección completada.
 Las asignaciones aprobadas aparecen bloqueadas al reemplazar las rechazadas.
 Todos los intentos y resultados anteriores permanecen trazables y ninguna unidad
 ya probada para esa solicitud se ofrece nuevamente.
@@ -64,13 +65,15 @@ usa dos tablas Carbon de igual altura, con scroll independiente y sin paginació
 Cada fila tiene una flecha con nombre accesible para asignar o devolver la unidad.
 Los indicadores cuentan las unidades faltantes por hemocomponente, consideran
 las unidades ya aprobadas y cambian a verde al completar la cantidad exacta.
-El checkbox de verificación está en el pie izquierdo. La selección conserva
-el requisito de coincidencia exacta de ABO/Rh.
+En selección funcionan como opciones excluyentes para filtrar la lista de
+candidatas. Limpiar filtros restablece el hemocomponente y la búsqueda. Las
+tablas conservan el desplazamiento con teclado, rueda o gestos táctiles.
+El checkbox de verificación está en el pie izquierdo.
 El progreso y título se compactan en todas las etapas de atención, reemplazo y entrega, y en
 el procesamiento de Compatibilidad. La opción del modal propio permanece
 desactivada por defecto para los demás flujos del ESM.
 
-Los títulos identifican el contexto: `Solicitud transfusional · TX-DEMO-0001`,
+Los títulos identifican el contexto: `Atención de la Solicitud transfusional · TX-DEMO-0001`,
 `Entrega de unidades · TX-DEMO-0001` y `Pruebas de compatibilidad · TX-DEMO-0001`.
 Compatibilidad reutiliza en la cabecera el símbolo `IbmDevopsTest` del menú.
 Los pares receptor–unidad muestran tubos de ensayo SVG decorativos en rojo.
@@ -104,11 +107,17 @@ por componente) y CC17 (verificaciones y entrega).
 - Receptor: nombre y HC, fecha de toma y profesional; confirmación de concordancia
   del tubo y registro. FR08 conserva antecedentes desconocidos, no los interpreta
   como negativos. El encargado confirma la documentación/consentimiento aplicable.
-- El filtro DEMO exige mismo ABO/Rh, componente pedido, APTO, sello confirmado,
-  siete resultados no reactivos, ausencia de incidencias y fecha de caducidad
-  válida. **No es una matriz clínica completa ni una prueba cruzada electrónica**.
-  No ofrece sustituciones ABO/Rh; la política definitiva necesita validación
-  por componente, paciente y servidor. Autólogas quedan fuera del flujo regular.
+- El filtro del flujo regular usa EG05-CC14 A, B y D y las tablas de
+  [Lifeblood](https://www.lifeblood.com.au/health-professionals/products/component-compatibility).
+  Aplica las tablas ABO de glóbulos rojos y plasma en sus sentidos respectivos,
+  admite ambos RhD para plasma y crioprecipitado, y exige ABO idéntico en
+  sangre total y su fracción pediátrica. Las plaquetas y el plasma rico en
+  plaquetas se limitan a ABO idéntico y RhD compatible en el flujo regular.
+  Admitir sustituciones de plaquetas requiere datos y políticas de laboratorio
+  sobre el producto y la situación clínica. La selección, asignación y entrega
+  usan la misma regla junto con componente solicitado, APTO, sello, tamizaje,
+  ausencia de incidencias y vigencia. La prueba cruzada se registra por separado.
+  La política definitiva requiere validación clínica y aplicación en el servidor.
 - La muestra expira conservadoramente a los tres días en todos los casos mock.
   Los criterios reales dependen de antecedentes/embarazo/transfusiones; esa regla
   y un flujo de nueva muestra, caducidad, cancelación y liberación excepcional
@@ -116,8 +125,9 @@ por componente) y CC17 (verificaciones y entrega).
 - El profesional confirma grupo/Rh, anticuerpos y estudios pretransfusionales;
   el mock no ejecuta pruebas ni sustituye su validación de laboratorio. Aféresis,
   componentes especiales, selección pediátrica y autorizaciones urgentes se difieren.
-- Impresos de tubo y resultados llevan marca sintética. Imprimir no confirma
-  impresión física, firma ni entrega. Los botones azules permanecen abajo a la
+- Las etiquetas de muestra llevan el logo de Santa Clotilde e identifican el
+  receptor por nombre, historia clínica y ABO/Rh. Imprimir abre el diálogo del
+  navegador. Los botones azules permanecen abajo a la
   izquierda; no se fuerza otro formato de fecha nativo del navegador.
 - El libro registra **egresos para transfusión** por unidad: solicitud, sello,
   componente, receptor/HC, servicio, médico/CMP, responsable de atención, persona

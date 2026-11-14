@@ -32,7 +32,10 @@ vi.mock('@openmrs/esm-framework', () => ({
   PageHeaderContent: ({ title }: { title: string }) => <div>{title}</div>,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
-vi.mock('../../shared/print-document', () => ({ printDocument: vi.fn() }));
+vi.mock(import('../../shared/print-document'), async (original) => ({
+  ...(await original()),
+  printDocument: vi.fn(),
+}));
 const t = (key: string, values?: Record<string, string>) =>
   (
     (spanish.transfusion as Record<string, string>)[key] ??
@@ -100,6 +103,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(await screen.findAllByRole('button', { name: t('txAttend') })).toHaveLength(3);
     const rows = within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row');
     expect(rows[1]).toHaveTextContent('TX-DEMO-0004');
+    expect(rows.find((row) => row.textContent?.includes('TX-DEMO-0003'))).toHaveTextContent('AB POSITIVO (+)');
     expect(screen.getByRole('button', { name: t('txUrgentPending') })).toBeDisabled();
     fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: 'TX-DEMO-0001' } });
     expect(screen.getAllByRole('button', { name: t('txAttend') })).toHaveLength(1);
@@ -116,6 +120,8 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const requested = screen.getByRole('region', { name: t('txRequirement') });
     expect(within(requested).getAllByRole('listitem')).toHaveLength(2);
     expect(within(requested).getByText('×2')).toBeInTheDocument();
+    expect(within(requested).getAllByText('O POSITIVO (+)')).toHaveLength(2);
+    expect(requested).not.toHaveTextContent('ABO/Rh');
     expect(screen.getByLabelText(t('txReviewer'))).toHaveValue('Rosa Calderón');
     expect(screen.getByLabelText(t('txReviewer'))).toHaveAttribute('readonly');
     fireEvent.click(screen.getByRole('checkbox', { name: t('txReviewCheck') }));
@@ -158,6 +164,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const left = screen.getByRole('table', { name: t('txCandidates') });
     fireEvent.click(within(left).getByRole('button', { name: t('txAddUnit', { unit: code(1) }) }));
     const right = screen.getByRole('table', { name: t('txAssigned') });
+    expect(within(right).getAllByRole('columnheader')[0]).toHaveTextContent('Acción');
     expect(within(right).getByText(code(1))).toBeInTheDocument();
     const cards = screen.getByRole('region', { name: t('txRequirement') });
     const redCells = within(cards).getAllByRole('listitem')[0];
@@ -168,6 +175,24 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(redCells).not.toHaveAttribute('data-complete');
     expect(within(right).queryByText(code(1))).not.toBeInTheDocument();
     expect(within(left).getByText(code(1))).toBeInTheDocument();
+    const [redCellFilter, plasmaFilter] = within(cards).getAllByRole('radio');
+    fireEvent.click(redCellFilter);
+    expect(redCellFilter).toBeChecked();
+    expect(within(left).queryByText(code(11))).not.toBeInTheDocument();
+    expect(within(right).getByText(code(2))).toBeInTheDocument();
+    fireEvent.click(plasmaFilter);
+    expect(plasmaFilter).toBeChecked();
+    expect(redCellFilter).not.toBeChecked();
+    expect(within(left).getByText(code(11))).toBeInTheDocument();
+    expect(within(left).queryByText(code(1))).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: t('txSearchUnits') }), { target: { value: 'AB+' } });
+    expect(within(left).queryByText(code(11))).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('clearFilters') }));
+    expect(plasmaFilter).not.toBeChecked();
+    expect(screen.getByRole('searchbox', { name: t('txSearchUnits') })).toHaveValue('');
+    expect(within(left).getByText(code(1))).toBeInTheDocument();
+    expect(within(left).getByText(code(11))).toBeInTheDocument();
+    expect(within(right).getByText(code(2))).toBeInTheDocument();
   });
   it('renders every candidate without pagination and uses accessible icon-only move buttons', async () => {
     const { request, units } = await prepared();
@@ -187,10 +212,11 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
       />,
     );
     const table = screen.getByRole('table', { name: t('txCandidates') });
-    expect(within(table).getAllByRole('button')).toHaveLength(17);
+    expect(within(table).getAllByRole('button')).toHaveLength(21);
     expect(within(table).queryByRole('checkbox')).not.toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'ABO/Rh' })).toBeInTheDocument();
     expect(within(table).getAllByText('O POSITIVO (+)')).toHaveLength(17);
+    expect(within(table).getByText('O NEGATIVO (-)')).toBeInTheDocument();
     expect(within(table).getByText('BB-UI-DEMO-11')).toBeInTheDocument();
     expect(screen.queryByText(t('itemsPerPage'))).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
@@ -311,7 +337,11 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(view.container.querySelector('script')).toBeNull();
     expect(view.container.textContent).toContain(request.order.patientName);
     expect(view.container.textContent).toContain(request.order.historyNumber);
-    expect(view.container.querySelector('[data-demo]')).toBeTruthy();
+    expect(view.container.querySelector('[data-demo]')).toBeNull();
+    expect(screen.getByRole('img', { name: t('certificateHospital') })).toBeInTheDocument();
+    expect(view.container).toHaveTextContent(`Nombre del paciente: ${request.order.patientName}`);
+    expect(view.container).toHaveTextContent(`Número de historia clínica: ${request.order.historyNumber}`);
+    expect(view.container).toHaveTextContent('ABO/Rh: O POSITIVO (+)');
     expect(Object.keys(spanish.transfusion).sort()).toEqual(Object.keys(english.transfusion).sort());
   });
   it('uses the sidebar compatibility symbol for its enlarged decorative page illustration', () => {
@@ -387,6 +417,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
     const warning = screen.getByRole('dialog', { name: t('txConfirmAssignment') });
     expect(within(warning).getByText(t('txAssignReserveEffect'))).toBeInTheDocument();
+    expect(within(warning).getByText('Esta acción no representa una transfusión para el paciente')).toBeInTheDocument();
     expect(within(warning).queryByText(t('txAssignTestsEffect'))).not.toBeInTheDocument();
     expect((await api.list()).units.find((unit) => unit.id === code(13))?.status).toBe('APTO');
     expect((await api.list()).requests[2].status).toBe('sampleReady');

@@ -1,9 +1,20 @@
 import { formatDatetime } from '@openmrs/esm-framework';
+import { processingPrintCss } from '../../shared/print-document';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
+import hospitalLogo from '../collection/hospital-santa-clotilde.png';
 import { inventoryDisplayDate, inventoryUnitSealCode } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import styles from './transfusions.scss';
 import type { CompatibilityRound, RecipientSample, TransfusionRequest } from './transfusions.types';
+
+export const transfusionLabelPrintCss = `${processingPrintCss}
+  [data-label] { box-sizing: border-box; margin-block: 0 3mm; break-inside: avoid; }
+  [data-label] header { display: flex; align-items: center; gap: 3mm; }
+  [data-label] header img { width: 12mm; height: 12mm; object-fit: contain; }
+  [data-label] header h2 { margin: 0; font-size: 12pt; text-align: start; }
+  [data-label] p { margin: 1.5mm 0; }
+`;
 
 export function TransfusionLabels({
   request,
@@ -20,7 +31,9 @@ export function TransfusionLabels({
     {
       code: sample.code,
       name: request.order.patientName,
-      identification: sample.historyNumber,
+      historyNumber: sample.historyNumber,
+      bloodGroup: request.order.bloodGroup,
+      seal: '',
       date: sample.collectedAt,
       operator: sample.collectedBy,
     },
@@ -29,24 +42,38 @@ export function TransfusionLabels({
       .map((item) => ({
         code: item.unitSampleCode ?? '',
         name: item.unit.id,
-        identification: `${item.unit.bloodGroup} · ${inventoryUnitSealCode(item.unit)}`,
+        historyNumber: '',
+        bloodGroup: item.unit.bloodGroup,
+        seal: inventoryUnitSealCode(item.unit),
         date: item.assignedAt,
         operator: request.draft.reviewer,
       })),
   ];
   return (
     <article className={styles.document}>
-      <p data-demo>{t('printPrototype')}</p>
-      {!round && <p>{t('txLabelDraft')}</p>}
       {labels.map((label) => (
         <section key={label.code} data-label>
-          <h2>{t('txSampleLabel')}</h2>
+          <header>
+            <img src={hospitalLogo} width={46} height={46} alt={t('certificateHospital')} />
+            <h2>{t('txSampleLabel')}</h2>
+          </header>
           <p>
             {t('sampleCode')}: {label.code}
           </p>
-          <p>{label.name}</p>
           <p>
-            {t('txIdentification')}: {label.identification}
+            {t(label.historyNumber ? 'txSamplePatientName' : 'inventoryUnitNumber')}: {label.name}
+          </p>
+          {label.historyNumber ? (
+            <p>
+              {t('txSampleHistoryNumber')}: {label.historyNumber}
+            </p>
+          ) : (
+            <p>
+              {t('txSeal')}: {label.seal || '—'}
+            </p>
+          )}
+          <p>
+            {t('bloodGroupShort')}: <strong>{transfusionBloodGroupLabel(label.bloodGroup, t)}</strong>
           </p>
           <p>
             {t('collectedOn')}: {label.date ? formatDatetime(new Date(label.date), { noToday: true }) : '—'}

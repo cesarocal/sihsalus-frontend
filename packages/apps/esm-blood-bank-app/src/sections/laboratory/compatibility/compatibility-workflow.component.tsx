@@ -8,7 +8,7 @@ import { printDocument } from '../../../shared/print-document';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { WarningConfirmation } from '../../../shared/warning-confirmation.component';
-import { TransfusionLabels } from '../../transfusions/transfusion-print.component';
+import { TransfusionLabels, transfusionLabelPrintCss } from '../../transfusions/transfusion-print.component';
 import styles from '../../transfusions/transfusions.scss';
 import type { CompatibilityRound, TransfusionRequest } from '../../transfusions/transfusions.types';
 import { FractionationContent } from '../fractionation/fractionation-content.component';
@@ -75,6 +75,7 @@ export function CompatibilityWorkflow({
         <TransfusionLabels request={request} sample={round.sample} round={round} t={t} />,
         t('txPrintLabels'),
         () => setFailed('printFailed'),
+        transfusionLabelPrintCss,
       );
     } catch {
       setFailed('printFailed');

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { disposalOperation } from '../sections/inventory/inventory-test-fixtures';
+import type { ComponentType } from '../sections/laboratory/fractionation/fractionation.types';
 import { localDateTime } from '../sections/laboratory/screening/screening-rules';
 import type { TransfusionRequest } from '../sections/transfusions/transfusions.types';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
@@ -123,6 +124,43 @@ describe('regular transfusion attention and compatibility shared stock', () => {
         reviewer: 'DEMO',
       }),
     ).rejects.toThrow('TRANSFUSION_CONFLICT');
+  });
+  it('checks donor-to-recipient ABO/Rh by component and retains the same rule at assignment and delivery', async () => {
+    const api = createMockTransfusionsApi();
+    const request = await sampled(1, api);
+    const units = (await api.list()).units;
+    const redCell = units.find((unit) => unit.id === unitCode(1));
+    if (!redCell) throw new Error('MISSING_FIXTURE');
+    const compatible = (componentType: ComponentType, donor: string, recipient: string) =>
+      transfusionCandidate(
+        { ...redCell, bloodGroup: donor, componentType },
+        {
+          ...request,
+          order: { ...request.order, bloodGroup: recipient, items: [{ component: componentType, quantity: 1 }] },
+        },
+      );
+    expect(compatible('redCells', 'O-', 'A+')).toBe(true);
+    expect(compatible('redCells', 'O+', 'A-')).toBe(false);
+    expect(compatible('redCells', 'B-', 'A+')).toBe(false);
+    expect(compatible('wholeBlood', 'O-', 'A+')).toBe(false);
+    expect(compatible('wholeBlood', 'A-', 'A+')).toBe(true);
+    expect(compatible('pediatricFraction', 'O-', 'A+')).toBe(false);
+    expect(compatible('freshFrozenPlasma', 'AB+', 'A-')).toBe(true);
+    expect(compatible('freshFrozenPlasma', 'O-', 'A-')).toBe(false);
+    expect(compatible('cryoprecipitate', 'AB+', 'O-')).toBe(true);
+    expect(compatible('platelets', 'O-', 'A+')).toBe(false);
+    expect(compatible('platelets', 'A+', 'A-')).toBe(false);
+    expect(compatible('platelets', 'A-', 'A+')).toBe(true);
+    expect(compatible('redCells', 'unknown', 'A+')).toBe(false);
+
+    await expect(
+      api.assign(request.id, request.revision, [unitCode(1), unitCode(5), unitCode(13)], true),
+    ).rejects.toThrow('INVALID_TRANSFUSION_SELECTION');
+    const allocated = await api.assign(request.id, request.revision, [unitCode(1), unitCode(6), unitCode(13)], true);
+    expect(allocated.rounds[0].results).toHaveProperty(unitCode(6));
+    const tested = await results(allocated, false, api);
+    const delivered = await api.deliver(tested.id, tested.revision, pickup(tested));
+    expect(delivered.status).toBe('delivered');
   });
   it('filters UTC timestamps by the displayed local calendar day, including evening handovers', () => {
     vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(300);

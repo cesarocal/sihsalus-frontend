@@ -11,7 +11,7 @@ import { WarningConfirmation } from '../../shared/warning-confirmation.component
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import type { TransferUnit } from '../transfers/transfers.types';
 import { TransfusionDetails } from './transfusion-details.component';
-import { CompatibilityReport, TransfusionLabels } from './transfusion-print.component';
+import { CompatibilityReport, TransfusionLabels, transfusionLabelPrintCss } from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import styles from './transfusions.scss';
 import type { TransfusionDraft, TransfusionRequest } from './transfusions.types';
@@ -183,7 +183,7 @@ export function TransfusionWorkflow({
         <TransfusionLabels request={request} sample={sampleToPrint} t={t} />,
         t('txPrintSample'),
         onError,
-        undefined,
+        transfusionLabelPrintCss,
         () => {
           if (!sampleReady) change({ sample: sampleToPrint });
           setPrintingSample(false);
@@ -367,7 +367,7 @@ export function TransfusionWorkflow({
           title={t(confirm === 'assign' ? 'txConfirmAssignment' : 'txConfirmDelivery')}
           description={t(confirm === 'assign' ? 'txAssignWarning' : 'txDeliveryWarning')}
           items={confirm === 'assign' ? assignmentEffects : [t('txDeliveryBookEffect'), t('txDeliveryRequestEffect')]}
-          note={t('txNoAdministration')}
+          note={t(confirm === 'assign' ? 'txAssignmentNote' : 'txNoAdministration')}
           cancelLabel={t('keepEditing')}
           confirmLabel={t('txConfirm')}
           closeLabel={t('close')}
