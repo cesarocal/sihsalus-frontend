@@ -108,7 +108,13 @@ function BloodBankRoutes({
           path="inventory"
           element={protectedPage(
             bloodBankPrivileges.inventory,
-            <InventoryPage api={api} shortcut={shortcut} expiryWarningDays={settings.expiryWarningDays} />,
+            <InventoryPage
+              api={api}
+              shortcut={shortcut}
+              expiryWarningDays={settings.expiryWarningDays}
+              stockMinimums={settings.stockMinimums}
+              inventoryCardComponents={settings.inventoryCardComponents}
+            />,
           )}
         />
         <Route

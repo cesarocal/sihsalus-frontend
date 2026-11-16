@@ -9,6 +9,7 @@ import { createDisposalSignatoriesLoader } from '../../api/inventory.api';
 import { mockBloodBankApi } from '../../api/mock-blood-bank.api';
 import { createMockInventoryApi } from '../../api/mock-inventory.api';
 import { printDocument } from '../../shared/print-document';
+import { componentTypes } from '../laboratory/fractionation/fractionation-rules';
 import { disposalCauses } from './disposal-causes';
 import { DisposalAct, QualitySeals } from './inventory-documents.component';
 import { InventoryPage } from './inventory-page.component';
@@ -169,6 +170,75 @@ describe('inventory selection, seals and disposal UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('inventoryDeselect') }));
     expect(screen.getByText('Unidades seleccionadas: 0')).toBeInTheDocument();
   });
+
+  it('counts available stock for minimums and uses the same component filter as the table', async () => {
+    vi.setSystemTime(new Date(2026, 10, 16, 12));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const api = instance();
+    const { units } = await api.inventory.list();
+    const unit = { ...units[0], component: 'Sangre total (DEMO)', status: 'APTO' as const, expiresAt: '16/11/2026' };
+    vi.spyOn(api.inventory, 'list').mockResolvedValue({
+      operations: [],
+      units: [
+        { ...unit, id: 'ST-AVAILABLE' },
+        { ...unit, id: 'ST-EXPIRED', expiresAt: '2026-11-16T11:59' },
+        { ...unit, id: 'ST-RESERVED', status: 'Reservados para transfusión' },
+        { ...unit, id: 'ST-QUARANTINE', status: 'Cuarentena' },
+        { ...unit, id: 'ST-UNKNOWN-EXPIRY', expiresAt: '' },
+        { ...unit, id: 'RED-AVAILABLE', component: 'Glóbulos rojos' },
+      ],
+    });
+    render(<InventoryPage api={api} stockMinimums={{ wholeBlood: 2, redCells: 1, pediatricFraction: 1 }} />);
+
+    const cards = within(await screen.findByRole('region', { name: t('inventoryStockByComponent') }));
+    const wholeBlood = cards.getByRole('button', { name: /^Sangre total/ });
+    expect(wholeBlood).toHaveTextContent('5 en almacén');
+    expect(wholeBlood).toHaveTextContent('Disponibles 1');
+    expect(wholeBlood).toHaveTextContent('Mín. 2');
+    expect(wholeBlood).toHaveAttribute('data-low-stock');
+    expect(cards.getByRole('button', { name: /^Glóbulos rojos 1/i })).not.toHaveAttribute('data-low-stock');
+    expect(cards.getByRole('button', { name: /^Fracción pediátrica/ })).toHaveTextContent('Disponibles 0');
+    expect(cards.getByRole('button', { name: /^Fracción pediátrica/ })).toHaveAttribute('data-low-stock');
+    expect(cards.getByRole('button', { name: /^Plasma fresco congelado/ })).not.toHaveAttribute('data-low-stock');
+
+    const filter = screen.getByLabelText(t('fractionationComponent'));
+    fireEvent.click(wholeBlood);
+    expect(wholeBlood).toHaveAttribute('aria-pressed', 'true');
+    expect(filter).toHaveValue('wholeBlood');
+    expect(screen.getByRole('checkbox', { name: 'Seleccionar ST-QUARANTINE' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Seleccionar RED-AVAILABLE' })).not.toBeInTheDocument();
+    fireEvent.click(wholeBlood);
+    expect(filter).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: 'Seleccionar RED-AVAILABLE' })).toBeInTheDocument();
+    fireEvent.change(filter, { target: { value: 'wholeBlood' } });
+    expect(wholeBlood).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: t('inventoryClearFilters') }));
+    expect(wholeBlood).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it.each([
+    [6, [6]],
+    [7, [4, 3]],
+    [11, [6, 5]],
+  ])('distributes %i configured component cards across balanced rows', async (count, rowSizes) => {
+    render(<InventoryPage api={instance()} inventoryCardComponents={componentTypes.slice(0, count)} />);
+    const cards = within(await screen.findByRole('region', { name: t('inventoryStockByComponent') }));
+    expect(cards.getAllByRole('list').map((row) => within(row).getAllByRole('button').length)).toEqual(rowSizes);
+    if (count === 6) {
+      expect(cards.queryByRole('button', { name: /^Concentrado de plaquetas/ })).not.toBeInTheDocument();
+      const filter = screen.getByLabelText(t('fractionationComponent'));
+      expect(within(filter).getByRole('option', { name: t('componentPlatelets') })).toBeInTheDocument();
+    }
+  });
+
+  it('omits the card area when every component is hidden', async () => {
+    render(<InventoryPage api={instance()} inventoryCardComponents={[]} />);
+    await screen.findByRole('checkbox', { name: 'Seleccionar BB-SELLO-DEMO-001' });
+    expect(screen.queryByRole('region', { name: t('inventoryStockByComponent') })).not.toBeInTheDocument();
+  });
+
   it.each([
     'inventory',
     'qualitySeal',

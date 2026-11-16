@@ -7,8 +7,10 @@ import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../.
 import type { InventorySummary } from '../../types/blood-bank.types';
 import { type DashboardShortcut, expiresSoon } from '../dashboard/dashboard-shortcuts';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
 import { screeningBloodGroups, screeningRhFactors } from '../laboratory/screening/screening.types';
-import { defaultExpiryWarningDays } from '../settings/blood-bank-settings';
+import { type StockMinimums, defaultExpiryWarningDays } from '../settings/blood-bank-settings';
+import { InventoryStockCards } from './inventory-stock-cards.component';
 import styles from './inventory.scss';
 import type { InventoryOperation, InventoryUnit } from './inventory.types';
 import { canSeal, disposalEligibleStatuses, inventoryDisplayDate, inventoryStatusKey } from './inventory-rules';
@@ -32,6 +34,8 @@ export function InventorySelector({
   t,
   shortcut,
   expiryWarningDays = defaultExpiryWarningDays,
+  stockMinimums,
+  inventoryCardComponents,
 }: {
   units: InventoryUnit[];
   selected: InventorySummary[];
@@ -48,6 +52,8 @@ export function InventorySelector({
   t: ProcessingTranslate;
   shortcut?: DashboardShortcut;
   expiryWarningDays?: number;
+  stockMinimums?: StockMinimums;
+  inventoryCardComponents?: readonly ComponentType[];
 }) {
   const [search, setSearch] = useState(shortcut?.unit || shortcut?.q || '');
   const [exactUnit, setExactUnit] = useState(shortcut?.unit ?? '');
@@ -119,6 +125,17 @@ export function InventorySelector({
   const now = Date.now();
   return (
     <>
+      {!!inventoryCardComponents?.length && !unavailable && (
+        <InventoryStockCards
+          units={units}
+          unitComponent={unitComponent}
+          stockMinimums={stockMinimums}
+          visibleComponents={inventoryCardComponents}
+          selectedComponent={component}
+          onSelectComponent={setComponent}
+          t={t}
+        />
+      )}
       <div className={actions ? `${styles.toolbar} ${styles.inventoryToolbar}` : styles.toolbar}>
         <Search
           id={`${prefix}-search`}

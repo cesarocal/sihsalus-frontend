@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import spanish from '../../../translations/es.json';
+import { componentTypes } from '../laboratory/fractionation/fractionation-rules';
 import { BloodBankSettingsPage } from './settings-page.component';
 
 vi.mock('@openmrs/esm-framework', () => ({
@@ -18,13 +19,66 @@ vi.mock('@openmrs/esm-framework', () => ({
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }) }));
 
 const t = spanish.processing;
-const settings = { expiryWarningDays: 7, servicePersonUuid: '', epidemiologyPersonUuid: '' };
+const settings = {
+  expiryWarningDays: 7,
+  stockMinimums: {},
+  inventoryCardComponents: componentTypes,
+  servicePersonUuid: '',
+  epidemiologyPersonUuid: '',
+};
 const response = (data: unknown) => ({ data }) as FetchResponse<unknown>;
 const person = (uuid: string, display: string) => ({ uuid, preferredName: { display } });
 
 describe('Blood Bank signatory settings', () => {
   beforeEach(() => {
     vi.mocked(openmrsFetch).mockReset();
+  });
+
+  it('validates minimums per component and removes a minimum when its input is cleared', async () => {
+    const onSave = vi.fn(async () => {});
+    render(<BloodBankSettingsPage settings={{ ...settings, stockMinimums: { wholeBlood: 5 } }} onSave={onSave} />);
+    const form = within(screen.getByRole('group', { name: t.settingsStockMinimums }));
+    const wholeBlood = form.getByRole('spinbutton', { name: t.componentWholeBlood });
+    const redCells = form.getByRole('spinbutton', { name: t.componentRedCells });
+    const save = screen.getByRole('button', { name: t.settingsSave });
+    expect(wholeBlood).toHaveValue(5);
+    fireEvent.change(redCells, { target: { value: '-1' } });
+    fireEvent.click(save);
+    expect(form.getByText(t.settingsInvalidStockMinimum)).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.change(redCells, { target: { value: '2' } });
+    fireEvent.change(wholeBlood, { target: { value: '' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ ...settings, stockMinimums: { redCells: 2 } }));
+  });
+
+  it('saves the visible cards separately from the stock minimums, including an empty selection', async () => {
+    const stockMinimums = { wholeBlood: 5 };
+    const onSave = vi.fn(async () => {});
+    render(
+      <BloodBankSettingsPage
+        settings={{ ...settings, stockMinimums, inventoryCardComponents: ['wholeBlood'] }}
+        onSave={onSave}
+      />,
+    );
+    const visibility = within(screen.getByRole('group', { name: t.settingsInventoryCards }));
+    const wholeBlood = visibility.getByRole('checkbox', { name: t.componentWholeBlood });
+    const redCells = visibility.getByRole('checkbox', { name: t.componentRedCells });
+    expect(wholeBlood).toBeChecked();
+    expect(redCells).not.toBeChecked();
+    fireEvent.click(wholeBlood);
+    fireEvent.click(redCells);
+    const save = screen.getByRole('button', { name: t.settingsSave });
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(onSave).toHaveBeenLastCalledWith({ ...settings, stockMinimums, inventoryCardComponents: ['redCells'] }),
+    );
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(redCells);
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(onSave).toHaveBeenLastCalledWith({ ...settings, stockMinimums, inventoryCardComponents: [] }),
+    );
   });
 
   it('loads a saved designation by name and submits only selected people for the two roles', async () => {

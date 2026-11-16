@@ -23,6 +23,22 @@
   gap: layout.$spacing-05;
 }
 
+.settingHelp {
+  @include type.type-style("body-01");
+  margin-block-end: layout.$spacing-04;
+}
+
+.cardVisibilityGrid,
+.minimumGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: layout.$spacing-04;
+}
+
+.minimumGrid {
+  align-items: end;
+}
+
 .signatory {
   > legend,
   > p {

@@ -15,6 +15,7 @@ import {
   type BloodBankSettings,
   defaultBloodBankSettings,
   isExpiryWarningDays,
+  isStockMinimum,
   readMockBloodBankSettings,
   saveMockBloodBankSettings,
   signatoryLookupError,
@@ -45,7 +46,12 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
     locationUuid &&
     userHasAccess([bloodBankPrivileges.module, bloodBankPrivileges.settings], user);
   const saveSettings = async (next: BloodBankSettings) => {
-    if (!canSave || !locationUuid || !isExpiryWarningDays(next.expiryWarningDays))
+    if (
+      !canSave ||
+      !locationUuid ||
+      !isExpiryWarningDays(next.expiryWarningDays) ||
+      !Object.values(next.stockMinimums).every(isStockMinimum)
+    )
       throw new Error('BLOOD_BANK_SETTINGS_UNAVAILABLE');
 
     const service = next.servicePersonUuid === servicePersonUuid ? '' : next.servicePersonUuid;

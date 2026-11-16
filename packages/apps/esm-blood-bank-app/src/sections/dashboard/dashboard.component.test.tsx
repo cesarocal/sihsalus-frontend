@@ -7,7 +7,7 @@ import { bloodBankPrivileges as p } from '../../access/blood-bank-privileges';
 import { mockBloodBankApi } from '../../api/mock-blood-bank.api';
 import { BloodBankApp } from '../../blood-bank-app.component';
 import { InventorySelector } from '../inventory/inventory-selector.component';
-import { eligibleSource } from '../laboratory/fractionation/fractionation-rules';
+import { componentTypes, eligibleSource } from '../laboratory/fractionation/fractionation-rules';
 import { localDateTime, screeningCategory } from '../laboratory/screening/screening-rules';
 import { DashboardPage } from './dashboard-page.component';
 import { dashboardLink, expiresSoon, readDashboardShortcut } from './dashboard-shortcuts';
@@ -138,7 +138,13 @@ describe('personalized home and actionable shortcuts', () => {
     fireEvent.change(days, { target: { value: '12' } });
     fireEvent.click(save);
     await waitFor(() =>
-      expect(onSave).toHaveBeenCalledWith({ expiryWarningDays: 12, servicePersonUuid: '', epidemiologyPersonUuid: '' }),
+      expect(onSave).toHaveBeenCalledWith({
+        expiryWarningDays: 12,
+        stockMinimums: {},
+        inventoryCardComponents: componentTypes,
+        servicePersonUuid: '',
+        epidemiologyPersonUuid: '',
+      }),
     );
   });
   it.each([

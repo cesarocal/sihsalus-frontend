@@ -6,6 +6,9 @@ import { ProcessingPage, useProcessingData, useProcessingTranslation } from '../
 import type { InventorySummary } from '../../types/blood-bank.types';
 import shared from '../applicant-selection/selection.scss';
 import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
+import { componentTypes } from '../laboratory/fractionation/fractionation-rules';
+import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
+import type { StockMinimums } from '../settings/blood-bank-settings';
 import type { InventoryOperation } from './inventory.types';
 import { InventoryHistory } from './inventory-history.component';
 import { canSeal, newInventoryOperation } from './inventory-rules';
@@ -16,10 +19,14 @@ export function InventoryPage({
   api,
   shortcut,
   expiryWarningDays,
+  stockMinimums = {},
+  inventoryCardComponents = componentTypes,
 }: {
   api: BloodBankApi;
   shortcut?: DashboardShortcut;
   expiryWarningDays?: number;
+  stockMinimums?: StockMinimums;
+  inventoryCardComponents?: readonly ComponentType[];
 }) {
   const t = useProcessingTranslation();
   const load = useCallback(() => api.inventory.list(), [api]);
@@ -64,6 +71,8 @@ export function InventoryPage({
         <InventorySelector
           shortcut={shortcut}
           expiryWarningDays={expiryWarningDays}
+          stockMinimums={stockMinimums}
+          inventoryCardComponents={inventoryCardComponents}
           units={units}
           selected={selected}
           onChange={setSelected}

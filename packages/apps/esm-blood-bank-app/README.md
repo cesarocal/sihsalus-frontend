@@ -217,6 +217,15 @@ muestra un aviso si falla la impresión.
   inicial es `dashboardExpiryWarningDays` o 7 si el desplegado no lo define. El
   mismo valor se aplica en Inicio e Inventario. Las fechas de caducidad de las
   unidades se conservan como registros operativos.
+- Inventario presenta tarjetas con el total en almacén y el número de unidades
+  aptas, vigentes y libres de reserva por hemocomponente. En Parametrización se
+  puede elegir cuáles se muestran. Por defecto aparecen todos. Se distribuyen
+  en una fila hasta seis tarjetas o en dos filas a partir de siete. Una
+  selección vacía oculta las tarjetas. Cada tarjeta usa el filtro de
+  hemocomponente de la tabla. Parametrización permite
+  definir un mínimo por componente con un número entero a partir de cero. La
+  tarjeta indica **Stock bajo** si el disponible queda por debajo de ese mínimo.
+  Un campo vacío deja la alerta desactivada para ese componente.
 - Los firmantes del acta se buscan por nombre y apellido en OpenMRS. La búsqueda
   usa REST `GET /ws/rest/v1/person?q=...` y requiere `Get People` en el backend.
   La pantalla guarda el UUID de la persona elegida y verifica su nombre en
@@ -230,7 +239,7 @@ muestra un aviso si falla la impresión.
   de las designaciones, o reutilizar una estructura existente. La configuración
   compartida necesita validación, permisos y auditoría de cambios en el servidor.
 
-Otros parámetros a evaluar son mínimos de stock por hemocomponente y ABO/Rh,
+Otros parámetros a evaluar son mínimos de stock desglosados por ABO/Rh,
 plazo de entrega de resultados y series documentales por banco. Los catálogos
 de OpenMRS que ya se configuran en extracción y laboratorio son candidatos
 para administración centralizada. La vigencia clínica, la compatibilidad y el

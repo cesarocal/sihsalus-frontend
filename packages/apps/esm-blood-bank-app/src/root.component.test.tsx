@@ -13,6 +13,7 @@ import { bloodBankPrivileges } from './access/blood-bank-privileges';
 import type { BloodBankApp } from './blood-bank-app.component';
 import type { BloodBankConfig } from './config-schema';
 import Root from './root.component';
+import { componentTypes } from './sections/laboratory/fractionation/fractionation-rules';
 
 type RequirePrivilegeProps = {
   privilege: string | string[];
@@ -105,13 +106,26 @@ describe('Blood Bank root', () => {
     vi.mocked(openmrsFetch).mockResolvedValue({
       data: { uuid: 'person-epidemiology', preferredName: { display: 'Celia Ríos' } },
     } as FetchResponse<unknown>);
-    await act(() => save({ ...before.settings, expiryWarningDays: 14, epidemiologyPersonUuid: 'person-epidemiology' }));
+    await act(() =>
+      save({
+        ...before.settings,
+        expiryWarningDays: 14,
+        stockMinimums: { wholeBlood: 3 },
+        inventoryCardComponents: ['wholeBlood', 'redCells'],
+        epidemiologyPersonUuid: 'person-epidemiology',
+      }),
+    );
     expect(mockBloodBankApp.mock.lastCall?.[0].settings?.expiryWarningDays).toBe(14);
     unmount();
 
     const bankA = render(<Root />);
     const restored = mockBloodBankApp.mock.lastCall?.[0];
-    expect(restored?.settings).toMatchObject({ expiryWarningDays: 14, epidemiologyPersonUuid: 'person-epidemiology' });
+    expect(restored?.settings).toMatchObject({
+      expiryWarningDays: 14,
+      stockMinimums: { wholeBlood: 3 },
+      inventoryCardComponents: ['wholeBlood', 'redCells'],
+      epidemiologyPersonUuid: 'person-epidemiology',
+    });
     await expect(restored?.api.inventory.getDisposalSignatories()).resolves.toMatchObject({
       epidemiologyResponsible: 'Celia Ríos',
     });
@@ -121,7 +135,23 @@ describe('Blood Bank root', () => {
     render(<Root />);
     expect(mockBloodBankApp.mock.lastCall?.[0].settings).toMatchObject({
       expiryWarningDays: 7,
+      stockMinimums: {},
+      inventoryCardComponents: componentTypes,
       epidemiologyPersonUuid: '',
+    });
+  });
+
+  it('shows all cards when reopening settings that predate card selection', () => {
+    localStorage.setItem(
+      'sihsalus.blood-bank.settings.mock.v1:bank-a',
+      JSON.stringify({ expiryWarningDays: 9, servicePersonUuid: 'service-person', epidemiologyPersonUuid: '' }),
+    );
+    render(<Root />);
+    expect(mockBloodBankApp.mock.lastCall?.[0].settings).toMatchObject({
+      expiryWarningDays: 9,
+      stockMinimums: {},
+      inventoryCardComponents: componentTypes,
+      servicePersonUuid: 'service-person',
     });
   });
 });

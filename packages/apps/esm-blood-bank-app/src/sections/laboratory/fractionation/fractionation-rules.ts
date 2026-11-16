@@ -97,6 +97,8 @@ export const componentDefinitions: Record<
   },
 };
 
+export const componentTypes = Object.keys(componentDefinitions) as ComponentType[];
+
 const separationOptions: Partial<Record<ComponentType, ComponentType[][]>> = {
   wholeBlood: [
     ['redCells', 'liquidPlasma'],
