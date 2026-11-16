@@ -3,6 +3,38 @@
 @use "@carbon/type";
 @use "@openmrs/esm-styleguide/src/vars" as *;
 
+.inventoryHeaderTotals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: layout.$spacing-04;
+  margin: 0;
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    gap: layout.$spacing-03;
+    white-space: nowrap;
+
+    + div {
+      padding-inline-start: layout.$spacing-04;
+      border-inline-start: 1px solid $ui-03;
+    }
+  }
+
+  dt {
+    @include type.type-style("label-01");
+    color: $text-02;
+  }
+
+  dd {
+    @include type.type-style("heading-04");
+    order: -1;
+    margin: 0;
+    color: var(--cds-text-primary);
+  }
+}
+
 .printFooter:global(.cds--modal-footer) > div:first-child {
   margin-inline-end: auto;
 }
@@ -22,6 +54,64 @@
   max-inline-size: none;
 }
 
+.stockDetails {
+  margin-block-end: layout.$spacing-03;
+
+  &[open] .stockDetailsActions > svg {
+    transform: rotate(180deg);
+  }
+}
+
+.stockDetailsSummary {
+  @include type.type-style("body-01");
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: layout.$spacing-03;
+  min-block-size: layout.$spacing-08;
+  padding: layout.$spacing-02 layout.$spacing-04;
+  border: 1px solid $ui-03;
+  background: colors.$gray-10;
+  list-style: none;
+  cursor: pointer;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:hover {
+    background: colors.$gray-10-hover;
+  }
+
+  &:focus-visible {
+    outline: 2px solid colors.$blue-60;
+    outline-offset: -2px;
+  }
+}
+
+.stockDetailsActions {
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-03;
+  margin-inline-start: auto;
+}
+
+.stockComponentCount,
+.lowStockSummary {
+  @include type.type-style("label-01");
+}
+
+.stockComponentCount {
+  color: $text-02;
+}
+
+.lowStockSummary {
+  padding: layout.$spacing-01 layout.$spacing-03;
+  border-radius: layout.$spacing-05;
+  background: colors.$orange-20;
+  color: colors.$orange-70;
+}
+
 .stockCardRows {
   display: grid;
   grid-template-columns: minmax(
@@ -32,7 +122,7 @@
   gap: layout.$spacing-03;
   max-inline-size: 100%;
   overflow-x: auto;
-  margin-block-end: layout.$spacing-03;
+  margin-block-start: layout.$spacing-03;
 }
 
 .stockCards {

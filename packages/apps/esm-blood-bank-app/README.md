@@ -226,6 +226,10 @@ muestra un aviso si falla la impresión.
   definir un mínimo por componente con un número entero a partir de cero. La
   tarjeta indica **Stock bajo** si el disponible queda por debajo de ese mínimo.
   Un campo vacío deja la alerta desactivada para ese componente.
+- Inventario muestra los totales de almacén, cuarentena y unidades aptas en el
+  encabezado. El acordeón de tarjetas empieza abierto. Al plegarlo sigue
+  visible el número de componentes con stock bajo entre las tarjetas
+  configuradas y el selector conserva el filtro activo.
 - Los firmantes del acta se buscan por nombre y apellido en OpenMRS. La búsqueda
   usa REST `GET /ws/rest/v1/person?q=...` y requiere `Get People` en el backend.
   La pantalla guarda el UUID de la persona elegida y verifica su nombre en

@@ -193,6 +193,15 @@ describe('inventory selection, seals and disposal UI', () => {
     render(<InventoryPage api={api} stockMinimums={{ wholeBlood: 2, redCells: 1, pediatricFraction: 1 }} />);
 
     const cards = within(await screen.findByRole('region', { name: t('inventoryStockByComponent') }));
+    const header = screen.getByRole('banner');
+    expect(header).toHaveTextContent(/Inventario.*En almacén.*Hospital DEMO/);
+    const totals = within(within(header).getByLabelText(t('inventorySummary')));
+    expect(totals.getByText(t('inventoryStock')).nextElementSibling).toHaveTextContent('6');
+    expect(totals.getByText(t('quarantine')).nextElementSibling).toHaveTextContent('1');
+    expect(totals.getByText(t('inventorySuitableUnits')).nextElementSibling).toHaveTextContent('4');
+    const toggle = screen.getByText(t('inventoryStockByComponent')).closest('summary');
+    if (!toggle) throw new Error('Expected a collapsible stock summary');
+    expect(toggle.parentElement).toHaveAttribute('open');
     const wholeBlood = cards.getByRole('button', { name: /^Sangre total/ });
     expect(wholeBlood).toHaveTextContent('5 en almacén');
     expect(wholeBlood).toHaveTextContent('Disponibles 1');
@@ -209,6 +218,14 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(filter).toHaveValue('wholeBlood');
     expect(screen.getByRole('checkbox', { name: 'Seleccionar ST-QUARANTINE' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Seleccionar RED-AVAILABLE' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle.parentElement).not.toHaveAttribute('open');
+    expect(within(toggle).getByText(`2 ${t('inventoryStockCountLow')}`)).toBeVisible();
+    expect(filter).toHaveValue('wholeBlood');
+    expect(screen.queryByRole('checkbox', { name: 'Seleccionar RED-AVAILABLE' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle.parentElement).toHaveAttribute('open');
+    expect(wholeBlood).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(wholeBlood);
     expect(filter).toHaveValue('');
     expect(screen.getByRole('checkbox', { name: 'Seleccionar RED-AVAILABLE' })).toBeInTheDocument();

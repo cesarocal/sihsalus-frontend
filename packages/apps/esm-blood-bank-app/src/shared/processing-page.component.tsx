@@ -60,12 +60,14 @@ export function useProcessingData<T>(load: () => Promise<T>, enabled = true) {
 export function ProcessingPage({
   title,
   counts,
+  headerSummary,
   children,
   illustration,
   tabs,
 }: {
   title: string;
-  counts: { label: string; description: string; value: number | string }[];
+  counts?: { label: string; description: string; value: number | string }[];
+  headerSummary?: ReactNode;
   children: ReactNode;
   illustration: BloodBankIllustration;
   tabs?: ReactNode;
@@ -73,18 +75,24 @@ export function ProcessingPage({
   return (
     <div className={styles.page}>
       <h1 className="cds--visually-hidden">{title}</h1>
-      <BloodBankPageHeader illustration={<BloodBankPageIllustration section={illustration} />} title={title} />
+      <BloodBankPageHeader
+        illustration={<BloodBankPageIllustration section={illustration} />}
+        summary={headerSummary}
+        title={title}
+      />
       {tabs}
       <div className={styles.content}>
-        <section className={styles.summary} aria-label={title}>
-          {counts.map((count) => (
-            <Tile className={styles.summaryTile} key={count.label}>
-              <p>{count.label}</p>
-              <small>{count.description}</small>
-              <span>{count.value}</span>
-            </Tile>
-          ))}
-        </section>
+        {counts && (
+          <section className={styles.summary} aria-label={title}>
+            {counts.map((count) => (
+              <Tile className={styles.summaryTile} key={count.label}>
+                <p>{count.label}</p>
+                <small>{count.description}</small>
+                <span>{count.value}</span>
+              </Tile>
+            ))}
+          </section>
+        )}
         {children}
       </div>
     </div>

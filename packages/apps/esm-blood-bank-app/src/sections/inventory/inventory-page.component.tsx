@@ -14,6 +14,7 @@ import { InventoryHistory } from './inventory-history.component';
 import { canSeal, newInventoryOperation } from './inventory-rules';
 import { InventorySelector } from './inventory-selector.component';
 import { InventoryWorkflow } from './inventory-workflow.component';
+import styles from './inventory.scss';
 
 export function InventoryPage({
   api,
@@ -37,6 +38,11 @@ export function InventoryPage({
   const [openReprint, setOpenReprint] = useState(false);
   const units = data?.units ?? [];
   const unavailable = loading || failed;
+  const totals = [
+    { label: 'inventoryStock', count: units.length },
+    { label: 'quarantine', count: units.filter((unit) => unit.status === 'Cuarentena').length },
+    { label: 'inventorySuitableUnits', count: units.filter((unit) => unit.status === 'APTO').length },
+  ];
   const open = (kind: InventoryOperation['kind']) => {
     if (unavailable) return;
     const candidates = units.filter(
@@ -49,23 +55,16 @@ export function InventoryPage({
     <ProcessingPage
       title={t('inventoryTitle')}
       illustration="inventory"
-      counts={[
-        {
-          label: t('inventoryStock'),
-          description: t('fractionationUnits'),
-          value: units.length,
-        },
-        {
-          label: t('quarantine'),
-          description: t('fractionationUnits'),
-          value: units.filter((unit) => unit.status === 'Cuarentena').length,
-        },
-        {
-          label: t('inventorySuitable'),
-          description: t('fractionationUnits'),
-          value: units.filter((unit) => unit.status === 'APTO').length,
-        },
-      ]}
+      headerSummary={
+        <dl className={styles.inventoryHeaderTotals} aria-label={t('inventorySummary')}>
+          {totals.map(({ label, count }) => (
+            <div key={label}>
+              <dt>{t(label)}</dt>
+              <dd>{unavailable ? '—' : count}</dd>
+            </div>
+          ))}
+        </dl>
+      }
     >
       <section className={shared.list}>
         <InventorySelector

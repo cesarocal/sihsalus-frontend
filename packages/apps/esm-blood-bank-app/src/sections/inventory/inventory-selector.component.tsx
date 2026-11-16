@@ -62,6 +62,7 @@ export function InventorySelector({
   const [component, setComponent] = useState('');
   const [status, setStatus] = useState(shortcut?.status ?? '');
   const [group, setGroup] = useState('');
+  const [stockExpanded, setStockExpanded] = useState(true);
   useEffect(() => {
     setSearch(shortcut?.unit || shortcut?.q || '');
     setExactUnit(shortcut?.unit ?? '');
@@ -131,6 +132,8 @@ export function InventorySelector({
           unitComponent={unitComponent}
           stockMinimums={stockMinimums}
           visibleComponents={inventoryCardComponents}
+          expanded={stockExpanded}
+          onExpandedChange={setStockExpanded}
           selectedComponent={component}
           onSelectComponent={setComponent}
           t={t}

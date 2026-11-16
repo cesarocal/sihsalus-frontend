@@ -34,16 +34,19 @@ export function BloodBankHeaderContext() {
 export function BloodBankPageHeader({
   title,
   illustration,
+  summary,
   actions,
 }: {
   title: string;
   illustration: ReactElement;
+  summary?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
     <PageHeader className={`${styles.pageHeader} ${styles.sectionHeader}`}>
       <PageHeaderContent title={title} illustration={illustration} />
       <div className={styles.headerRight}>
+        {summary}
         <BloodBankHeaderContext />
         {actions}
       </div>
