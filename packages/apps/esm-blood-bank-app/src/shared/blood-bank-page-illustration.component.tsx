@@ -1,4 +1,13 @@
-import { Home, DecisionTree, IbmWatsonStudio, Fork, IbmDevopsTest, Movement, RainDrop } from '@carbon/react/icons';
+import {
+  DecisionTree,
+  Fork,
+  Home,
+  IbmDevopsTest,
+  IbmWatsonStudio,
+  Movement,
+  RainDrop,
+  Settings,
+} from '@carbon/react/icons';
 import {
   BloodBankPictogram,
   LaboratoryPictogram,
@@ -10,6 +19,7 @@ import styles from '../sections/applicant-selection/selection.scss';
 
 export type BloodBankIllustration =
   | 'dashboard'
+  | 'settings'
   | 'donors'
   | 'selection'
   | 'collection'
@@ -27,6 +37,7 @@ export function BloodBankPageIllustration({ section }: { section: BloodBankIllus
   return (
     <span className={styles.headerIllustration} aria-hidden="true">
       {section === 'dashboard' && <Home size={64} className={styles.selectionIllustration} />}
+      {section === 'settings' && <Settings size={64} className={styles.selectionIllustration} />}
       {section === 'donorFollowUp' && <IbmWatsonStudio size={64} className={styles.selectionIllustration} />}
       {section === 'recipientFollowUp' && <DecisionTree size={64} className={styles.selectionIllustration} />}
       {section === 'donors' && <PatientsPictogram />}

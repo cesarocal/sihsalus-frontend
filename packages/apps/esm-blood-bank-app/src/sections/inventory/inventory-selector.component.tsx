@@ -8,11 +8,11 @@ import type { InventorySummary } from '../../types/blood-bank.types';
 import { type DashboardShortcut, expiresSoon } from '../dashboard/dashboard-shortcuts';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { screeningBloodGroups, screeningRhFactors } from '../laboratory/screening/screening.types';
+import { defaultExpiryWarningDays } from '../settings/blood-bank-settings';
 import styles from './inventory.scss';
 import type { InventoryOperation, InventoryUnit } from './inventory.types';
 import { canSeal, disposalEligibleStatuses, inventoryDisplayDate, inventoryStatusKey } from './inventory-rules';
 
-const expiryWarningDays = 7;
 const bloodGroups = screeningBloodGroups.flatMap((abo) => screeningRhFactors.map((rh) => `${abo}${rh}`));
 const componentName = (value: string) => normalizeSearch(value.replace(/\s*\(DEMO\)$/i, '').trim());
 
@@ -31,6 +31,7 @@ export function InventorySelector({
   prefix,
   t,
   shortcut,
+  expiryWarningDays = defaultExpiryWarningDays,
 }: {
   units: InventoryUnit[];
   selected: InventorySummary[];
@@ -46,6 +47,7 @@ export function InventorySelector({
   prefix: string;
   t: ProcessingTranslate;
   shortcut?: DashboardShortcut;
+  expiryWarningDays?: number;
 }) {
   const [search, setSearch] = useState(shortcut?.unit || shortcut?.q || '');
   const [exactUnit, setExactUnit] = useState(shortcut?.unit ?? '');

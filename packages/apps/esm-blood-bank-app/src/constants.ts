@@ -6,3 +6,4 @@ export const donorsPath = '/donors';
 export const donorDetailRoute = 'donors/:donorId';
 export const donorDetailPath = (id: string) => `${donorsPath}/${encodeURIComponent(id)}`;
 export const applicantSelectionPath = '/applicant-selection';
+export const settingsPath = '/settings';

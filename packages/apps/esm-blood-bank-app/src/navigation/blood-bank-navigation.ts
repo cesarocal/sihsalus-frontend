@@ -1,4 +1,4 @@
-import { DecisionTree, Fork, Home, IbmDevopsTest, IbmWatsonStudio, RainDrop } from '@carbon/react/icons';
+import { DecisionTree, Fork, Home, IbmDevopsTest, IbmWatsonStudio, RainDrop, Settings } from '@carbon/react/icons';
 import {
   ChemistryIcon,
   GroupIcon,
@@ -10,6 +10,7 @@ import {
   UserFollowIcon,
 } from '@openmrs/esm-framework';
 import { bloodBankPrivileges, type BloodBankPrivilege } from '../access/blood-bank-privileges';
+import { settingsPath } from '../constants';
 
 export interface NavigationItem {
   labelKey: string;
@@ -56,5 +57,12 @@ export const bloodBankNavigation: NavigationItem[] = [
   },
   { labelKey: 'transfers', defaultLabel: 'Transferencias', path: '/transfers', privilege: bloodBankPrivileges.transfers, icon: MovementIcon },
   { labelKey: 'inventory', defaultLabel: 'Inventario', path: '/inventory', privilege: bloodBankPrivileges.inventory, icon: InventoryManagementIcon },
-  { labelKey: 'transfusions', defaultLabel: 'Transfusiones', path: '/transfusions', privilege: bloodBankPrivileges.transfusions, icon: RainDrop },
+  { labelKey: 'transfusions', defaultLabel: 'Transfusiones', path: '/transfusions', privilege: bloodBankPrivileges.transfusions, icon: RainDrop, Settings },
+  {
+    labelKey: 'settings',
+    defaultLabel: 'Parametrización',
+    path: settingsPath,
+    privilege: bloodBankPrivileges.settings,
+    icon: Settings,
+  },
 ];

@@ -10,8 +10,8 @@ import {
 } from '@carbon/react/icons';
 import { RequirePrivilege } from '@sihsalus/esm-rbac';
 import { type ReactNode, useCallback, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import spanish from '../../../translations/es.json';
 import { bloodBankPrivileges as p } from '../../access/blood-bank-privileges';
 import { ProtectedSection } from '../../access/protected-section.component';
@@ -22,13 +22,14 @@ import { ProcessingPage, useProcessingData } from '../../shared/processing-page.
 import type { InventoryUnit } from '../inventory/inventory.types';
 import { inventoryDisplayDate } from '../inventory/inventory-rules';
 import { eligibleSource } from '../laboratory/fractionation/fractionation-rules';
-import { screeningCategory } from '../laboratory/screening/screening-rules';
 import { screeningQueueStatus } from '../laboratory/screening/screening-repeat-rules';
+import { screeningCategory } from '../laboratory/screening/screening-rules';
+import { defaultExpiryWarningDays, isExpiryWarningDays } from '../settings/blood-bank-settings';
 import { transferDirection } from '../transfers/transfers-rules';
-import { dashboardLink, expiresSoon } from './dashboard-shortcuts';
 import styles from './dashboard.scss';
-import { SelectionHomeOverview } from './selection-home-overview.component';
+import { dashboardLink, expiresSoon } from './dashboard-shortcuts';
 import { LaboratoryHomeOverview } from './laboratory-home-overview.component';
+import { SelectionHomeOverview } from './selection-home-overview.component';
 
 type T = (key: string) => string;
 /** Mount data sources only after both view and destination privileges are granted. */
@@ -254,13 +255,12 @@ function InventoryAlerts({ source, days, t }: { source: InventorySource | null; 
     </div>
   );
 }
-export function DashboardPage({ api, expiryWarningDays = 7 }: { api: BloodBankApi; expiryWarningDays?: number }) {
+export function DashboardPage({ api, expiryWarningDays }: { api: BloodBankApi; expiryWarningDays?: number }) {
   const { t: translate } = useTranslation(moduleName);
   const t = (key: string) =>
     String(translate(`dashboard.${key}`, (spanish.dashboard as Record<string, string>)[key] ?? key));
   const [version, setVersion] = useState(0);
-  const days =
-    Number.isInteger(expiryWarningDays) && expiryWarningDays >= 1 && expiryWarningDays <= 365 ? expiryWarningDays : 7;
+  const days = isExpiryWarningDays(expiryWarningDays) ? expiryWarningDays : defaultExpiryWarningDays;
   const group = (
     key: 'selectionGroup' | 'laboratoryGroup' | 'inventoryGroup' | 'supervisorGroup',
     children: ReactNode,

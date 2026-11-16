@@ -1,13 +1,13 @@
-import { readDashboardShortcut } from './sections/dashboard/dashboard-shortcuts';
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { type BloodBankPrivilege, bloodBankPrivileges } from './access/blood-bank-privileges';
 import { ProtectedSection } from './access/protected-section.component';
 import type { BloodBankApi } from './api';
-import { applicantSelectionPath, donorDetailRoute, donorsPath } from './constants';
+import { applicantSelectionPath, donorDetailRoute, donorsPath, settingsPath } from './constants';
 import { BloodBankLayout } from './layout/blood-bank-layout.component';
 import { ApplicantSelectionRoute } from './sections/applicant-selection/applicant-selection-route.component';
 import { CollectionPage } from './sections/collection/collection-page.component';
 import { DashboardPage } from './sections/dashboard/dashboard-page.component';
+import { readDashboardShortcut } from './sections/dashboard/dashboard-shortcuts';
 import { DonorDetailPage } from './sections/donors/donor-detail.component';
 import { DonorsPage } from './sections/donors/donors-page.component';
 import { DonorFollowUpPage } from './sections/follow-up/donor-follow-up-page.component';
@@ -16,18 +16,30 @@ import { InventoryPage } from './sections/inventory/inventory-page.component';
 import { CompatibilityPage } from './sections/laboratory/compatibility/compatibility-page.component';
 import { FractionationPage } from './sections/laboratory/fractionation/fractionation-page.component';
 import { ScreeningPage } from './sections/laboratory/screening/screening-page.component';
+import { type BloodBankSettings, defaultBloodBankSettings } from './sections/settings/blood-bank-settings';
+import { BloodBankSettingsPage } from './sections/settings/settings-page.component';
 import { TransfersPage } from './sections/transfers/transfers-page.component';
 import { TransfusionsPage } from './sections/transfusions/transfusions-page.component';
 
-interface BloodBankAppProps {
+interface BloodBankRoutesProps {
   api: BloodBankApi;
-  expiryWarningDays?: number;
+  settings?: BloodBankSettings;
+  saveSettings?: (settings: BloodBankSettings) => Promise<void>;
+  settingsLocationUuid?: string;
+}
+
+interface BloodBankAppProps extends BloodBankRoutesProps {
   router?: 'browser' | 'memory';
   initialPath?: string;
   basename?: string;
 }
 
-function BloodBankRoutes({ api, expiryWarningDays }: { api: BloodBankApi; expiryWarningDays?: number }) {
+function BloodBankRoutes({
+  api,
+  settings = defaultBloodBankSettings(),
+  saveSettings,
+  settingsLocationUuid,
+}: BloodBankRoutesProps) {
   const shortcut = readDashboardShortcut(useLocation().search);
   const protectedPage = (privilege: BloodBankPrivilege, page: React.ReactNode) => (
     <ProtectedSection privilege={privilege}>{page}</ProtectedSection>
@@ -36,7 +48,7 @@ function BloodBankRoutes({ api, expiryWarningDays }: { api: BloodBankApi; expiry
   return (
     <Routes>
       <Route element={<BloodBankLayout />}>
-        <Route index element={<DashboardPage api={api} expiryWarningDays={expiryWarningDays} />} />
+        <Route index element={<DashboardPage api={api} expiryWarningDays={settings.expiryWarningDays} />} />
         <Route path={donorsPath} element={protectedPage(bloodBankPrivileges.donors, <DonorsPage api={api} />)} />
         <Route
           path={donorDetailRoute}
@@ -94,11 +106,21 @@ function BloodBankRoutes({ api, expiryWarningDays }: { api: BloodBankApi; expiry
         />
         <Route
           path="inventory"
-          element={protectedPage(bloodBankPrivileges.inventory, <InventoryPage api={api} shortcut={shortcut} />)}
+          element={protectedPage(
+            bloodBankPrivileges.inventory,
+            <InventoryPage api={api} shortcut={shortcut} expiryWarningDays={settings.expiryWarningDays} />,
+          )}
         />
         <Route
           path="transfusions"
           element={protectedPage(bloodBankPrivileges.transfusions, <TransfusionsPage api={api.transfusions} />)}
+        />
+        <Route
+          path={settingsPath}
+          element={protectedPage(
+            bloodBankPrivileges.settings,
+            <BloodBankSettingsPage key={settingsLocationUuid} settings={settings} onSave={saveSettings} />,
+          )}
         />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Route>
@@ -106,24 +128,18 @@ function BloodBankRoutes({ api, expiryWarningDays }: { api: BloodBankApi; expiry
   );
 }
 
-export function BloodBankApp({
-  api,
-  router = 'memory',
-  initialPath = '/',
-  basename,
-  expiryWarningDays,
-}: BloodBankAppProps) {
+export function BloodBankApp({ router = 'memory', initialPath = '/', basename, ...routes }: BloodBankAppProps) {
   if (router === 'browser') {
     return (
       <BrowserRouter basename={basename}>
-        <BloodBankRoutes api={api} expiryWarningDays={expiryWarningDays} />
+        <BloodBankRoutes {...routes} />
       </BrowserRouter>
     );
   }
 
   return (
     <MemoryRouter initialEntries={[initialPath]}>
-      <BloodBankRoutes api={api} expiryWarningDays={expiryWarningDays} />
+      <BloodBankRoutes {...routes} />
     </MemoryRouter>
   );
 }

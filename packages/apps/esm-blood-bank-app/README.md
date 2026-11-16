@@ -207,6 +207,32 @@ estados de unidades ni las reglas de confirmación del sello.
 El formato de selección usa este helper con su propia hoja de estilos A4 y
 muestra un aviso si falla la impresión.
 
+## Parametrización del Banco de Sangre
+
+- Ruta `/blood-bank/settings`. La navegación y el acceso directo requieren
+  `app:home.bancoSangre.parametrizacion` además de `app:home.bancoSangre`.
+  Registre el nuevo privilegio en OpenMRS y agréguelo al rol a cargo de
+  administrar el banco. La designación de un firmante se hace por persona.
+- La anticipación de los avisos de vencimiento acepta de 1 a 365 días. El valor
+  inicial es `dashboardExpiryWarningDays` o 7 si el desplegado no lo define. El
+  mismo valor se aplica en Inicio e Inventario. Las fechas de caducidad de las
+  unidades se conservan como registros operativos.
+- Los firmantes del acta se designan mediante UUID de persona en OpenMRS. La
+  pantalla verifica el nombre de las nuevas designaciones al guardarlas.
+  `inventoryDisposalSignatories` suministra los valores iniciales. Cada acta
+  conserva los nombres registrados durante el procedimiento.
+- El prototipo guarda estos valores en el navegador por UUID de ubicación
+  activa. Para continuar la parametrización, decidir con backend si se requiere
+  una tabla de configuración por banco y otra para la vigencia y el historial
+  de las designaciones, o reutilizar una estructura existente. La configuración
+  compartida necesita validación, permisos y auditoría de cambios en el servidor.
+
+Otros parámetros a evaluar son mínimos de stock por hemocomponente y ABO/Rh,
+plazo de entrega de resultados y series documentales por banco. Los catálogos
+de OpenMRS que ya se configuran en extracción y laboratorio son candidatos
+para administración centralizada. La vigencia clínica, la compatibilidad y el
+tamizaje requieren reglas versionadas y revisadas antes de ofrecer su edición.
+
 ## Desarrollo integrado con OpenMRS
 
 Después de preparar el SPA según el README principal:

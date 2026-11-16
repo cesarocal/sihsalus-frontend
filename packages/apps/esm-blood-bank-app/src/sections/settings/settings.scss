@@ -1,0 +1,23 @@
+@use "@carbon/layout";
+@use "@openmrs/esm-styleguide/src/vars" as *;
+
+.form {
+  display: grid;
+  justify-items: start;
+  gap: layout.$spacing-06;
+  max-inline-size: 48rem;
+  padding: layout.$spacing-06;
+  border: 1px solid $ui-03;
+  background: $ui-02;
+
+  fieldset {
+    inline-size: 100%;
+    min-inline-size: 0;
+    margin: 0;
+  }
+}
+
+.signatories {
+  display: grid;
+  gap: layout.$spacing-05;
+}

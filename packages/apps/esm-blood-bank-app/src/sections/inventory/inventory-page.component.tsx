@@ -12,7 +12,15 @@ import { canSeal, newInventoryOperation } from './inventory-rules';
 import { InventorySelector } from './inventory-selector.component';
 import { InventoryWorkflow } from './inventory-workflow.component';
 
-export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?: DashboardShortcut }) {
+export function InventoryPage({
+  api,
+  shortcut,
+  expiryWarningDays,
+}: {
+  api: BloodBankApi;
+  shortcut?: DashboardShortcut;
+  expiryWarningDays?: number;
+}) {
   const t = useProcessingTranslation();
   const load = useCallback(() => api.inventory.list(), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
@@ -55,6 +63,7 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
       <section className={shared.list}>
         <InventorySelector
           shortcut={shortcut}
+          expiryWarningDays={expiryWarningDays}
           units={units}
           selected={selected}
           onChange={setSelected}

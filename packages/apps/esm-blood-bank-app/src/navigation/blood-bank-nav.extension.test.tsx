@@ -55,9 +55,19 @@ describe('blood bank navigation active state', () => {
     expect(screen.getByRole('link', { name: 'Inicio' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Donantes' })).toHaveAttribute('href', '/openmrs/spa/blood-bank/donors');
     expect(screen.queryByRole('link', { name: 'Inventario' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Parametrización' })).not.toBeInTheDocument();
     expect(screen.queryByText('Laboratorio')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Donantes' }));
     expect(vi.mocked(navigate)).toHaveBeenCalledWith({ to: '/openmrs/spa/blood-bank/donors' });
+  });
+  it('shows the settings link only with its dedicated privilege', () => {
+    allowed.add(bloodBankPrivileges.settings);
+    showNavigation('/openmrs/spa/blood-bank/settings');
+    expect(screen.getByRole('link', { name: 'Parametrización' })).toHaveAttribute(
+      'href',
+      '/openmrs/spa/blood-bank/settings',
+    );
+    expect(screen.getByRole('link', { name: 'Parametrización' })).toHaveClass('cds--side-nav__link--current');
   });
   it('hides Home when no Home view privilege is assigned, without hiding authorized sections', () => {
     allowed.delete(bloodBankPrivileges.homeSelection);

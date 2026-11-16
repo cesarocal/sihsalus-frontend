@@ -16,6 +16,7 @@ export const bloodBankPrivileges = {
   transfers: 'app:home.bancoSangre.transferencias',
   inventory: 'app:home.bancoSangre.inventario',
   transfusions: 'app:home.bancoSangre.transfusiones',
+  settings: 'app:home.bancoSangre.parametrizacion',
 } as const;
 
 export type BloodBankPrivilege = (typeof bloodBankPrivileges)[keyof typeof bloodBankPrivileges];

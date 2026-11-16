@@ -1,10 +1,17 @@
-import { useConfig, useLeftNav } from '@openmrs/esm-framework';
-import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import {
+  type FetchResponse,
+  openmrsFetch,
+  useConfig,
+  useLeftNav,
+  userHasAccess,
+  useSession,
+} from '@openmrs/esm-framework';
+import { act, render, screen } from '@testing-library/react';
+import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import type { BloodBankConfig } from './config-schema';
 import { bloodBankPrivileges } from './access/blood-bank-privileges';
+import type { BloodBankApp } from './blood-bank-app.component';
+import type { BloodBankConfig } from './config-schema';
 import Root from './root.component';
 
 type RequirePrivilegeProps = {
@@ -15,10 +22,15 @@ type RequirePrivilegeProps = {
 const mockRequirePrivilege = vi.hoisted(() => vi.fn((_props: RequirePrivilegeProps): ReactNode => null));
 const mockUseConfig = vi.mocked(useConfig<BloodBankConfig>);
 const mockUseLeftNav = vi.mocked(useLeftNav);
+const mockBloodBankApp = vi.hoisted(() => vi.fn<(props: ComponentProps<typeof BloodBankApp>) => ReactNode>());
 
 vi.mock('@openmrs/esm-framework', () => ({
   useConfig: vi.fn(),
   useLeftNav: vi.fn(),
+  useSession: vi.fn(),
+  userHasAccess: vi.fn(),
+  openmrsFetch: vi.fn(),
+  restBaseUrl: '/ws/rest/v1',
 }));
 
 vi.mock('@sihsalus/esm-rbac', async () => {
@@ -31,12 +43,20 @@ vi.mock('@sihsalus/esm-rbac', async () => {
 });
 
 vi.mock('./blood-bank-app.component', () => ({
-  BloodBankApp: () => <div>Blood Bank application</div>,
+  BloodBankApp: mockBloodBankApp,
 }));
+
+const sessionAt = (uuid: string) =>
+  ({ authenticated: true, sessionLocation: { uuid, display: 'Hospital DEMO' } }) as ReturnType<typeof useSession>;
 
 describe('Blood Bank root', () => {
   beforeEach(() => {
+    localStorage.clear();
     mockUseLeftNav.mockClear();
+    mockBloodBankApp.mockClear();
+    mockBloodBankApp.mockReturnValue(<div>Blood Bank application</div>);
+    vi.mocked(useSession).mockReturnValue(sessionAt('bank-a'));
+    vi.mocked(userHasAccess).mockReturnValue(true);
     mockUseConfig.mockReturnValue({ enabled: true, useMockData: true });
     mockRequirePrivilege.mockImplementation(({ children }) => <>{children}</>);
   });
@@ -68,5 +88,40 @@ describe('Blood Bank root', () => {
     render(<Root />);
 
     expect(screen.getByText('Banco de Sangre deshabilitado')).toBeInTheDocument();
+  });
+
+  it('does not allow settings edits without the dedicated privilege', () => {
+    vi.mocked(userHasAccess).mockReturnValue(false);
+    render(<Root />);
+    expect(mockBloodBankApp.mock.lastCall?.[0].saveSettings).toBeUndefined();
+    expect(userHasAccess).toHaveBeenCalledWith([bloodBankPrivileges.module, bloodBankPrivileges.settings], undefined);
+  });
+
+  it('persists settings per location and uses the designated person in the disposal workflow', async () => {
+    const { unmount } = render(<Root />);
+    const before = mockBloodBankApp.mock.lastCall?.[0];
+    const save = before?.saveSettings;
+    if (!save || !before.settings) throw new Error('Missing settings editor');
+    vi.mocked(openmrsFetch).mockResolvedValue({
+      data: { uuid: 'person-epidemiology', preferredName: { display: 'Celia Ríos' } },
+    } as FetchResponse<unknown>);
+    await act(() => save({ ...before.settings, expiryWarningDays: 14, epidemiologyPersonUuid: 'person-epidemiology' }));
+    expect(mockBloodBankApp.mock.lastCall?.[0].settings?.expiryWarningDays).toBe(14);
+    unmount();
+
+    const bankA = render(<Root />);
+    const restored = mockBloodBankApp.mock.lastCall?.[0];
+    expect(restored?.settings).toMatchObject({ expiryWarningDays: 14, epidemiologyPersonUuid: 'person-epidemiology' });
+    await expect(restored?.api.inventory.getDisposalSignatories()).resolves.toMatchObject({
+      epidemiologyResponsible: 'Celia Ríos',
+    });
+    bankA.unmount();
+
+    vi.mocked(useSession).mockReturnValue(sessionAt('bank-b'));
+    render(<Root />);
+    expect(mockBloodBankApp.mock.lastCall?.[0].settings).toMatchObject({
+      expiryWarningDays: 7,
+      epidemiologyPersonUuid: '',
+    });
   });
 });

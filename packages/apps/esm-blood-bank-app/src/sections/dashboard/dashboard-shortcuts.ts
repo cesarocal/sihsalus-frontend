@@ -1,5 +1,6 @@
 import { inventoryExpiry } from '../inventory/inventory-rules';
 import { localDateTime } from '../laboratory/screening/screening-rules';
+import { isExpiryWarningDays } from '../settings/blood-bank-settings';
 
 export interface DashboardShortcut {
   q: string;
@@ -21,7 +22,7 @@ export function readDashboardShortcut(search: string): DashboardShortcut {
     status: params.get('status') ?? '',
     category: params.get('category') ?? '',
     unit: params.get('unit') ?? '',
-    expires: Number.isInteger(days) && days > 0 && days <= 365 ? days : 0,
+    expires: isExpiryWarningDays(days) ? days : 0,
     newApplication: params.get('action') === 'newApplication',
     application: params.get('application') ?? '',
     collection: params.get('collection') ?? '',

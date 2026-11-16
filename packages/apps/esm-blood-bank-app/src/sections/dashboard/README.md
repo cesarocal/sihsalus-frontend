@@ -144,7 +144,9 @@ La referencia se consume una vez en la pantalla: cerrar el formulario no lo
 reabre, ni siquiera al actualizar la cola. Recargar explícitamente la URL vuelve
 a consultar y validar el registro. Abrir una URL no concede permisos de destino.
 
-`dashboardExpiryWarningDays` configura de 1 a 365 días, con valor predeterminado 7. Es un recordatorio operativo por fecha de calendario: incluye hoy y el último
+`dashboardExpiryWarningDays` da el valor inicial (7 por defecto) para el plazo de
+1 a 365 días editable en Parametrización del Banco de Sangre. El plazo se usa en
+Inicio e Inventario. Es un recordatorio operativo por fecha de calendario: incluye hoy y el último
 día del periodo, excluye fechas anteriores, desconocidas o inválidas. No modifica
 caducidad, aptitud, política de almacenamiento ni reglas clínicas. Los controles
 de fecha existentes permanecen nativos.
