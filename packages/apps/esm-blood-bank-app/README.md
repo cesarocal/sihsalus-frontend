@@ -217,10 +217,13 @@ muestra un aviso si falla la impresión.
   inicial es `dashboardExpiryWarningDays` o 7 si el desplegado no lo define. El
   mismo valor se aplica en Inicio e Inventario. Las fechas de caducidad de las
   unidades se conservan como registros operativos.
-- Los firmantes del acta se designan mediante UUID de persona en OpenMRS. La
-  pantalla verifica el nombre de las nuevas designaciones al guardarlas.
-  `inventoryDisposalSignatories` suministra los valores iniciales. Cada acta
-  conserva los nombres registrados durante el procedimiento.
+- Los firmantes del acta se buscan por nombre y apellido en OpenMRS. La búsqueda
+  usa REST `GET /ws/rest/v1/person?q=...` y requiere `Get People` en el backend.
+  La pantalla guarda el UUID de la persona elegida y verifica su nombre en
+  `GET /ws/rest/v1/person/{uuid}`. Si falla la búsqueda, muestra un aviso y
+  conserva la designación. `inventoryDisposalSignatories` suministra los
+  valores iniciales. Cada acta conserva los nombres registrados durante el
+  procedimiento.
 - El prototipo guarda estos valores en el navegador por UUID de ubicación
   activa. Para continuar la parametrización, decidir con backend si se requiere
   una tabla de configuración por banco y otra para la vigencia y el historial

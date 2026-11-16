@@ -8,6 +8,7 @@ import {
   maxExpiryWarningDays,
   signatoryLookupError,
 } from './blood-bank-settings';
+import { SignatoryPicker } from './signatory-picker.component';
 import styles from './settings.scss';
 
 export function BloodBankSettingsPage({
@@ -37,8 +38,8 @@ export function BloodBankSettingsPage({
     try {
       await onSave({
         expiryWarningDays,
-        servicePersonUuid: service.trim(),
-        epidemiologyPersonUuid: epidemiology.trim(),
+        servicePersonUuid: service,
+        epidemiologyPersonUuid: epidemiology,
       });
       notifySuccess(t('settingsSaved'));
     } catch (failure) {
@@ -76,21 +77,19 @@ export function BloodBankSettingsPage({
         </FormGroup>
         <FormGroup legendText={t('settingsDisposalSignatories')}>
           <div className={styles.signatories}>
-            <TextInput
-              id="blood-bank-service-signatory"
-              labelText={t('inventoryServiceResponsible')}
-              helperText={t('settingsPersonUuid')}
-              value={service}
-              readOnly={!onSave || saving}
-              onChange={(event) => setService(event.target.value)}
+            <SignatoryPicker
+              label={t('inventoryServiceResponsible')}
+              personUuid={service}
+              editable={Boolean(onSave)}
+              saving={saving}
+              onChange={setService}
             />
-            <TextInput
-              id="blood-bank-epidemiology-signatory"
-              labelText={t('inventoryEpidemiologyResponsible')}
-              helperText={t('settingsPersonUuid')}
-              value={epidemiology}
-              readOnly={!onSave || saving}
-              onChange={(event) => setEpidemiology(event.target.value)}
+            <SignatoryPicker
+              label={t('inventoryEpidemiologyResponsible')}
+              personUuid={epidemiology}
+              editable={Boolean(onSave)}
+              saving={saving}
+              onChange={setEpidemiology}
             />
           </div>
         </FormGroup>

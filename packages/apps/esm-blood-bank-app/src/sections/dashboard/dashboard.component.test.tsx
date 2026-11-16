@@ -47,6 +47,7 @@ vi.mock('@sihsalus/esm-rbac', () => ({
 }));
 vi.mock('@openmrs/esm-framework', () => ({
   useSession: () => ({ sessionLocation: { display: 'Hospital DEMO' } }),
+  useDebounce: (value: string) => value,
   formatDatetime: () => '31 oct 2026, 12:00',
   showSnackbar: vi.fn(),
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,

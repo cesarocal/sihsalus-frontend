@@ -57,7 +57,7 @@ export const bloodBankNavigation: NavigationItem[] = [
   },
   { labelKey: 'transfers', defaultLabel: 'Transferencias', path: '/transfers', privilege: bloodBankPrivileges.transfers, icon: MovementIcon },
   { labelKey: 'inventory', defaultLabel: 'Inventario', path: '/inventory', privilege: bloodBankPrivileges.inventory, icon: InventoryManagementIcon },
-  { labelKey: 'transfusions', defaultLabel: 'Transfusiones', path: '/transfusions', privilege: bloodBankPrivileges.transfusions, icon: RainDrop, Settings },
+  { labelKey: 'transfusions', defaultLabel: 'Transfusiones', path: '/transfusions', privilege: bloodBankPrivileges.transfusions, icon: RainDrop },
   {
     labelKey: 'settings',
     defaultLabel: 'Parametrización',
