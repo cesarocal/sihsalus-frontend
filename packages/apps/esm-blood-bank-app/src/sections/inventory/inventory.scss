@@ -114,21 +114,15 @@
 
 .stockCardRows {
   display: grid;
-  grid-template-columns: minmax(
-    calc(var(--stock-card-columns) * 8.25rem + (var(--stock-card-columns) - 1) * #{layout.$spacing-03}),
-    1fr
-  );
-  grid-auto-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: layout.$spacing-03;
-  max-inline-size: 100%;
-  overflow-x: auto;
   margin-block-start: layout.$spacing-03;
 }
 
 .stockCards {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  grid-auto-rows: minmax(7.25rem, 1fr);
   gap: layout.$spacing-03;
   padding: 0;
   margin: 0;
@@ -144,12 +138,14 @@
   flex-direction: column;
   align-items: flex-start;
   gap: layout.$spacing-01;
+  box-sizing: border-box;
   inline-size: 100%;
   block-size: 100%;
   padding: layout.$spacing-02;
   border: 1px solid $ui-03;
   color: var(--cds-text-primary);
   background: $ui-02;
+  overflow-wrap: anywhere;
   text-align: start;
   cursor: pointer;
 

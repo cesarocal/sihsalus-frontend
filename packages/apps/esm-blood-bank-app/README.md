@@ -220,9 +220,10 @@ muestra un aviso si falla la impresión.
 - Inventario presenta tarjetas con el total en almacén y el número de unidades
   aptas, vigentes y libres de reserva por hemocomponente. En Parametrización se
   puede elegir cuáles se muestran. Por defecto aparecen todos. Se distribuyen
-  en una fila hasta seis tarjetas o en dos filas a partir de siete. Una
-  selección vacía oculta las tarjetas. Cada tarjeta usa el filtro de
-  hemocomponente de la tabla. Parametrización permite
+  en una fila hasta seis tarjetas o en dos filas a partir de siete cuando hay
+  espacio suficiente. En pantallas estrechas pasan a filas adicionales sin
+  desplazamiento interno. Una selección vacía oculta las tarjetas. Cada tarjeta
+  usa el filtro de hemocomponente de la tabla. Parametrización permite
   definir un mínimo por componente con un número entero a partir de cero. La
   tarjeta indica **Stock bajo** si el disponible queda por debajo de ese mínimo.
   Un campo vacío deja la alerta desactivada para ese componente.

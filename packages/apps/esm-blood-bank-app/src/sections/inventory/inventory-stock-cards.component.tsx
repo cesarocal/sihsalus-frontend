@@ -1,5 +1,4 @@
 import { ChevronDown } from '@carbon/react/icons';
-import type { CSSProperties } from 'react';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { ComponentBag } from '../laboratory/fractionation/fractionation-tree.component';
@@ -76,11 +75,7 @@ export function InventoryStockCards({
           <ChevronDown size={16} aria-hidden="true" />
         </span>
       </summary>
-      <section
-        className={styles.stockCardRows}
-        aria-label={t('inventoryStockByComponent')}
-        style={{ '--stock-card-columns': columns } as CSSProperties}
-      >
+      <section className={styles.stockCardRows} aria-label={t('inventoryStockByComponent')}>
         {rows.map((row) => (
           <ul className={styles.stockCards} key={row[0].component}>
             {row.map(({ component, total, available, minimum, low }) => {
