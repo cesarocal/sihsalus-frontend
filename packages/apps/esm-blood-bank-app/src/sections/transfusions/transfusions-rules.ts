@@ -34,6 +34,9 @@ export const needsCrossmatch = (component: ComponentType | null) =>
   component === 'pediatricFraction';
 export const lockedAssignments = (request: TransfusionRequest) =>
   request.assignments.filter((item) => item.active && item.result !== 'pending');
+export const compatibilityReportReady = (request: TransfusionRequest) =>
+  request.assignments.length > 0 && request.assignments.every((item) => item.result !== 'pending');
+
 export function requestComplete(order: TransfusionOrder): boolean {
   return !!(
     order.patientId &&

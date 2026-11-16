@@ -3,6 +3,7 @@ import type { ProcessingTranslate } from '../../shared/processing-page.component
 import { ProcessingTable } from '../../shared/processing-page.component';
 import { inventoryDisplayDate } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionComponentCards } from './transfusion-component-cards.component';
 import styles from './transfusions.scss';
 import type { TransfusionRequest } from './transfusions.types';
@@ -27,7 +28,7 @@ export function TransfusionDetails({
     document: order.document,
     txAge: order.age,
     txSex: t(order.sex === 'F' ? 'female' : 'male'),
-    bloodGroup: order.bloodGroup,
+    bloodGroup: transfusionBloodGroupLabel(order.bloodGroup, t),
     txService: order.service,
     txWard: order.ward,
     txBed: order.bed,

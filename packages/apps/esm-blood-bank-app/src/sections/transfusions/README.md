@@ -59,8 +59,9 @@ Las asignaciones aprobadas aparecen bloqueadas al reemplazar las rechazadas.
 Todos los intentos y resultados anteriores permanecen trazables y ninguna unidad
 ya probada para esa solicitud se ofrece nuevamente.
 
-Los hemocomponentes solicitados se muestran entre el detalle y los antecedentes,
-con la bolsa ilustrada de Fraccionamiento y la cantidad requerida. El selector
+Los hemocomponentes solicitados se muestran entre el detalle y los antecedentes
+en Atención, Ver pruebas y Entrega, con la bolsa ilustrada de Fraccionamiento
+y la cantidad requerida. El selector
 usa dos tablas Carbon de igual altura, con scroll independiente y sin paginación.
 Cada fila tiene una flecha con nombre accesible para asignar o devolver la unidad.
 Los indicadores cuentan las unidades faltantes por hemocomponente, consideran
@@ -129,6 +130,10 @@ por componente) y CC17 (verificaciones y entrega).
   receptor por nombre, historia clínica y ABO/Rh. Imprimir abre el diálogo del
   navegador. Los botones azules permanecen abajo a la
   izquierda; no se fuerza otro formato de fecha nativo del navegador.
+- El informe de compatibilidad identifica al paciente y sus muestras, conserva
+  los intentos anteriores y separa resultados de trazabilidad. La impresión lleva
+  el logo del hospital y se habilita en la solicitud y los historiales cuando
+  todas las pruebas requeridas tienen un resultado definitivo.
 - El libro registra **egresos para transfusión** por unidad: solicitud, sello,
   componente, receptor/HC, servicio, médico/CMP, responsable de atención, persona
   que recoge/documento y fecha/hora. No equivale a administración clínica ni crea

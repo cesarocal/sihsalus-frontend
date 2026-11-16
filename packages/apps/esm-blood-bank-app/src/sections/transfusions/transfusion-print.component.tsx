@@ -7,6 +7,7 @@ import { componentDefinitions } from '../laboratory/fractionation/fractionation-
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import styles from './transfusions.scss';
 import type { CompatibilityRound, RecipientSample, TransfusionRequest } from './transfusions.types';
+import { compatibilityReportReady } from './transfusions-rules';
 
 export const transfusionLabelPrintCss = `${processingPrintCss}
   [data-label] { box-sizing: border-box; margin-block: 0 3mm; break-inside: avoid; }
@@ -15,6 +16,39 @@ export const transfusionLabelPrintCss = `${processingPrintCss}
   [data-label] header h2 { margin: 0; font-size: 12pt; text-align: start; }
   [data-label] p { margin: 1.5mm 0; }
 `;
+
+export const compatibilityReportPrintCss = `${processingPrintCss}
+  [data-compatibility-report] header {
+    display: flex; align-items: center; gap: 5mm; padding-block-end: 4mm;
+    border-bottom: 2px solid #185b5d; break-after: avoid;
+  }
+  [data-compatibility-report] header img { width: 18mm; height: 18mm; object-fit: contain; }
+  [data-compatibility-report] h2 { margin: 0; text-align: start; }
+  [data-compatibility-report] dl {
+    margin: 4mm 0; padding: 3mm; border: 1px solid #aaa; font-size: 10pt; break-inside: avoid;
+  }
+  [data-compatibility-report] th { text-align: start; background: #edf2f2; }
+  [data-compatibility-report] th, [data-compatibility-report] td { padding: 4pt; vertical-align: top; }
+  [data-compatibility-report] thead { display: table-header-group; }
+  [data-compatibility-results] { table-layout: fixed; }
+  [data-compatibility-results] th { box-sizing: border-box; }
+  [data-compatibility-results] th:nth-child(1) { width: 14%; }
+  [data-compatibility-results] th:nth-child(2) { width: 19%; }
+  [data-compatibility-results] th:nth-child(3) { width: 13%; }
+  [data-compatibility-results] th:nth-child(4) { width: 18%; }
+  [data-compatibility-results] th:nth-child(5) { width: 13%; }
+  [data-compatibility-results] th:nth-child(6) { width: 12%; }
+  [data-compatibility-report] summary {
+    list-style: none; margin-block: 4mm 2mm; font-weight: bold; break-after: avoid;
+  }
+`;
+
+const compatibilityResultKeys = {
+  pending: 'txResultPending',
+  compatible: 'txCompatible',
+  incompatible: 'txIncompatible',
+  notRequired: 'txNotRequired',
+} as const;
 
 export function TransfusionLabels({
   request,
@@ -95,70 +129,101 @@ export function CompatibilityReport({
   t: ProcessingTranslate;
   print?: boolean;
 }) {
+  const { assignments, order } = request;
+  const summary = {
+    txReportRequestNumber: order.number,
+    txSamplePatientName: order.patientName,
+    txSampleHistoryNumber: order.historyNumber,
+    txReportBloodGroup: transfusionBloodGroupLabel(order.bloodGroup, t),
+    ...(request.sample?.code ? { txRecipientSample: request.sample.code } : {}),
+  };
+
   return (
-    <article className={styles.document}>
-      {print && <p data-demo>{t('printPrototype')}</p>}
-      <h2>{t('txCompatibilityReport')}</h2>
-      <p>
-        {request.order.number} · {request.order.patientName} · {request.order.historyNumber} ·{' '}
-        {request.order.bloodGroup}
-      </p>
-      <table aria-label={t('txCompatibilityReport')}>
-        <thead>
-          <tr>
-            {[
-              'inventoryUnitNumber',
-              'fractionationComponent',
-              'sampleCode',
-              'txResult',
-              'txTestedBy',
-              'txResultAt',
-            ].map((key) => (
-              <th key={key}>{t(key)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {request.assignments.map((item) => (
-            <tr key={`${item.unit.id}/${item.roundId}`}>
-              <td>
-                {item.unit.id}
-                <br />
-                {t('txSeal')}: {item.unit.sealId}/{item.unit.id}
-                <br />
-                {t('bloodGroup')}: {item.unit.bloodGroup}
-                <br />
-                {t('collectedOn')}: {inventoryDisplayDate(item.unit.collectedOn)}
-                <br />
-                {t('inventoryExpiration')}: {inventoryDisplayDate(item.unit.expiresAt)}
-              </td>
-              <td>
-                {item.unit.componentType ? t(componentDefinitions[item.unit.componentType].key) : item.unit.component}
-              </td>
-              <td>
-                {item.unitSampleCode || t('txNotRequired')}
-                <br />
-                {request.sample?.code}
-              </td>
-              <td>
-                {t(
-                  item.result === 'pending'
-                    ? 'txResultPending'
-                    : item.result === 'compatible'
-                      ? 'txCompatible'
-                      : item.result === 'incompatible'
-                        ? 'txIncompatible'
-                        : 'txNotRequired',
-                )}
-                {!item.active && ` · ${t('txReleased')}`}
-              </td>
-              <td>{item.testedBy || '—'}</td>
-              <td>{item.resultAt ? formatDatetime(new Date(item.resultAt), { noToday: true }) : '—'}</td>
+    <article className={`${styles.document} ${styles.compatibilityReport}`} data-compatibility-report>
+      <header>
+        {print && <img src={hospitalLogo} width={68} height={68} alt={t('certificateHospital')} />}
+        <h2>{t('txCompatibilityReport')}</h2>
+      </header>
+      <dl className={`${styles.summary} ${styles.reportSummary}`}>
+        {Object.entries(summary).map(([key, value]) => (
+          <div key={key}>
+            <dt>{t(key)}</dt>
+            <dd>{value || '—'}</dd>
+          </div>
+        ))}
+      </dl>
+      {!print && !compatibilityReportReady(request) && (
+        <p className={styles.reportStatus} role="status">
+          {t('txReportPendingPrint')}
+        </p>
+      )}
+      <div className={styles.reportTable}>
+        <table data-compatibility-results aria-label={t('txCompatibilityReport')}>
+          <thead>
+            <tr>
+              {[
+                'inventoryUnitNumber',
+                'fractionationComponent',
+                'bloodGroupShort',
+                'txUnitSample',
+                'txResult',
+                'txTestedBy',
+                'txResultAt',
+              ].map((key) => (
+                <th key={key} scope="col">
+                  {t(key)}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <p>{t('txReportHelp')}</p>
+          </thead>
+          <tbody>
+            {assignments.map((item) => (
+              <tr key={`${item.unit.id}/${item.roundId}`}>
+                <td>{item.unit.id}</td>
+                <td>
+                  {item.unit.componentType ? t(componentDefinitions[item.unit.componentType].key) : item.unit.component}
+                </td>
+                <td>{transfusionBloodGroupLabel(item.unit.bloodGroup, t)}</td>
+                <td>{item.unitSampleCode || '—'}</td>
+                <td>
+                  {t(compatibilityResultKeys[item.result])}
+                  {!item.active && ` · ${t('txReleased')}`}
+                </td>
+                <td>{item.testedBy || '—'}</td>
+                <td>{item.resultAt ? formatDatetime(new Date(item.resultAt), { noToday: true }) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {assignments.length > 0 && (
+        <details className={styles.reportTraceability} open={print || undefined}>
+          <summary>{t('txReportTraceability')}</summary>
+          <div className={styles.reportTable}>
+            <table aria-label={t('txReportTraceability')}>
+              <thead>
+                <tr>
+                  {['inventoryUnitNumber', 'txSeal', 'collectedOn', 'inventoryExpiration'].map((key) => (
+                    <th key={key} scope="col">
+                      {t(key)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {assignments.map(({ unit, roundId }) => (
+                  <tr key={`${unit.id}/${roundId}`}>
+                    <td>{unit.id}</td>
+                    <td>{inventoryUnitSealCode(unit) || '—'}</td>
+                    <td>{inventoryDisplayDate(unit.collectedOn)}</td>
+                    <td>{inventoryDisplayDate(unit.expiresAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
       {request.deliveredAt && (
         <p>
           {t('txDelivered')}: {formatDatetime(new Date(request.deliveredAt), { noToday: true })} ·{' '}

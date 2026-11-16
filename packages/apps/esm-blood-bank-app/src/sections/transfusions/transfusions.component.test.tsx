@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IbmDevopsTest } from '@carbon/react/icons';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,15 +7,15 @@ import english from '../../../translations/en.json';
 import spanish from '../../../translations/es.json';
 import { createMockTransfusionsApi } from '../../api/mock-transfusions.api';
 import { openmrsTransfusionsApi } from '../../api/transfusions.api';
+import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustration.component';
 import { formatListDate } from '../../shared/format-list-date';
 import { printDocument } from '../../shared/print-document';
-import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustration.component';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
 import { CompatibilityPage } from '../laboratory/compatibility/compatibility-page.component';
 import { CompatibilityWorkflow } from '../laboratory/compatibility/compatibility-workflow.component';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { TransfusionHistory } from './transfusion-history.component';
-import { TransfusionLabels } from './transfusion-print.component';
+import { compatibilityReportPrintCss, TransfusionLabels } from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
@@ -273,8 +273,33 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const { api, request, units } = await compatible();
     const closed = vi.fn();
     render(<TransfusionWorkflow initial={request} units={units} api={api} onSaved={vi.fn()} onClose={closed} t={t} />);
+    const cards = screen.getByRole('region', { name: t('txRequirement') });
+    expect(cards.previousElementSibling).toHaveTextContent(t('txRequestDetails'));
+    expect(cards.nextElementSibling).toHaveTextContent(t('txPatientHistory'));
+    expect(within(cards).getByText('×2')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: t('txPrintResults') }));
     expect(printDocument).toHaveBeenCalledOnce();
+    const [content, title, , css] = vi.mocked(printDocument).mock.calls[0];
+    expect(title).toBe(t('txCompatibilityReport'));
+    expect(css).toBe(compatibilityReportPrintCss);
+    const printed = render(content);
+    const report = within(printed.container);
+    expect(report.getByRole('img', { name: t('certificateHospital') })).toBeInTheDocument();
+    expect(report.getByText(t('txReportRequestNumber')).nextElementSibling).toHaveTextContent(request.order.number);
+    expect(report.getByText(t('txReportBloodGroup')).nextElementSibling).toHaveTextContent('O POSITIVO (+)');
+    expect(report.getByText(t('txSamplePatientName')).nextElementSibling).toHaveTextContent(request.order.patientName);
+    expect(report.getByText(t('txSampleHistoryNumber')).nextElementSibling).toHaveTextContent(
+      request.order.historyNumber,
+    );
+    expect(printed.container.querySelector('[data-demo]')).toBeNull();
+    const results = within(report.getByRole('table', { name: t('txCompatibilityReport') }));
+    const unit = request.assignments[0];
+    const cells = within(results.getByRole('row', { name: new RegExp(unit.unit.id) })).getAllByRole('cell');
+    expect(cells[0].textContent).toBe(unit.unit.id);
+    expect(cells[3].textContent).toBe(unit.unitSampleCode);
+    expect(results.getByText(t('txNotRequired'))).toBeInTheDocument();
+    expect(report.getByRole('table', { name: t('txReportTraceability') })).toBeInTheDocument();
+    printed.unmount();
     expect((await api.list()).bookEntries).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
     fireEvent.change(screen.getByLabelText(t('txCollector')), { target: { value: 'Recepción DEMO' } });
@@ -290,6 +315,39 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('txConfirm') }));
     await waitFor(() => expect(closed).toHaveBeenCalledOnce());
     expect((await api.list()).bookEntries).toHaveLength(3);
+  });
+  it('shows cards in View tests and blocks printing draft results, including replacements in history', async () => {
+    const { api, request, units } = await assigned();
+    const round = {
+      ...request.rounds[0],
+      operator: 'Laboratorio DEMO',
+      identityVerified: true,
+      pretransfusionVerified: true,
+      results: { [code(1)]: 'compatible', [code(2)]: 'incompatible' } as const,
+    };
+    const draft = await api.saveCompatibility(request.id, request.revision, round, false);
+    const view = render(
+      <TransfusionWorkflow initial={draft} units={units} api={api} onSaved={vi.fn()} onClose={vi.fn()} t={t} />,
+    );
+    const cards = screen.getByRole('region', { name: t('txRequirement') });
+    expect(cards.previousElementSibling).toHaveTextContent(t('txRequestDetails'));
+    expect(cards.nextElementSibling).toHaveTextContent(t('txPatientHistory'));
+    expect(screen.getByText(t('txReportPendingPrint'))).toBeInTheDocument();
+    const printButton = screen.getByRole('button', { name: t('txPrintResults') });
+    expect(printButton).toBeDisabled();
+    fireEvent.click(printButton);
+    expect(printDocument).not.toHaveBeenCalled();
+    view.unmount();
+
+    const rejected = await api.saveCompatibility(draft.id, draft.revision, round, true);
+    const replacement = await api.assign(rejected.id, rejected.revision, [code(3)], true);
+    render(<TransfusionHistory requests={[replacement]} entries={[]} onClose={vi.fn()} t={t} compatibility />);
+    fireEvent.click(screen.getByRole('button', { name: t('txViewDetail') }));
+    const historyPrintButton = screen.getByRole('button', { name: t('txPrintResults') });
+    expect(historyPrintButton).toBeDisabled();
+    expect(screen.getByText(t('txReportPendingPrint'))).toBeInTheDocument();
+    fireEvent.click(historyPrintButton);
+    expect(printDocument).not.toHaveBeenCalled();
   });
   it('uses the shared exit dialog to save a draft without creating a sample', async () => {
     const api = createMockTransfusionsApi();

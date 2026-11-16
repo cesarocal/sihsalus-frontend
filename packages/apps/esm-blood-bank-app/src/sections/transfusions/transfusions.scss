@@ -216,6 +216,47 @@
     white-space: pre-wrap;
   }
 }
+.compatibilityReport {
+  border: 1px solid $ui-03;
+
+  h2 {
+    margin-block: 0 layout.$spacing-05;
+  }
+
+  th {
+    background: $ui-01;
+    text-align: start;
+  }
+
+  th,
+  td {
+    padding: layout.$spacing-04;
+    vertical-align: top;
+  }
+}
+.reportSummary {
+  background: $ui-01;
+  padding: layout.$spacing-05;
+  margin-block-end: layout.$spacing-05;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+.reportStatus {
+  border-inline-start: 3px solid colors.$yellow-30;
+  padding: layout.$spacing-03 layout.$spacing-04;
+}
+.reportTable {
+  overflow-x: auto;
+
+  table {
+    min-inline-size: 42rem;
+    table-layout: auto;
+  }
+}
+.reportTraceability summary {
+  cursor: pointer;
+  padding-block: layout.$spacing-04;
+  @include type.type-style("heading-compact-01");
+}
 @media (max-width: 42rem) {
   .fields,
   .summary,

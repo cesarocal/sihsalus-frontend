@@ -11,11 +11,22 @@ import { WarningConfirmation } from '../../shared/warning-confirmation.component
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import type { TransferUnit } from '../transfers/transfers.types';
 import { TransfusionDetails } from './transfusion-details.component';
-import { CompatibilityReport, TransfusionLabels, transfusionLabelPrintCss } from './transfusion-print.component';
+import {
+  CompatibilityReport,
+  compatibilityReportPrintCss,
+  TransfusionLabels,
+  transfusionLabelPrintCss,
+} from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import styles from './transfusions.scss';
 import type { TransfusionDraft, TransfusionRequest } from './transfusions.types';
-import { needsCrossmatch, requestComplete, sampleValid, selectionComplete } from './transfusions-rules';
+import {
+  compatibilityReportReady,
+  needsCrossmatch,
+  requestComplete,
+  sampleValid,
+  selectionComplete,
+} from './transfusions-rules';
 
 export function TransfusionWorkflow({
   initial,
@@ -99,6 +110,7 @@ export function TransfusionWorkflow({
   };
   const selectionStep = !delivery && !readOnly && step === steps.length - 1;
   const sampleStep = step === 1 && !delivery && !replacement;
+  const reportReady = compatibilityReportReady(request);
   const sample = request.sample ?? draft.sample;
   const sampleReady =
     !!request.sample || (sample.printRequestedAt === sample.collectedAt && sampleValid(sample, request.order));
@@ -157,10 +169,14 @@ export function TransfusionWorkflow({
     }
   };
   const print = () => {
+    if (!reportReady) return;
     setFailed('');
     try {
-      printDocument(<CompatibilityReport request={request} t={t} print />, t('txPrint'), () =>
-        setFailed('printFailed'),
+      printDocument(
+        <CompatibilityReport request={request} t={t} print />,
+        t('txCompatibilityReport'),
+        () => setFailed('printFailed'),
+        compatibilityReportPrintCss,
       );
     } catch {
       setFailed('printFailed');
@@ -240,7 +256,7 @@ export function TransfusionWorkflow({
                 className={styles.printButton}
                 size="sm"
                 renderIcon={Printer}
-                disabled={saving || printingSample || (sampleStep && !operator && !sampleReady)}
+                disabled={saving || printingSample || (sampleStep ? !operator && !sampleReady : !reportReady)}
                 onClick={sampleStep ? printSample : print}
               >
                 {t(sampleStep ? (sampleReady ? 'txReprintSample' : 'txPrintSample') : 'txPrintResults')}
@@ -323,12 +339,7 @@ export function TransfusionWorkflow({
               </>
             ) : (
               <>
-                <TransfusionDetails
-                  request={request}
-                  t={t}
-                  history
-                  componentCards={!delivery && !readOnly && !replacement}
-                />
+                <TransfusionDetails request={request} t={t} history componentCards={!replacement} />
                 {delivery || readOnly || replacement ? (
                   <CompatibilityReport request={request} t={t} />
                 ) : (

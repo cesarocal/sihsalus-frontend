@@ -19,10 +19,15 @@ import { useState } from 'react';
 import { printDocument } from '../../shared/print-document';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import { TransfusionDetails } from './transfusion-details.component';
-import { CompatibilityReport } from './transfusion-print.component';
+import { CompatibilityReport, compatibilityReportPrintCss } from './transfusion-print.component';
 import styles from './transfusions.scss';
 import type { TransfusionBookEntry, TransfusionRequest } from './transfusions.types';
-import { priorityKeys, transfusionLocalDay, transfusionStatusKeys } from './transfusions-rules';
+import {
+  compatibilityReportReady,
+  priorityKeys,
+  transfusionLocalDay,
+  transfusionStatusKeys,
+} from './transfusions-rules';
 
 export function TransfusionHistory({
   requests,
@@ -41,6 +46,7 @@ export function TransfusionHistory({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [detail, setDetail] = useState<TransfusionRequest | null>(null);
+  const reportReady = detail && compatibilityReportReady(detail);
   const [failed, setFailed] = useState(false);
   const matches = (text: string) => normalizeSearch(text).includes(normalizeSearch(search));
   const range = (at: string) => {
@@ -67,11 +73,14 @@ export function TransfusionHistory({
     )
     .sort((a, b) => b.at.localeCompare(a.at));
   const print = () => {
-    if (!detail) return;
+    if (!detail || !reportReady) return;
     setFailed(false);
     try {
-      printDocument(<CompatibilityReport request={detail} t={t} print />, t('txCompatibilityReport'), () =>
-        setFailed(true),
+      printDocument(
+        <CompatibilityReport request={detail} t={t} print />,
+        t('txCompatibilityReport'),
+        () => setFailed(true),
+        compatibilityReportPrintCss,
       );
     } catch {
       setFailed(true);
@@ -237,7 +246,14 @@ export function TransfusionHistory({
       {detail && (
         <ModalFooter className={styles.printFooter}>
           <div>
-            <Button kind="tertiary" className={styles.printButton} size="sm" renderIcon={Printer} onClick={print}>
+            <Button
+              kind="tertiary"
+              className={styles.printButton}
+              size="sm"
+              renderIcon={Printer}
+              disabled={!reportReady}
+              onClick={print}
+            >
               {t('txPrintResults')}
             </Button>
           </div>
