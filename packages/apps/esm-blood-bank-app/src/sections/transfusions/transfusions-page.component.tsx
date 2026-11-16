@@ -1,8 +1,8 @@
-import { formatListDate } from '../../shared/format-list-date';
 import { Button, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { RecentlyViewed } from '@carbon/react/icons';
 import { useCallback, useState } from 'react';
 import type { TransfusionsApi } from '../../api/transfusions.api';
+import { formatListDate } from '../../shared/format-list-date';
 import {
   normalizeSearch,
   ProcessingPage,
@@ -10,15 +10,44 @@ import {
   useProcessingData,
 } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
+import { IssuedTransfusionOrders } from './issued-transfusion-orders.component';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionHistory } from './transfusion-history.component';
+import { configuredTransfusionOrders, type TransfusionOrderConfig } from './transfusion-order.resource';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import styles from './transfusions.scss';
 import type { TransfusionRequest } from './transfusions.types';
 import { comparePriority, priorityKeys, transfusionStatusKeys } from './transfusions-rules';
 import { useTransfusionsTranslation } from './use-transfusions-translation';
 
-export function TransfusionsPage({ api }: { api: TransfusionsApi }) {
+export function TransfusionsPage({
+  api,
+  orderConfig,
+  useMockData = true,
+}: {
+  api: TransfusionsApi;
+  orderConfig?: TransfusionOrderConfig;
+  useMockData?: boolean;
+}) {
+  const t = useTransfusionsTranslation();
+  const configured = configuredTransfusionOrders(orderConfig);
+  if (!configured || useMockData) {
+    return <OperationalTransfusionsPage api={api} orderConfig={configured ? orderConfig : undefined} />;
+  }
+  return (
+    <ProcessingPage title={t('txTitle')} illustration="transfusions">
+      <IssuedTransfusionOrders config={orderConfig} bank />
+    </ProcessingPage>
+  );
+}
+
+function OperationalTransfusionsPage({
+  api,
+  orderConfig,
+}: {
+  api: TransfusionsApi;
+  orderConfig?: TransfusionOrderConfig;
+}) {
   const t = useTransfusionsTranslation();
   const load = useCallback(() => api.list(), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
@@ -48,29 +77,34 @@ export function TransfusionsPage({ api }: { api: TransfusionsApi }) {
     <ProcessingPage
       title={t('txTitle')}
       illustration="transfusions"
-      counts={[
-        {
-          label: t('txPendingCount'),
-          description: t('txRequests'),
-          value:
-            loading || failed
-              ? '—'
-              : requests.filter((item) => ['pending', 'reviewed', 'sampleReady'].includes(item.status)).length,
-        },
-        {
-          label: t('txTesting'),
-          description: t('txRequests'),
-          value: loading || failed ? '—' : requests.filter((item) => item.status === 'testing').length,
-        },
-        {
-          label: t('txReadyCount'),
-          description: t('txRequests'),
-          value: loading || failed ? '—' : requests.filter((item) => item.status === 'compatible').length,
-        },
-      ]}
+      counts={
+        orderConfig
+          ? undefined
+          : [
+              {
+                label: t('txPendingCount'),
+                description: t('txRequests'),
+                value:
+                  loading || failed
+                    ? '—'
+                    : requests.filter((item) => ['pending', 'reviewed', 'sampleReady'].includes(item.status)).length,
+              },
+              {
+                label: t('txTesting'),
+                description: t('txRequests'),
+                value: loading || failed ? '—' : requests.filter((item) => item.status === 'testing').length,
+              },
+              {
+                label: t('txReadyCount'),
+                description: t('txRequests'),
+                value: loading || failed ? '—' : requests.filter((item) => item.status === 'compatible').length,
+              },
+            ]
+      }
     >
+      {orderConfig && <IssuedTransfusionOrders config={orderConfig} bank />}
       <div className={shared.listHeading}>
-        <h2>{t('txInbox')}</h2>
+        <h2>{t(orderConfig ? 'fr08MockTransfusions' : 'txInbox')}</h2>
       </div>
       <div className={`${shared.surface} ${styles.responsive}`}>
         <div className={styles.toolbar}>

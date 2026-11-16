@@ -13,7 +13,7 @@ export type TransfusionPriority = 'scheduled' | 'urgent' | 'veryUrgent';
 export interface TransfusionOrder {
   id: string;
   number: string;
-  /** Synthetic references only; not OpenMRS UUIDs. */
+  /** OpenMRS UUIDs for issued orders and synthetic references for mock requests. */
   patientId: string;
   encounterId: string;
   orderer: string;

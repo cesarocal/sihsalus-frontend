@@ -102,6 +102,8 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
       settings={settings}
       saveSettings={canSave ? saveSettings : undefined}
       settingsLocationUuid={locationUuid}
+      transfusionOrders={config.transfusionOrders}
+      useMockData={useMockData}
       basename={modulePath}
       router="browser"
     />

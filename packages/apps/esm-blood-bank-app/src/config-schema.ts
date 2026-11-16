@@ -7,6 +7,14 @@ export interface CollectionLabelConceptConfig {
 }
 
 export interface BloodBankConfig {
+  transfusionOrders?: {
+    orderTypeUuid: string;
+    conceptUuid: string;
+    encounterTypeUuid: string;
+    careSettingUuid: string;
+    historyIdentifierTypeUuid: string;
+    documentIdentifierTypeUuids: string[];
+  };
   collectionLabelConcepts?: CollectionLabelConceptConfig;
   inventoryDisposalSignatories?: {
     servicePersonUuid?: string;
@@ -24,6 +32,19 @@ export interface BloodBankConfig {
 }
 
 export const configSchema = {
+  transfusionOrders: {
+    orderTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de orden transfusional.' },
+    conceptUuid: { _type: Type.String, _default: '', _description: 'UUID del concepto de la solicitud transfusional.' },
+    encounterTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de encuentro de órdenes.' },
+    careSettingUuid: { _type: Type.String, _default: '', _description: 'UUID del ámbito de atención de la orden.' },
+    historyIdentifierTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de historia clínica.' },
+    documentIdentifierTypeUuids: {
+      _type: Type.Array,
+      _elements: { _type: Type.UUID },
+      _default: [],
+      _description: 'Tipos de documento de identidad en orden de preferencia.',
+    },
+  },
   inventoryDisposalSignatories: {
     servicePersonUuid: {
       _type: Type.String,

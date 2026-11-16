@@ -2,6 +2,7 @@ import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } fro
 import { type BloodBankPrivilege, bloodBankPrivileges } from './access/blood-bank-privileges';
 import { ProtectedSection } from './access/protected-section.component';
 import type { BloodBankApi } from './api';
+import type { BloodBankConfig } from './config-schema';
 import { applicantSelectionPath, donorDetailRoute, donorsPath, settingsPath } from './constants';
 import { BloodBankLayout } from './layout/blood-bank-layout.component';
 import { ApplicantSelectionRoute } from './sections/applicant-selection/applicant-selection-route.component';
@@ -26,6 +27,8 @@ interface BloodBankRoutesProps {
   settings?: BloodBankSettings;
   saveSettings?: (settings: BloodBankSettings) => Promise<void>;
   settingsLocationUuid?: string;
+  transfusionOrders?: BloodBankConfig['transfusionOrders'];
+  useMockData?: boolean;
 }
 
 interface BloodBankAppProps extends BloodBankRoutesProps {
@@ -39,6 +42,8 @@ function BloodBankRoutes({
   settings = defaultBloodBankSettings(),
   saveSettings,
   settingsLocationUuid,
+  transfusionOrders,
+  useMockData,
 }: BloodBankRoutesProps) {
   const shortcut = readDashboardShortcut(useLocation().search);
   const protectedPage = (privilege: BloodBankPrivilege, page: React.ReactNode) => (
@@ -119,7 +124,10 @@ function BloodBankRoutes({
         />
         <Route
           path="transfusions"
-          element={protectedPage(bloodBankPrivileges.transfusions, <TransfusionsPage api={api.transfusions} />)}
+          element={protectedPage(
+            bloodBankPrivileges.transfusions,
+            <TransfusionsPage api={api.transfusions} orderConfig={transfusionOrders} useMockData={useMockData} />,
+          )}
         />
         <Route
           path={settingsPath}

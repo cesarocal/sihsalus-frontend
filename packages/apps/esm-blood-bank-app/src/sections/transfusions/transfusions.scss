@@ -257,6 +257,81 @@
   padding-block: layout.$spacing-04;
   @include type.type-style("heading-compact-01");
 }
+.fr08List {
+  margin: layout.$spacing-05;
+  min-width: 0;
+  overflow-x: auto;
+}
+.fr08ListHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: layout.$spacing-04;
+  margin-block-end: layout.$spacing-04;
+}
+.fr08Form {
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: layout.$spacing-05;
+
+  h3 {
+    @include type.type-style("heading-compact-02");
+    margin-block-end: layout.$spacing-03;
+  }
+
+  section {
+    border: 1px solid $ui-03;
+    padding: layout.$spacing-05;
+  }
+}
+.fr08Grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: layout.$spacing-04;
+}
+.fr08Footer:global(.cds--modal-footer) {
+  align-items: center;
+}
+.fr08Document {
+  overflow-wrap: anywhere;
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: layout.$spacing-05;
+    margin-block-end: layout.$spacing-05;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border: 1px solid $ui-03;
+  }
+
+  dl > div,
+  th,
+  td {
+    padding: layout.$spacing-03 layout.$spacing-04;
+    border: 1px solid $ui-03;
+  }
+
+  dt {
+    @include type.type-style("heading-compact-01");
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  h3,
+  footer {
+    @include type.type-style("heading-compact-01");
+    margin-block: layout.$spacing-05 layout.$spacing-03;
+  }
+}
 @media (max-width: 42rem) {
   .fields,
   .summary,
