@@ -18,6 +18,9 @@
     min-width: 0;
   }
 }
+.inventoryToolbar > button {
+  max-inline-size: none;
+}
 .filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
@@ -126,6 +129,15 @@
 .review {
   overflow-wrap: anywhere;
 }
+.actHeader {
+  display: flex;
+  align-items: center;
+  gap: layout.$spacing-05;
+  img {
+    inline-size: 3rem;
+    block-size: auto;
+  }
+}
 .review h4 {
   @include type.type-style("heading-compact-02");
   margin-block: layout.$spacing-05;
@@ -161,6 +173,9 @@
 @media (max-width: 42rem) {
   .toolbar > button {
     width: 100%;
+  }
+  .inventoryToolbar > button:has(:global(.cds--btn__icon)) {
+    padding-inline-end: layout.$spacing-08;
   }
   .filters,
   .form,

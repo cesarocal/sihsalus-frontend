@@ -6,6 +6,7 @@ import { SWRConfig } from 'swr';
 import {
   fetchAdmissionPages,
   useActiveVisitSummary,
+  useAdmissionFilterCatalogs,
   useAdmissions,
   usePatientDetail,
   usePatientUpcomingAppointments,
@@ -50,6 +51,24 @@ describe('admissions resources', () => {
     >);
     await expect(fetchAdmissionPages('/ws/rest/v1/visit?limit=1')).rejects.toThrow('pagination did not advance');
     expect(mockOpenmrsFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads all visit type pages and tagged UPSS independently from the visit report', async () => {
+    mockOpenmrsFetch.mockImplementation(async (resource) => {
+      const url = new URL(String(resource), 'http://localhost');
+      const page = url.pathname.endsWith('/location')
+        ? { results: [{ uuid: 'upss-b', display: 'UPSS B' }] }
+        : url.searchParams.get('startIndex')
+          ? { results: [{ uuid: 'type-b', display: 'Tipo B' }] }
+          : { results: [{ uuid: 'type-a', display: 'Tipo A' }], links: [{ rel: 'next' }] };
+      return { data: page } as Awaited<ReturnType<typeof openmrsFetch>>;
+    });
+    const { result } = renderHook(() => useAdmissionFilterCatalogs('Care UPSS'), { wrapper });
+    await waitFor(() =>
+      expect(result.current).toEqual({ services: ['Tipo A', 'Tipo B'], locations: ['UPSS B'], error: undefined }),
+    );
+    expect(mockOpenmrsFetch).toHaveBeenCalledWith(expect.stringContaining('/location?tag=Care%20UPSS'));
+    expect(mockOpenmrsFetch).toHaveBeenCalledTimes(3);
   });
 
   it('queries inclusive Lima date boundaries and sorts newest visits first across pages', async () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
+import type { InventoryOperation } from '../sections/inventory/inventory.types';
 import { canSeal } from '../sections/inventory/inventory-rules';
 import {
   disposalOperation,
@@ -25,6 +26,10 @@ describe('mock inventory state transitions and retained traceability', () => {
     sessionStorage.clear();
   });
   const api = () => createMockInventoryApi();
+  const reviewDisposal = async (input: InventoryOperation) => {
+    const instance = api();
+    return instance.saveDisposalDetails(await instance.saveDisposalSelection(input));
+  };
   const ready = async () => {
     seedInventoryReadyUnits();
     return (await api().list()).units.filter((unit) => unit.id.startsWith('PFC-'));
@@ -174,7 +179,7 @@ describe('mock inventory state transitions and retained traceability', () => {
       [{ ...units[0], id: 'unknown' }],
       [{ ...units[0], bloodGroup: 'O+' }],
     ]) {
-      await expect(api().dispose(disposalOperation(selected))).rejects.toThrow();
+      await expect(api().saveDisposalSelection(disposalOperation(selected))).rejects.toThrow();
     }
     expect((await api().list()).operations).toHaveLength(0);
     const draft = await api().saveDraft(disposalOperation(units));
@@ -184,18 +189,22 @@ describe('mock inventory state transitions and retained traceability', () => {
   it('requires causes, date, witnesses and signatories before disposing a whole batch atomically', async () => {
     const units = await ready();
     const input = disposalOperation(units);
+    const selected = await api().saveDisposalSelection(input);
+    await expect(api().dispose(selected)).rejects.toThrow('INVENTORY_LOCKED');
     for (const invalid of [
-      { ...input, causes: {} },
-      { ...input, causes: { ...input.causes, [units[0].id]: 'free text outside the BPMN catalog' } },
-      { ...input, witnesses: '' },
-      { ...input, serviceResponsible: '' },
-      { ...input, epidemiologyResponsible: '' },
-      { ...input, date: '2026-02-30' },
-      { ...input, date: '2027-01-01' },
+      { ...selected, causes: {} },
+      { ...selected, causes: { ...selected.causes, [units[0].id]: 'free text outside the BPMN catalog' } },
+      { ...selected, witnesses: '' },
+      { ...selected, serviceResponsible: '' },
+      { ...selected, epidemiologyResponsible: '' },
     ]) {
-      await expect(api().dispose(invalid)).rejects.toThrow('INVALID_INVENTORY_FIELDS');
+      await expect(api().saveDisposalDetails(invalid)).rejects.toThrow('INVALID_INVENTORY_FIELDS');
     }
-    const completed = await api().dispose(input);
+    vi.setSystemTime(new Date('2026-10-06T13:20:00'));
+    const review = await api().saveDisposalDetails({ ...selected, date: '2027-01-01', time: '00:00' });
+    expect(review).toMatchObject({ date: '2026-10-06', time: '13:20' });
+    await expect(api().dispose({ ...review, witnesses: 'Otra persona' })).rejects.toThrow('INVENTORY_CONFLICT');
+    const completed = await api().dispose(review);
     expect(completed.stage).toBe('completed');
     expect(completed.outcome).toBe('ELIMINADAS');
     expect((await api().list()).units.some((unit) => units.some((item) => item.id === unit.id))).toBe(false);
@@ -209,7 +218,7 @@ describe('mock inventory state transitions and retained traceability', () => {
   });
   it('prevents disposed or reserved-for-print units from starting fractionation, including stale requests', async () => {
     const units = await ready();
-    await api().dispose(disposalOperation([units[0]]));
+    await api().dispose(await reviewDisposal(disposalOperation([units[0]])));
     await api().prepareSeal(sealOperation([units[1]]));
     expect(
       (await createMockFractionationApi().list()).units.some((unit) => units.some((item) => item.id === unit.id)),
@@ -217,14 +226,28 @@ describe('mock inventory state transitions and retained traceability', () => {
     for (const unit of units)
       await expect(createMockFractionationApi().start([unit.id])).rejects.toThrow('FRACTIONATION_INVALID_SELECTION');
   });
-  it('does not seal or dispose units already in the fractionation laboratory', async () => {
+  it('holds units in fractionation until released from disposal and restores their prior state', async () => {
     const units = await ready();
-    await createMockFractionationApi().start([units[0].id]);
+    const fractionation = createMockFractionationApi();
+    const batch = await reviewBatch(fractionation, await fractionation.start([units[0].id]));
     const lab = (await api().list()).units.find((unit) => unit.id === units[0].id);
     if (!lab) throw new Error('TEST_FIXTURE_MISSING');
-    expect(lab.canDispose).toBe(false);
-    await expect(api().dispose(disposalOperation([lab]))).rejects.toThrow('INVENTORY_NOT_ELIGIBLE');
     await expect(api().prepareSeal(sealOperation([lab]))).rejects.toThrow('INVENTORY_NOT_ELIGIBLE');
+    const disposal = await api().saveDisposalSelection(disposalOperation([lab]));
+    const held = (await api().list()).units.find(({ id }) => id === lab.id);
+    expect(held).toMatchObject({
+      status: 'En proceso de eliminación',
+      canDispose: false,
+      disposalOperationId: disposal.id,
+    });
+    await expect(api().saveDisposalSelection(disposalOperation([lab]))).rejects.toThrow('INVENTORY_NOT_ELIGIBLE');
+    await expect(fractionation.finalize(batch)).rejects.toThrow('FRACTIONATION_CONFLICT');
+    await api().saveDraft({ ...disposal, units: [] });
+    expect((await api().list()).units.find(({ id }) => id === lab.id)).toMatchObject({
+      status: 'En fraccionamiento',
+      canDispose: true,
+    });
+    await expect(fractionation.finalize(batch)).resolves.toMatchObject({ status: 'completed' });
   });
   it('retains seals and the act if a sealed unit is subsequently disposed', async () => {
     const units = await ready();
@@ -235,7 +258,7 @@ describe('mock inventory state transitions and retained traceability', () => {
     await api().confirmSeal(requested);
     const unit = (await api().list()).units.find((item) => item.id === units[0].id);
     if (!unit) throw new Error('TEST_FIXTURE_MISSING');
-    await api().dispose(disposalOperation([unit]));
+    await api().dispose(await reviewDisposal(disposalOperation([unit])));
     expect((await api().list()).operations.map((op) => op.outcome)).toEqual(['APTO', 'ELIMINADAS']);
   });
   it('allows final sealed plasma to be fractionated; new children stay in quarantine without inherited seals', async () => {
@@ -263,7 +286,7 @@ describe('mock inventory state transitions and retained traceability', () => {
         throw new Error('STORAGE_FULL');
       },
     }));
-    await expect(bad.dispose(disposalOperation(units))).rejects.toThrow('STORAGE_FULL');
+    await expect(bad.saveDisposalSelection(disposalOperation(units))).rejects.toThrow('STORAGE_FULL');
     await expect(bad.prepareSeal(sealOperation(units))).rejects.toThrow('STORAGE_FULL');
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });
@@ -301,7 +324,7 @@ describe('mock inventory state transitions and retained traceability', () => {
   });
   it('keeps removed and fractionated demo stock out of inventory across fresh API instances', async () => {
     const units = (await api().list()).units.filter((unit) => unit.id.startsWith('BB-SELLO-DEMO-'));
-    await api().dispose(disposalOperation([units[0]]));
+    await api().dispose(await reviewDisposal(disposalOperation([units[0]])));
     const state = readProcessingState(() => sessionStorage);
     const source = state.fractionation?.units.find((unit) => unit.code === units[1].id);
     if (!source) throw new Error('TEST_FIXTURE_MISSING');
@@ -368,7 +391,7 @@ describe('mock inventory state transitions and retained traceability', () => {
     const units = (await inventory.list()).units;
     const disposed = units.find((unit) => unit.id === 'BB-TX-DEMO-001');
     if (!disposed) throw new Error('TEST_FIXTURE_MISSING');
-    await inventory.dispose(disposalOperation([disposed]));
+    await inventory.dispose(await reviewDisposal(disposalOperation([disposed])));
     const fractions = createMockFractionationApi();
     let batch = await fractions.start(['BB-TX-DEMO-011']);
     expect((await api().list()).units.find((unit) => unit.id === 'BB-TX-DEMO-011')?.status).toBe('En fraccionamiento');

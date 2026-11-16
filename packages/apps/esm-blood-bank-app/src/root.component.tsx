@@ -3,11 +3,11 @@ import { useConfig, useLeftNav } from '@openmrs/esm-framework';
 import { AppErrorBoundary, RequirePrivilege } from '@sihsalus/esm-rbac';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { bloodBankPrivileges } from './access/blood-bank-privileges';
 import { mockBloodBankApi, openmrsBloodBankApi } from './api';
 import { createCollectionLabelConceptLoader } from './api/collection-label-concepts.api';
+import { createDisposalSignatoriesLoader } from './api/inventory.api';
 import { createLaboratoryCatalogs } from './api/laboratory-catalogs.api';
-import { bloodBankPrivileges } from './access/blood-bank-privileges';
 import { BloodBankApp } from './blood-bank-app.component';
 import type { BloodBankConfig } from './config-schema';
 import { appName, basePath, moduleName } from './constants';
@@ -16,13 +16,19 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
   const modulePath = `${globalThis.getOpenmrsSpaBase().slice(0, -1)}${basePath}`;
   const leftNav = useMemo(() => ({ name: 'blood-bank-nav-slot', basePath: modulePath }), [modulePath]);
   useLeftNav(leftNav);
-  const { collectionLabelConcepts, laboratoryCatalogs, useMockData } = config;
+  const { collectionLabelConcepts, inventoryDisposalSignatories, laboratoryCatalogs, useMockData } = config;
   const api = useMemo(() => {
     const source = useMockData ? mockBloodBankApi : openmrsBloodBankApi;
     const concepts = collectionLabelConcepts ?? {};
     const catalogs = createLaboratoryCatalogs(laboratoryCatalogs ?? {}, concepts.anticoagulantSetUuid);
     return {
       ...source,
+      inventory: useMockData
+        ? {
+            ...source.inventory,
+            getDisposalSignatories: createDisposalSignatoriesLoader(inventoryDisposalSignatories),
+          }
+        : source.inventory,
       collection:
         useMockData && !Object.values(concepts).some(Boolean)
           ? source.collection
@@ -34,7 +40,7 @@ function BloodBankContent({ config }: { config: BloodBankConfig }) {
       },
       screening: { ...source.screening, listAdditionalTestConcepts: catalogs.listAdditionalTestConcepts },
     };
-  }, [collectionLabelConcepts, laboratoryCatalogs, useMockData]);
+  }, [collectionLabelConcepts, inventoryDisposalSignatories, laboratoryCatalogs, useMockData]);
 
   return (
     <BloodBankApp

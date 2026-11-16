@@ -8,6 +8,10 @@ export interface CollectionLabelConceptConfig {
 
 export interface BloodBankConfig {
   collectionLabelConcepts?: CollectionLabelConceptConfig;
+  inventoryDisposalSignatories?: {
+    servicePersonUuid?: string;
+    epidemiologyPersonUuid?: string;
+  };
   laboratoryCatalogs?: {
     modifierLocationUuid?: string;
     storageTemperatureSetUuid?: string;
@@ -20,6 +24,18 @@ export interface BloodBankConfig {
 }
 
 export const configSchema = {
+  inventoryDisposalSignatories: {
+    servicePersonUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'Persona designada como responsable del Banco de Sangre para el acta de eliminación.',
+    },
+    epidemiologyPersonUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'Persona designada como representante de Epidemiología para el acta de eliminación.',
+    },
+  },
   laboratoryCatalogs: {
     modifierLocationUuid: {
       _type: Type.String,

@@ -1,9 +1,9 @@
 import { useConfig } from '@openmrs/esm-framework';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { type PropsWithChildren } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
-import { type AdmissionRow, useAdmissions } from '../resources/admissions.resource';
+import { type AdmissionRow, useAdmissionFilterCatalogs, useAdmissions } from '../resources/admissions.resource';
 import AdmissionHome from './admission-home.component';
 
 vi.mock('@openmrs/esm-framework', async () => ({
@@ -23,11 +23,14 @@ vi.mock('@sihsalus/esm-rbac', () => ({
   ),
 }));
 
-vi.mock('../resources/admissions.resource', () => ({
+vi.mock(import('../resources/admissions.resource'), async (original) => ({
+  ...(await original()),
   useAdmissions: vi.fn(),
+  useAdmissionFilterCatalogs: vi.fn(),
 }));
 
 const mockUseAdmissions = vi.mocked(useAdmissions);
+const mockUseAdmissionFilterCatalogs = vi.mocked(useAdmissionFilterCatalogs);
 const mockUseConfig = vi.mocked(useConfig);
 
 function renderAdmissionHome() {
@@ -74,6 +77,27 @@ describe('AdmissionHome', () => {
     window.history.pushState({}, '', '/');
     globalThis.getOpenmrsSpaBase = vi.fn(() => '/openmrs/spa/');
     mockUseConfig.mockReturnValue({ admissionReportPageSize: 75 });
+    mockUseAdmissionFilterCatalogs.mockReturnValue({ services: [], locations: [], error: undefined });
+  });
+
+  it('offers all configured visit types, UPSS and statuses on an empty date range', () => {
+    mockUseAdmissions.mockReturnValue({ admissions: [], error: undefined, isLoading: false });
+    mockUseAdmissionFilterCatalogs.mockReturnValue({
+      services: ['Consulta externa', 'Emergencia'],
+      locations: ['UPSS Consulta externa', 'UPSS Emergencia'],
+      error: undefined,
+    });
+    renderAdmissionHome();
+    const visitTypes = screen.getByLabelText('Tipo de visita');
+    const locations = screen.getByLabelText('UPSS');
+    const status = screen.getByLabelText(/filtrar por estado/i);
+    expect(within(status).getByRole('option', { name: 'Activa' })).toBeInTheDocument();
+    expect(within(status).getByRole('option', { name: 'Finalizada' })).toBeInTheDocument();
+    expect(within(visitTypes).getByRole('option', { name: 'Emergencia' })).toBeInTheDocument();
+    fireEvent.change(locations, { target: { value: 'UPSS Emergencia' } });
+    expect(within(locations).getByRole('option', { name: 'UPSS Consulta externa' })).toBeInTheDocument();
+    expect(screen.getByText('No hay atenciones que coincidan')).toBeInTheDocument();
+    expect(mockUseAdmissionFilterCatalogs).toHaveBeenCalledWith('Care UPSS');
   });
 
   it('starts with today in Lima, allows date history and rejects inverted ranges', () => {

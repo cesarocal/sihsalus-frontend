@@ -18,8 +18,13 @@ mockUseConfig.mockReturnValue({
 
 describe('VisitDetailOverview', () => {
   it('renders an empty state view if encounters data is unavailable', async () => {
+    const user = userEvent.setup();
     mockOpenmrsFetch.mockReturnValueOnce({ data: { results: [] } });
     mockGetConfig.mockResolvedValue({ htmlFormEntryForms: [] });
+    mockUseConfig.mockReturnValue({
+      ...getDefaultsFromConfigSchema(esmPatientChartSchema),
+      showAllEncountersTab: true,
+    });
 
     renderWithSwr(<VisitDetailOverview patientUuid={mockPatient.uuid} />);
 
@@ -28,6 +33,8 @@ describe('VisitDetailOverview', () => {
     expect(screen.getByRole('heading', { name: /visits/i })).toBeInTheDocument();
     expect(screen.getAllByTitle(/Empty data illustration/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/There are no visits to display for this patient/i)[0]).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /all encounters/i }));
+    expect(screen.getByRole('combobox', { name: /filter by encounter type/i })).toBeInTheDocument();
   });
 
   it('renders an error state view if there was a problem fetching encounter data', async () => {

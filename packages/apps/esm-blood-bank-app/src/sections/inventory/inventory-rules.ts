@@ -12,9 +12,22 @@ export const inventoryStatusKey: Record<InventorySummary['status'], string> = {
   'No apta': 'inventoryUnsuitable',
   APTO: 'inventorySuitable',
   'Por transferir': 'inventoryPendingTransfer',
+  'En proceso de eliminación': 'inventoryDisposalInProgress',
   'En pruebas de compatibilidad': 'inventoryCompatibilityTesting',
   'Reservados para transfusión': 'inventoryReservedTransfusion',
 };
+
+// Mock states used until the configured stock-state concepts are available.
+export const disposalEligibleStatuses: ReadonlySet<InventorySummary['status']> = new Set([
+  'Cuarentena',
+  'En fraccionamiento',
+  'Sello pendiente',
+  'APTO',
+  'No apta',
+  'Por transferir',
+  'En pruebas de compatibilidad',
+  'Reservados para transfusión',
+]);
 export function newInventoryOperation(
   kind: InventoryOperation['kind'],
   units: InventorySummary[] = [],
@@ -91,13 +104,14 @@ export function validateInventoryOperation(operation: InventoryOperation, select
     `${operation.date}T${operation.time}` > localDateTime()
   )
     errors.push('inventoryDateRequired');
-  if (!operation.serviceResponsible.trim()) errors.push('inventoryResponsibleRequired');
   if (operation.kind === 'qualitySeal') {
+    if (!operation.serviceResponsible.trim()) errors.push('inventoryResponsibleRequired');
     if (!operation.labelsVerified || !operation.integrityVerified || !operation.recordsVerified)
       errors.push('inventoryChecksRequired');
   } else {
-    if (!operation.witnesses.trim() || !operation.epidemiologyResponsible.trim())
-      errors.push('inventoryWitnessesRequired');
+    if (!operation.serviceResponsible.trim() || !operation.epidemiologyResponsible.trim())
+      errors.push('inventoryDisposalSignatoriesUnavailable');
+    if (!operation.witnesses.trim()) errors.push('inventoryOperatorUnavailable');
     if (operation.units.some((unit) => !isDisposalCause(operation.causes[unit.id])))
       errors.push('inventoryCausesRequired');
   }

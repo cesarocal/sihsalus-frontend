@@ -1,4 +1,13 @@
-import { formatDatetime, getConfig, parseDate, showModal, userHasAccess } from '@openmrs/esm-framework';
+import {
+  type FetchResponse,
+  formatDatetime,
+  getConfig,
+  openmrsFetch,
+  parseDate,
+  showModal,
+  useConnectivity,
+  userHasAccess,
+} from '@openmrs/esm-framework';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mockEncounters, mockPatient, renderWithSwr } from 'test-utils';
@@ -29,6 +38,32 @@ describe('EncounterList', () => {
 
     await screen.findByTitle(/empty data illustration/i);
     expect(screen.getByText(/there are no encounters to display for this patient/i)).toBeInTheDocument();
+  });
+
+  it('offers paginated catalog options with no encounters and excludes options that require a missing privilege', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useConnectivity).mockReturnValue(true);
+    const fetcher = vi.mocked(openmrsFetch);
+    fetcher.mockResolvedValueOnce({
+      data: { results: [{ uuid: 'a', display: 'Admission' }], links: [{ rel: 'next' }] },
+    } as FetchResponse<unknown>);
+    fetcher.mockResolvedValueOnce({
+      data: {
+        results: [
+          { uuid: 'b', display: 'Outpatient' },
+          { uuid: 'restricted', display: 'Restricted type', viewPrivilege: { display: 'Private encounter access' } },
+        ],
+      },
+    } as FetchResponse<unknown>);
+    mockUserHasAccess.mockReturnValue(false);
+    renderVisitsTable({ visits: [] });
+    await user.click(screen.getByRole('combobox', { name: /filter by encounter type/i }));
+    expect(await screen.findByRole('option', { name: 'Outpatient' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Admission' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Restricted type' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Outpatient' }));
+    expect(screen.getByText('Check the filters above')).toBeInTheDocument();
+    vi.mocked(useConnectivity).mockReturnValue(false);
   });
 
   it("renders a tabular overview of the patient's clinical encounters", async () => {

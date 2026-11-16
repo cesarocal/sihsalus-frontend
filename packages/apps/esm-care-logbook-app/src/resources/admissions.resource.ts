@@ -6,6 +6,7 @@ import {
 } from '@openmrs/esm-patient-common-lib';
 import dayjs from 'dayjs';
 import useSWR from 'swr';
+import useSWRImmutable from 'swr/immutable';
 
 interface Identifier {
   identifier?: string;
@@ -89,10 +90,14 @@ interface Visit {
   };
 }
 
-interface VisitResponse {
-  results?: Visit[];
+interface AdmissionPage<T> {
+  results?: T[];
   links?: { rel: string; uri: string }[];
 }
+
+type VisitResponse = AdmissionPage<Visit>;
+type FilterCatalogItem = { uuid: string; display: string };
+export const admissionStatuses = { active: 'Activa', finished: 'Finalizada' } as const;
 
 export interface AdmissionRow {
   uuid: string;
@@ -403,7 +408,7 @@ function mapVisitToAdmission(visit: Visit, relationships: VisitRelationship[] = 
     gender: person?.gender ?? '',
     service: visit.visitType?.display ?? '',
     location: visit.location?.display ?? '',
-    status: visit.stopDatetime ? 'Finalizada' : 'Activa',
+    status: visit.stopDatetime ? admissionStatuses.finished : admissionStatuses.active,
     searchText: [
       getIdentifierSearchText(identifiers),
       getAttributeSearchText(attributes),
@@ -425,20 +430,36 @@ export interface AdmissionDateRange {
   to?: string;
 }
 
-export async function fetchAdmissionPages(url: string): Promise<{ data: VisitResponse }> {
-  const visits = new Map<string, Visit>();
+export async function fetchAdmissionPages<T extends { uuid: string } = Visit>(
+  url: string,
+): Promise<{ data: AdmissionPage<T> }> {
+  const rowsById = new Map<string, T>();
   let startIndex = 0;
   while (true) {
     // Only request the configured REST endpoint; never follow a server-supplied absolute URL.
-    const response = await openmrsFetch<VisitResponse>(startIndex ? `${url}&startIndex=${startIndex}` : url);
+    const response = await openmrsFetch<AdmissionPage<T>>(startIndex ? `${url}&startIndex=${startIndex}` : url);
     const rows = response.data.results ?? [];
-    const previousSize = visits.size;
-    for (const visit of rows) visits.set(visit.uuid, visit);
+    const previousSize = rowsById.size;
+    for (const row of rows) rowsById.set(row.uuid, row);
     if (!response.data.links?.some((link) => link.rel === 'next')) break;
-    if (!rows.length || visits.size === previousSize) throw new Error('Visit pagination did not advance');
+    if (!rows.length || rowsById.size === previousSize) throw new Error('Report pagination did not advance');
     startIndex += rows.length;
   }
-  return { data: { results: Array.from(visits.values()) } };
+  return { data: { results: Array.from(rowsById.values()) } };
+}
+
+export function useAdmissionFilterCatalogs(locationTag: string) {
+  const params = 'v=custom:(uuid,display)&limit=100';
+  const visitTypes = useSWRImmutable(`${restBaseUrl}/visittype?${params}`, fetchAdmissionPages<FilterCatalogItem>);
+  const locations = useSWRImmutable(
+    `${restBaseUrl}/location?tag=${encodeURIComponent(locationTag)}&${params}`,
+    fetchAdmissionPages<FilterCatalogItem>,
+  );
+  return {
+    services: visitTypes.data?.data.results?.map(({ display }) => display) ?? [],
+    locations: locations.data?.data.results?.map(({ display }) => display) ?? [],
+    error: visitTypes.error || locations.error,
+  };
 }
 
 export function useAdmissions(limit: number, range: AdmissionDateRange = {}) {

@@ -1,10 +1,11 @@
 import { type FetchResponse, openmrsFetch, showSnackbar } from '@openmrs/esm-framework';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import english from '../../../translations/en.json';
 import spanish from '../../../translations/es.json';
+import { createDisposalSignatoriesLoader } from '../../api/inventory.api';
 import { mockBloodBankApi } from '../../api/mock-blood-bank.api';
 import { createMockInventoryApi } from '../../api/mock-inventory.api';
 import { printDocument } from '../../shared/print-document';
@@ -41,9 +42,14 @@ vi.mock('react-i18next', () => ({
 vi.mock(import('../../shared/print-document'), async (original) => ({ ...(await original()), printDocument: vi.fn() }));
 vi.mock('./inventory.scss', () => ({ default: { expiringRow: 'expiringRow' } }));
 const t = (key: string) => (spanish.processing as Record<string, string>)[key] ?? key;
+const signatories = { serviceResponsible: 'Rosa Torres', epidemiologyResponsible: 'Elena Díaz' };
+const inventoryApi = () => ({
+  ...createMockInventoryApi(),
+  getDisposalSignatories: async () => signatories,
+});
 const instance = () => ({
   ...mockBloodBankApi,
-  inventory: createMockInventoryApi(),
+  inventory: inventoryApi(),
 });
 
 describe('inventory selection, seals and disposal UI', () => {
@@ -149,7 +155,7 @@ describe('inventory selection, seals and disposal UI', () => {
       target: { value: 'PFC' },
     });
     fireEvent.change(screen.getByLabelText(t('bloodGroup')), {
-      target: { value: 'A−' },
+      target: { value: 'A-' },
     });
     fireEvent.change(screen.getByLabelText(t('status')), {
       target: { value: 'Cuarentena' },
@@ -157,11 +163,38 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(first).toBeInTheDocument();
     expect(screen.queryByText('PFC-2026-003')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(t('fractionationComponent')), {
-      target: { value: 'Glóbulos rojos' },
+      target: { value: 'redCells' },
     });
     expect(screen.queryByText('PFC-2026-002')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: t('inventoryDeselect') }));
     expect(screen.getByText('Unidades seleccionadas: 0')).toBeInTheDocument();
+  });
+  it.each([
+    'inventory',
+    'qualitySeal',
+    'disposal',
+  ] as const)('keeps the %s catalogs available without matching stock', async (view) => {
+    render(<InventoryPage api={instance()} />);
+    await screen.findByRole('checkbox', { name: 'Seleccionar BB-SELLO-DEMO-001' });
+    if (view !== 'inventory') {
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: t(view === 'qualitySeal' ? 'inventoryQualitySeal' : 'inventoryDispose'),
+        }),
+      );
+    }
+    const scope = view === 'inventory' ? screen : within(screen.getByRole('dialog'));
+    const component = scope.getByLabelText(t('fractionationComponent'));
+    const group = scope.getByLabelText(t('bloodGroup'));
+    expect(within(group).getAllByRole('option')).toHaveLength(9);
+    const pediatric = within(component).getByRole('option', { name: t('componentPediatricFraction') });
+    fireEvent.change(component, { target: { value: (pediatric as HTMLOptionElement).value } });
+    expect(scope.queryByRole('checkbox', { name: 'Seleccionar BB-SELLO-DEMO-001' })).not.toBeInTheDocument();
+    expect(within(component).getByRole('option', { name: t('componentWholeBlood') })).toBeInTheDocument();
+    if (view !== 'qualitySeal') {
+      const status = scope.getByLabelText(t('status'));
+      expect(within(status).getByRole('option', { name: t('inventoryPendingTransfer') })).toBeInTheDocument();
+    }
   });
   it.each([
     'qualitySeal',
@@ -271,10 +304,15 @@ describe('inventory selection, seals and disposal UI', () => {
     await waitFor(() => expect(printDocument).toHaveBeenCalledOnce());
     expect(screen.queryByRole('button', { name: t('inventoryPrintSeals') })).not.toBeInTheDocument();
     expect((await api.list()).units.filter((unit) => unit.status === 'APTO')).toHaveLength(20);
+    sessionPerson.display = 'Luis Campos';
     fireEvent.click(screen.getByLabelText(t('inventoryPrintConfirmed')));
     fireEvent.click(screen.getByRole('button', { name: t('inventoryConfirmPrinting') }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
     expect((await api.list()).units.filter((unit) => unit.status === 'APTO')).toHaveLength(22);
+    expect((await api.list()).operations[0]).toMatchObject({
+      serviceResponsible: 'Operador de prueba',
+      completedBy: 'Luis Campos',
+    });
     expect(showSnackbar).toHaveBeenCalledWith(
       expect.objectContaining({
         title: t('inventorySealsCompleted'),
@@ -375,8 +413,8 @@ describe('inventory selection, seals and disposal UI', () => {
     let modal = screen.getByRole('dialog');
     fireEvent.click(within(modal).getByRole('button', { name: t('next') }));
     await screen.findByLabelText(t('inventoryServiceResponsible'));
-    fireEvent.change(within(modal).getByLabelText(t('inventoryServiceResponsible')), {
-      target: { value: 'Edición DEMO' },
+    fireEvent.change(screen.getByLabelText(`${t('inventoryDisposalCause')} — PFC-2026-002`), {
+      target: { value: 'expired' },
     });
     fireEvent.click(within(modal).getByRole('button', { name: t('close') }));
     const exit = screen.getByRole('dialog', { name: t('exitTitle') });
@@ -386,13 +424,11 @@ describe('inventory selection, seals and disposal UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('inventoryHistory') }));
     fireEvent.click(screen.getByRole('button', { name: t('inventoryResume') }));
     modal = screen.getByRole('dialog');
-    fireEvent.change(within(modal).getByLabelText(t('search')), { target: { value: 'PFC' } });
-    expect(within(modal).getByRole('checkbox', { name: 'Seleccionar PFC-2026-002' })).toBeChecked();
-    fireEvent.click(within(modal).getByRole('button', { name: t('next') }));
-    expect(await screen.findByLabelText(t('inventoryServiceResponsible'))).toHaveValue('Edición DEMO');
+    expect(within(modal).getByLabelText(`${t('inventoryDisposalCause')} — PFC-2026-002`)).toHaveValue('expired');
+    await waitFor(() => expect(screen.getByLabelText(t('inventoryServiceResponsible'))).toHaveValue('Rosa Torres'));
   });
   it('keeps units until final disposal confirmation; retains the printable act after stock exit', async () => {
-    const api = createMockInventoryApi();
+    const api = inventoryApi();
     const unit = (await api.list()).units.find((item) => item.id === 'PFC-2026-002');
     if (!unit) throw new Error('TEST_FIXTURE_MISSING');
     const draft = await api.saveDraft(disposalOperation([unit]));
@@ -403,6 +439,7 @@ describe('inventory selection, seals and disposal UI', () => {
     fireEvent.click(screen.getByRole('button', { name: t('inventoryResume') }));
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     await screen.findByLabelText(t('inventoryServiceResponsible'));
+    await waitFor(() => expect(screen.getByRole('button', { name: t('next') })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     await screen.findByRole('button', { name: t('inventoryRegisterAct') });
     const reviewPrint = screen.getByRole('button', { name: t('inventoryPrintAct') });
@@ -418,6 +455,7 @@ describe('inventory selection, seals and disposal UI', () => {
     let warning = screen.getByRole('dialog', {
       name: t('inventoryConfirmDisposal'),
     });
+    expect(warning).toHaveTextContent(t('inventoryDisposalWarningSingle'));
     fireEvent.click(within(warning).getByRole('button', { name: t('keepEditing') }));
     expect((await api.list()).units.some((item) => item.id === unit.id)).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: t('inventoryRegisterAct') }));
@@ -428,6 +466,8 @@ describe('inventory selection, seals and disposal UI', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByText(unit.id)).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: t('inventoryHistory') }));
+    expect(screen.getByRole('row', { name: new RegExp(draft.id) })).toHaveTextContent('Operador de prueba');
+    expect(screen.getByRole('row', { name: new RegExp(draft.id) })).toHaveTextContent(t('inventoryOperationCompleted'));
     fireEvent.change(within(screen.getByRole('dialog')).getByLabelText(t('search')), { target: { value: draft.id } });
     fireEvent.click(screen.getByRole('button', { name: t('inventoryView') }));
     expect(screen.getByText(t('inventoryActIntroduction'))).toBeInTheDocument();
@@ -446,7 +486,7 @@ describe('inventory selection, seals and disposal UI', () => {
     ).toHaveLength(1);
   });
   it('saves selected units before details and requires one BPMN dropdown cause per unit before review', async () => {
-    const api = createMockInventoryApi();
+    const api = inventoryApi();
     const units = (await api.list()).units.slice(0, 2);
     render(
       <InventoryWorkflow
@@ -465,12 +505,20 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(savedSelection.units.map((unit) => unit.id)).toEqual(units.map((unit) => unit.id));
     expect(savedSelection.causes).toEqual(Object.fromEntries(units.map((unit) => [unit.id, ''])));
     expect(savedSelection.stage).toBe('draft');
-    for (const [field, value] of [
-      ['inventoryServiceResponsible', 'Responsable DEMO'],
-      ['inventoryEpidemiologyResponsible', 'Epidemiología DEMO'],
-      ['inventoryWitnesses', 'Testigo DEMO'],
+    expect((await api.list()).units.filter(({ id }) => units.some((unit) => unit.id === id))).toEqual(
+      units.map((unit) => expect.objectContaining({ id: unit.id, status: 'En proceso de eliminación' })),
+    );
+    await waitFor(() => expect(screen.getByLabelText(t('inventoryServiceResponsible'))).toHaveValue('Rosa Torres'));
+    expect(screen.getByLabelText(t('inventoryEpidemiologyResponsible'))).toHaveValue('Elena Díaz');
+    expect(screen.getByLabelText(t('inventoryWitnesses'))).toHaveValue('Operador de prueba');
+    for (const key of [
+      'inventoryDate',
+      'inventoryTime',
+      'inventoryServiceResponsible',
+      'inventoryEpidemiologyResponsible',
+      'inventoryWitnesses',
     ])
-      fireEvent.change(screen.getByLabelText(t(field)), { target: { value } });
+      expect(screen.getByLabelText(t(key))).toHaveAttribute('readonly');
     for (const unit of units) {
       const dropdown = screen.getByLabelText(`${t('inventoryDisposalCause')} — ${unit.id}`);
       expect(
@@ -496,9 +544,15 @@ describe('inventory selection, seals and disposal UI', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: t('previous') }));
     expect(screen.getByLabelText(`${t('inventoryDisposalCause')} — ${units[1].id}`)).toHaveValue('coldChainBreak');
+    fireEvent.click(screen.getByRole('button', { name: `${t('inventoryRemoveDisposalUnit')} ${units[0].id}` }));
+    await waitFor(() =>
+      expect(screen.queryByLabelText(`${t('inventoryDisposalCause')} — ${units[0].id}`)).not.toBeInTheDocument(),
+    );
+    expect((await api.list()).units.find(({ id }) => id === units[0].id)?.status).toBe(units[0].status);
+    expect((await api.list()).units.find(({ id }) => id === units[1].id)?.status).toBe('En proceso de eliminación');
   });
   it('handles review print failures safely without registering an act or removing units', async () => {
-    const api = createMockInventoryApi();
+    const api = inventoryApi();
     const units = (await api.list()).units.slice(0, 1);
     render(
       <InventoryWorkflow
@@ -512,6 +566,7 @@ describe('inventory selection, seals and disposal UI', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     await screen.findByLabelText(t('inventoryServiceResponsible'));
+    await waitFor(() => expect(screen.getByRole('button', { name: t('next') })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     const print = await screen.findByRole('button', { name: t('inventoryPrintAct') });
     vi.mocked(printDocument).mockImplementationOnce((_content, _title, onError) => onError?.());
@@ -527,7 +582,7 @@ describe('inventory selection, seals and disposal UI', () => {
     expect(screen.queryByText('private printer trace')).not.toBeInTheDocument();
   });
   it('preserves a historical free-text cause but requires a catalog choice when resuming a legacy draft', async () => {
-    const api = createMockInventoryApi();
+    const api = inventoryApi();
     const units = (await api.list()).units.slice(0, 1);
     const operation = { ...disposalOperation(units), causes: { [units[0].id]: 'Causa anterior DEMO' } };
     const { unmount } = render(<DisposalAct operation={{ ...operation, stage: 'completed' }} print t={t} />);
@@ -538,6 +593,7 @@ describe('inventory selection, seals and disposal UI', () => {
     render(<InventoryWorkflow initial={operation} units={units} api={api} onClose={vi.fn()} onSaved={vi.fn()} t={t} />);
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     await screen.findByLabelText(t('inventoryServiceResponsible'));
+    await waitFor(() => expect(screen.getByRole('button', { name: t('next') })).toBeEnabled());
     expect(screen.getByRole('option', { name: `${t('inventoryPreviousCause')}: Causa anterior DEMO` })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
     expect(screen.getByRole('alert', { name: t('requiredFields') })).toHaveTextContent(t('inventoryCausesRequired'));
@@ -615,11 +671,37 @@ describe('inventory selection, seals and disposal UI', () => {
       expect(t(key)).not.toBe(key);
     }
   });
-  it('keeps page-counter CSS in the print document only and escapes act data', async () => {
+  it('resolves the designated signatories from OpenMRS people and skips missing configuration', async () => {
+    const respond = (uuid: string, display: string) =>
+      ({ data: { uuid, preferredName: { display } } }) as FetchResponse<unknown>;
+    vi.mocked(openmrsFetch)
+      .mockResolvedValueOnce(respond('service-person', 'Rosa Torres'))
+      .mockResolvedValueOnce(respond('epidemiology-person', 'Elena Díaz'));
+    await expect(
+      createDisposalSignatoriesLoader({
+        servicePersonUuid: 'service-person',
+        epidemiologyPersonUuid: 'epidemiology-person',
+      })(),
+    ).resolves.toEqual(signatories);
+    await expect(createDisposalSignatoriesLoader(undefined)()).resolves.toEqual({
+      serviceResponsible: '',
+      epidemiologyResponsible: '',
+    });
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
+    expect(openmrsFetch).toHaveBeenCalledWith(
+      '/ws/rest/v1/person/service-person?v=custom:(uuid,preferredName:(display))',
+      { rejectOnAuthFailure: true },
+    );
+  });
+  it('prints the hospital logo and full Rh without demo, draft, page counters or browser URL', async () => {
     const units = (await createMockInventoryApi().list()).units.slice(0, 1);
     const operation = { ...disposalOperation(units), witnesses: '<script>synthetic</script>' };
     const { container, rerender } = render(<DisposalAct operation={operation} print t={t} />);
-    expect(container.querySelector('style')?.textContent).toContain('content: counter(page) " / " counter(pages)');
+    expect(container.querySelector('style')?.textContent).toContain('@bottom-left { content: ""; }');
+    expect(container.querySelector('style')?.textContent).not.toContain('counter(page)');
+    expect(container.querySelector('img')).toBeInTheDocument();
+    expect(container.querySelector('[data-demo], [data-act-draft]')).toBeNull();
+    expect(container).toHaveTextContent(/POSITIVO \(\+\)|NEGATIVO \(-\)/);
     expect(container.innerHTML).toContain('&lt;script&gt;synthetic&lt;/script&gt;');
     expect(container.querySelector('script')).toBeNull();
     rerender(<DisposalAct operation={operation} t={t} />);

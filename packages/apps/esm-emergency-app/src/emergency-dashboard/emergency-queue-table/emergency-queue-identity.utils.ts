@@ -1,15 +1,9 @@
 import type { Config } from '../../config-schema';
+import { identificationStatusLabels } from '../../emergency-workflow/patient-search-registration.validation';
 import { type EmergencyQueueEntry } from '../../resources/emergency.resource';
 
-const IDENTIFICATION_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  partial: 'Parcial',
-  confirmed: 'Confirmado',
-  merged: 'Fusionado',
-};
-
 type IdentificationAttributeValue = string | { uuid?: string; display?: string } | undefined;
-type IdentificationStatusCode = keyof typeof IDENTIFICATION_STATUS_LABELS;
+type IdentificationStatusCode = keyof typeof identificationStatusLabels;
 
 function getStatusByConceptUuid(
   config: Pick<Config['patientRegistration'], 'identificationStatusConcepts'>,
@@ -61,7 +55,7 @@ function getPersonAttributeConceptUuid(
 
   if (typeof rawValue === 'string') {
     const statusCode = getStatusByConceptUuid(config, rawValue);
-    return statusCode ? IDENTIFICATION_STATUS_LABELS[statusCode] : '';
+    return statusCode ? identificationStatusLabels[statusCode] : '';
   }
 
   if (!rawValue?.uuid) {
@@ -73,7 +67,7 @@ function getPersonAttributeConceptUuid(
     return '';
   }
 
-  return IDENTIFICATION_STATUS_LABELS[conceptCode];
+  return identificationStatusLabels[conceptCode];
 }
 
 function getIdentifierValue(queueEntry: EmergencyQueueEntry, pattern: RegExp) {
@@ -109,7 +103,7 @@ export function getQueueEntryIdentificationStatus(
 
   if (configuredStatus) {
     const normalizedStatus = configuredStatus.trim().toLocaleLowerCase();
-    return IDENTIFICATION_STATUS_LABELS[normalizedStatus] ?? configuredStatus;
+    return identificationStatusLabels[normalizedStatus] ?? configuredStatus;
   }
 
   const unknownPatient = getAttributeValue(queueEntry, /paciente no identificado|unidentified patient/i);

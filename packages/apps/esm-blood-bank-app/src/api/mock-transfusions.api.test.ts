@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { withInventoryFixtures } from '../mocks/inventory.mock';
 import { disposalOperation } from '../sections/inventory/inventory-test-fixtures';
 import type { ComponentType } from '../sections/laboratory/fractionation/fractionation.types';
 import { localDateTime } from '../sections/laboratory/screening/screening-rules';
 import type { TransfusionRequest } from '../sections/transfusions/transfusions.types';
-import { withInventoryFixtures } from '../mocks/inventory.mock';
 import {
   comparePriority,
   transfusionCandidate,
@@ -278,20 +278,27 @@ describe('regular transfusion attention and compatibility shared stock', () => {
       api.assign(request.id, request.revision, [unitCode(1), unitCode(2), unitCode(11)], true),
     ).rejects.toThrow('INVALID_TRANSFUSION_SELECTION');
   });
-  it('blocks disposal, fractionation and transfers for assigned units', async () => {
+  it('holds assigned units for disposal and restores compatibility and transfusion reservations when released', async () => {
+    const api = createMockTransfusionsApi();
     const request = await assigned();
     const inventory = createMockInventoryApi();
     const units = (await inventory.list()).units.filter((unit) =>
       request.assignments.some((item) => item.unit.id === unit.id),
     );
-    expect(units.every((unit) => !unit.canDispose)).toBe(true);
-    await expect(inventory.dispose(disposalOperation(units))).rejects.toThrow('INVENTORY_NOT_ELIGIBLE');
+    expect(units).toHaveLength(3);
+    expect(units.every((unit) => unit.canDispose)).toBe(true);
+    const disposal = await inventory.saveDisposalSelection(disposalOperation(units));
+    await expect(results(request, false, api)).rejects.toThrow('TRANSFUSION_STOCK_CONFLICT');
     expect(
       (await createMockFractionationApi().list()).units.some((unit) => units.some((item) => item.id === unit.id)),
     ).toBe(false);
     expect((await createMockTransfersApi().list()).units.find((unit) => unit.id === unitCode(1))?.status).toBe(
-      'En pruebas de compatibilidad',
+      'En proceso de eliminación',
     );
+    await inventory.saveDraft({ ...disposal, units: [] });
+    const restored = (await inventory.list()).units.filter(({ id }) => units.some((unit) => unit.id === id));
+    expect(restored.map(({ status }) => status)).toEqual(units.map(({ status }) => status));
+    await expect(results(request, false, api)).resolves.toMatchObject({ status: 'compatible' });
   });
   it('persists partial laboratory drafts without reserving/releasing and rejects an incomplete final batch', async () => {
     const api = createMockTransfusionsApi();

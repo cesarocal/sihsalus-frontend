@@ -36,6 +36,9 @@ restablece tanto el texto buscado como las selecciones visibles. Si una
 actualización deja sin coincidencias un filtro activo, su selección permanece
 visible y puede limpiarse.
 
+El filtro de identificación ofrece los cuatro estados del catálogo de registro
+rápido aunque la cola esté vacía.
+
 Cambiar la búsqueda, un filtro o el tamaño de página vuelve a la primera página.
 La actualización de datos conserva la página actual mientras siga existiendo;
 si desaparece, muestra la última página disponible. Estos controles afectan la

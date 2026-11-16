@@ -33,6 +33,7 @@ import { useTranslation } from 'react-i18next';
 import { type Config } from '../../config-schema';
 import { emergencyEditPrivilege } from '../../constants';
 import { emergencyWorkflowWorkspace } from '../../emergency-workflow/constants';
+import { identificationStatusLabels } from '../../emergency-workflow/patient-search-registration.validation';
 import { usePriorityConfig } from '../../hooks/usePriorityConfig';
 import { type EmergencyQueueEntry, useEmergencyQueueEntries } from '../../resources/emergency.resource';
 import { useEmergencyQueueColumns } from './emergency-queue-columns.resource';
@@ -121,11 +122,12 @@ const EmergencyQueueTable: React.FC<EmergencyQueueTableProps> = ({ queueUuid }) 
 
   const availableIdentificationStatuses = useMemo(() => {
     return Array.from(
-      new Set(
-        queueEntries
+      new Set([
+        ...Object.values(identificationStatusLabels),
+        ...queueEntries
           .map((entry) => getQueueEntryIdentificationStatus(entry, config.patientRegistration))
           .filter(Boolean),
-      ),
+      ]),
     ).sort();
   }, [queueEntries, config.patientRegistration]);
 

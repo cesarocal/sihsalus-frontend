@@ -92,20 +92,13 @@ function VisitDetailOverviewComponent({ patientUuid }: VisitOverviewComponentPro
                 <InlineLoading description={`${t('loading', 'Loading')} ...`} role="progressbar" />
               ) : error ? (
                 <ErrorState headerTitle={t('visits', 'visits')} error={error} />
-              ) : visits?.length ? (
+              ) : (
                 <VisitsTable
                   mutateVisits={mutateVisits}
                   visits={visitsWithEncounters}
                   showAllEncounters
                   patientUuid={patientUuid}
                 />
-              ) : (
-                <div className={styles.emptyStateContainer}>
-                  <EmptyState
-                    displayText={t('encounters__lower', 'encounters')}
-                    headerTitle={t('encounters', 'Encounters')}
-                  />
-                </div>
               )}
             </TabPanel>
           )}

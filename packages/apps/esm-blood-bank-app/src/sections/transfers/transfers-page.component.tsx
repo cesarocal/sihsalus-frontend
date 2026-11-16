@@ -1,8 +1,8 @@
-import { formatListDate } from '../../shared/format-list-date';
 import { Button, Search, Select, SelectItem, Tab, TabList, TabPanel, TabPanels, Tabs, Tag } from '@carbon/react';
 import { Add, RecentlyViewed } from '@carbon/react/icons';
 import { useCallback, useState } from 'react';
 import type { TransfersApi } from '../../api/transfers.api';
+import { formatListDate } from '../../shared/format-list-date';
 import {
   normalizeSearch,
   ProcessingPage,
@@ -37,6 +37,11 @@ export function TransfersPage({ api }: { api: TransfersApi }) {
     null,
   );
   const allRequests = data?.requests ?? [];
+  const institutions = [
+    ...new Set(
+      allRequests.flatMap(({ data }) => [data.requestingInstitution, data.destinationInstitution]).filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
   const requests = allRequests.filter((item) => transferDirection(item) === direction);
   const queue = requests.filter((item) => outgoing || ['draft', 'received', 'prepared'].includes(item.status));
   const institutionOf = (item: TransferRequest) =>
@@ -107,11 +112,9 @@ export function TransfersPage({ api }: { api: TransfersApi }) {
             onChange={(event) => update('institution', event.target.value)}
           >
             <SelectItem value="" text={t('transferAllInstitutions')} />
-            {Array.from(new Set(queue.map(institutionOf)))
-              .filter(Boolean)
-              .map((value) => (
-                <SelectItem key={value} value={value} text={value} />
-              ))}
+            {institutions.map((value) => (
+              <SelectItem key={value} value={value} text={value} />
+            ))}
           </Select>
         </div>
         <ProcessingTable

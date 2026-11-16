@@ -1,16 +1,16 @@
-import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
 import { Button } from '@carbon/react';
 import { CertificateCheck, RecentlyViewed, TrashCan } from '@carbon/react/icons';
 import { useCallback, useState } from 'react';
 import type { BloodBankApi } from '../../api';
 import { ProcessingPage, useProcessingData, useProcessingTranslation } from '../../shared/processing-page.component';
-import { canSeal, newInventoryOperation } from './inventory-rules';
-import { InventorySelector } from './inventory-selector.component';
-import { InventoryHistory } from './inventory-history.component';
-import { InventoryWorkflow } from './inventory-workflow.component';
-import type { InventoryOperation } from './inventory.types';
 import type { InventorySummary } from '../../types/blood-bank.types';
 import shared from '../applicant-selection/selection.scss';
+import type { DashboardShortcut } from '../dashboard/dashboard-shortcuts';
+import type { InventoryOperation } from './inventory.types';
+import { InventoryHistory } from './inventory-history.component';
+import { canSeal, newInventoryOperation } from './inventory-rules';
+import { InventorySelector } from './inventory-selector.component';
+import { InventoryWorkflow } from './inventory-workflow.component';
 
 export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?: DashboardShortcut }) {
   const t = useProcessingTranslation();
@@ -25,7 +25,8 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
   const open = (kind: InventoryOperation['kind']) => {
     if (unavailable) return;
     const candidates = units.filter(
-      (unit) => selected.some((item) => item.id === unit.id) && (kind !== 'qualitySeal' || canSeal(unit)),
+      (unit) =>
+        selected.some((item) => item.id === unit.id) && (kind === 'qualitySeal' ? canSeal(unit) : unit.canDispose),
     );
     setActive(newInventoryOperation(kind, candidates));
   };
@@ -68,6 +69,7 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
             <>
               <Button
                 kind="tertiary"
+                size="lg"
                 renderIcon={RecentlyViewed}
                 disabled={unavailable}
                 onClick={() => setHistory(true)}
@@ -76,6 +78,7 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
               </Button>
               <Button
                 kind="tertiary"
+                size="lg"
                 renderIcon={CertificateCheck}
                 disabled={unavailable}
                 onClick={() => open('qualitySeal')}
@@ -84,6 +87,7 @@ export function InventoryPage({ api, shortcut }: { api: BloodBankApi; shortcut?:
               </Button>
               <Button
                 kind="danger--tertiary"
+                size="lg"
                 aria-label={t('inventoryDispose')}
                 dangerDescription={t('inventoryDangerDescription')}
                 renderIcon={TrashCan}

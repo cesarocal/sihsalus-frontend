@@ -183,12 +183,16 @@ la primera solicitud de impresión exige confirmación. La reimpresión conserva
 el código por unidad y registra selección, justificación, responsable y fecha.
 Solo la confirmación de impresión pasa la unidad a `APTO`. Estado operativo y resultado de tamizaje permanecen separados, conforme
 al SQL aportado. Eliminar unidades tiene tres pasos: selección, causas (ocho
-opciones del BPMN por unidad) y revisión con impresión del borrador. Imprimir
-no retira stock. El acta EG010-FR02 registra las causas y responsables, marca el lote
-`ELIMINADAS` y lo retira del stock activo sin borrar su historial.
+opciones del BPMN por unidad) y revisión con impresión del acta. Al guardar la
+selección, las unidades pasan a En proceso de eliminación. Quitar una unidad
+en Causas de eliminación libera el bloqueo y recupera su estado operativo. Al
+guardar las causas se registra la fecha y hora y se conservan los nombres
+de las personas designadas y del operador de sesión. El registro final del
+acta EG010-FR02 retira las unidades del stock activo y conserva su historial.
 
-El historial permite retomar borradores y consultar/imprimir actas. Los sellos
-asignados y pendientes de impresión, así como las unidades eliminadas, se bloquean también en Fraccionamiento.
+El historial presenta los estados En proceso y Completado, y permite retomar
+procesos y consultar o imprimir actas. Las unidades en eliminación quedan
+bloqueadas para otras salidas mientras continúe el proceso.
 Persistencia atómica mock en la misma pestaña, sin cambios de backend/login ni
 standalone; el adaptador OMOD nuevo está deshabilitado. Ver [Inventario](src/sections/inventory/README.md)
 para los contratos, límites de impresión y validación clínica pendiente.

@@ -5,6 +5,7 @@ import {
   type DataTableHeader,
   type DataTableRenderProps,
   Dropdown,
+  InlineNotification,
   Layer,
   OverflowMenu,
   OverflowMenuItem,
@@ -49,7 +50,7 @@ import { useTranslation } from 'react-i18next';
 import EncounterObservations from '../../encounter-observations';
 import { type MappedEncounter } from '../../visit.resource';
 
-import { deleteEncounter } from './visits-table.resource';
+import { deleteEncounter, useEncounterTypeCatalog } from './visits-table.resource';
 import styles from './visits-table.scss';
 
 interface VisitTableProps {
@@ -93,14 +94,22 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
     };
   }, []);
 
-  const encounterTypes = [...new Set(visits.map((encounter) => encounter.encounterType))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-
   const [filter, setFilter] = useState('');
+  const { data: catalog, error: catalogError } = useEncounterTypeCatalog();
+  const encounterTypeOptions = [
+    ...new Set(
+      [
+        ...(catalog ?? [])
+          .filter(({ viewPrivilege }) => !viewPrivilege?.display || userHasAccess(viewPrivilege.display, session?.user))
+          .map(({ display }) => display),
+        ...visits.map(({ encounterType }) => encounterType),
+        filter,
+      ].filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
   const filteredRows = useMemo(() => {
-    if (!filter || filter === 'All') {
+    if (!filter) {
       return visits;
     }
 
@@ -145,8 +154,6 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
       datetime: formatDatetime(parseDate(encounter.datetime)),
     }));
   }, [paginatedVisits]);
-
-  const handleEncounterTypeChange = useCallback(({ selectedItem }) => setFilter(selectedItem), []);
 
   const handleDeleteEncounter = useCallback(
     (encounterUuid: string, encounterTypeName?: string) => {
@@ -200,14 +207,6 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
     [],
   );
 
-  if (!visits?.length) {
-    return (
-      <div className={styles.container}>
-        <EmptyState headerTitle={t('encounters', 'Encounters')} displayText={t('encounters__lower', 'encounters')} />
-      </div>
-    );
-  }
-
   return (
     <div className={styles.container}>
       <DataTable
@@ -235,12 +234,16 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
                   <div className={styles.filterContainer}>
                     <Dropdown
                       id="serviceFilter"
-                      initialSelectedItem={t('all', 'All')}
+                      selectedItem={filter}
                       label=""
                       titleText={t('filterByEncounterType', 'Filter by encounter type') + ':'}
                       type="inline"
-                      items={[t('all', 'All'), ...encounterTypes]}
-                      onChange={handleEncounterTypeChange}
+                      items={['', ...encounterTypeOptions]}
+                      itemToString={(item) => item || t('all', 'All')}
+                      onChange={({ selectedItem }) => {
+                        setFilter(selectedItem ?? '');
+                        goTo(1);
+                      }}
                       size={desktopLayout ? 'sm' : 'lg'}
                     />
                   </div>
@@ -252,6 +255,13 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
                   />
                 </TableToolbarContent>
               </TableToolbar>
+              {catalogError && (
+                <InlineNotification
+                  hideCloseButton
+                  kind="warning"
+                  title={t('encounterTypeCatalogError', 'The full encounter type catalog could not be loaded.')}
+                />
+              )}
               <Table {...getTableProps()}>
                 <TableHead>
                   <TableRow>
@@ -386,7 +396,12 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
               </Table>
             </TableContainer>
 
-            {rows.length === 0 ? (
+            {!visits.length && !filter ? (
+              <EmptyState
+                headerTitle={t('encounters', 'Encounters')}
+                displayText={t('encounters__lower', 'encounters')}
+              />
+            ) : rows.length === 0 ? (
               <div className={styles.tileContainer}>
                 <Tile className={styles.tile}>
                   <div className={styles.tileContent}>
@@ -397,7 +412,7 @@ const VisitTable: React.FC<VisitTableProps> = ({ showAllEncounters, visits, pati
               </div>
             ) : null}
 
-            {showAllEncounters ? (
+            {showAllEncounters && visits.length > 0 ? (
               <div className={styles.paginationContainer}>
                 <PatientChartPagination
                   currentItems={paginatedVisits.length}

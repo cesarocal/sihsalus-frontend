@@ -1,20 +1,26 @@
-import { formatListDate } from '../../shared/format-list-date';
 import { Button, Checkbox, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { Clean, WarningAlt } from '@carbon/react/icons';
-import { useEffect, useState, type ReactNode } from 'react';
-import { expiresSoon, type DashboardShortcut } from '../dashboard/dashboard-shortcuts';
+import { type ReactNode, useEffect, useState } from 'react';
+import spanish from '../../../translations/es.json';
+import { formatListDate } from '../../shared/format-list-date';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
-import { canSeal, inventoryDisplayDate, inventoryStatusKey } from './inventory-rules';
-import type { InventoryOperation, InventoryUnit } from './inventory.types';
 import type { InventorySummary } from '../../types/blood-bank.types';
+import { type DashboardShortcut, expiresSoon } from '../dashboard/dashboard-shortcuts';
+import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { screeningBloodGroups, screeningRhFactors } from '../laboratory/screening/screening.types';
 import styles from './inventory.scss';
+import type { InventoryOperation, InventoryUnit } from './inventory.types';
+import { canSeal, disposalEligibleStatuses, inventoryDisplayDate, inventoryStatusKey } from './inventory-rules';
 
 const expiryWarningDays = 7;
+const bloodGroups = screeningBloodGroups.flatMap((abo) => screeningRhFactors.map((rh) => `${abo}${rh}`));
+const componentName = (value: string) => normalizeSearch(value.replace(/\s*\(DEMO\)$/i, '').trim());
 
 export function InventorySelector({
   units,
   selected,
   kind,
+  operationId,
   onChange,
   busy,
   loading = false,
@@ -29,6 +35,7 @@ export function InventorySelector({
   units: InventoryUnit[];
   selected: InventorySummary[];
   kind?: InventoryOperation['kind'];
+  operationId?: string;
   onChange: (units: InventorySummary[]) => void;
   busy: boolean;
   loading?: boolean;
@@ -68,25 +75,52 @@ export function InventorySelector({
     setGroup('');
   };
   const sealWorkflow = kind === 'qualitySeal';
-  const candidates = sealWorkflow ? units.filter((unit) => unit.status === 'Sello pendiente') : units;
+  const components = Object.entries(componentDefinitions).map(([id, { key }]) => ({
+    id,
+    label: t(key),
+    originalLabel: (spanish.processing as Record<string, string>)[key],
+  }));
+  const catalogByLabel = new Map(
+    components.flatMap(({ id, label, originalLabel }) => [
+      [componentName(label), id] as const,
+      [componentName(originalLabel), id] as const,
+    ]),
+  );
+  const componentOptions = new Map(components.map(({ id, label }) => [id, label]));
+  const unitComponent = (unit: InventoryUnit) => catalogByLabel.get(componentName(unit.component)) ?? unit.component;
+  for (const unit of units) {
+    if (unit.component && !componentOptions.has(unitComponent(unit)))
+      componentOptions.set(unit.component, unit.component);
+  }
+  const statusOptions =
+    kind === 'disposal'
+      ? [...disposalEligibleStatuses, ...(operationId && selected.length ? ['En proceso de eliminación' as const] : [])]
+      : (Object.keys(inventoryStatusKey) as InventorySummary['status'][]);
+  const eligible = (unit: InventoryUnit) =>
+    sealWorkflow
+      ? canSeal(unit)
+      : unit.canDispose || (kind === 'disposal' && !!operationId && unit.disposalOperationId === operationId);
+  const candidates = units.filter((unit) =>
+    sealWorkflow ? unit.status === 'Sello pendiente' : kind !== 'disposal' || eligible(unit),
+  );
   const filtered = candidates.filter(
     (unit) =>
       (!exactUnit || unit.id === exactUnit) &&
       (!expiryDays || expiresSoon(unit.expiresAt, expiryDays)) &&
       (!sealOnly || unit.status === 'Sello pendiente') &&
-      (!component || unit.component === component) &&
+      (!component || unitComponent(unit) === component) &&
       (!status || unit.status === status) &&
-      (!group || unit.bloodGroup === group) &&
+      (!group || unit.bloodGroup.replace('−', '-').trim() === group) &&
       normalizeSearch(`${unit.id} ${unit.originalCode} ${unit.component}`).includes(normalizeSearch(search)),
   );
-  const eligible = (unit: InventoryUnit) => (kind === 'qualitySeal' ? canSeal(unit) : unit.canDispose);
   const visibleEligible = filtered.filter(eligible);
   const now = Date.now();
   return (
     <>
-      <div className={styles.toolbar}>
+      <div className={actions ? `${styles.toolbar} ${styles.inventoryToolbar}` : styles.toolbar}>
         <Search
           id={`${prefix}-search`}
+          size={actions ? 'lg' : undefined}
           labelText={t('search')}
           placeholder={t('inventorySearch')}
           value={search}
@@ -131,9 +165,11 @@ export function InventorySelector({
           onChange={(event) => setComponent(event.target.value)}
         >
           <SelectItem value="" text={t('fractionationAllComponents')} />
-          {[...new Set(candidates.map((unit) => unit.component))].sort().map((value) => (
-            <SelectItem key={value} value={value} text={value} />
-          ))}
+          {[...componentOptions]
+            .sort(([, a], [, b]) => a.localeCompare(b))
+            .map(([value, label]) => (
+              <SelectItem key={value} value={value} text={label} />
+            ))}
         </Select>
         <Select
           id={`${prefix}-group`}
@@ -142,12 +178,9 @@ export function InventorySelector({
           onChange={(event) => setGroup(event.target.value)}
         >
           <SelectItem value="" text={t('inventoryAllGroups')} />
-          {[...new Set(candidates.map((unit) => unit.bloodGroup))]
-            .filter(Boolean)
-            .sort()
-            .map((value) => (
-              <SelectItem key={value} value={value} text={value} />
-            ))}
+          {bloodGroups.map((value) => (
+            <SelectItem key={value} value={value} text={value} />
+          ))}
         </Select>
         {!sealWorkflow && (
           <Select
@@ -157,7 +190,7 @@ export function InventorySelector({
             onChange={(event) => setStatus(event.target.value)}
           >
             <SelectItem value="" text={t('allStatuses')} />
-            {[...new Set(units.map((unit) => unit.status))].map((value) => (
+            {statusOptions.map((value) => (
               <SelectItem key={value} value={value} text={t(inventoryStatusKey[value])} />
             ))}
           </Select>
@@ -261,7 +294,13 @@ export function InventorySelector({
         loading={loading}
         failed={failed}
         reload={reload}
-        emptyHelp={t(kind === 'qualitySeal' ? 'inventorySealEmpty' : 'inventoryEmpty')}
+        emptyHelp={t(
+          kind === 'qualitySeal'
+            ? 'inventorySealEmpty'
+            : kind === 'disposal'
+              ? 'inventoryDisposalEmpty'
+              : 'inventoryEmpty',
+        )}
         filterKey={`${search}:${component}:${group}:${status}:${exactUnit}:${expiryDays}:${sealOnly}`}
         t={t}
       />

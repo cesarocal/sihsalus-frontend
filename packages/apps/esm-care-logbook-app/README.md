@@ -9,6 +9,7 @@ Tambien concentra evidencia funcional del perfil `N1.ADM` de la acreditacion SIH
 - Libro de aperturas: una fila por `visit`, no por encuentro clínico ni por cita futura.
 - Vista inicial **Hoy**, según America/Lima; **Histórico** permite rango inclusivo de fechas o todo el histórico.
 - Filtros por tipo de atención (`visitType`), UPSS y estado, además de búsqueda libre. Incluye aperturas activas y finalizadas, ordenadas de más reciente a más antigua.
+- Los filtros consultan todas las páginas de `visittype` y `location` por separado del periodo del reporte. El parámetro `admissionReportLocationTag` usa `Care UPSS` por defecto. Si falla un catálogo, se muestra un aviso y siguen disponibles los valores de las filas cargadas.
 - Se recorren todas las páginas REST del periodo antes de mostrar resultados o permitir exportar. `admissionReportPageSize` controla el lote REST, no el límite del histórico. La tabla se pagina de forma independiente y el CSV incluye todos los resultados filtrados.
 - El permiso de consulta sigue siendo `app:home.libroAtenciones`: debe asignarse al rol Admision en el content package. No concede edición, fusión de pacientes ni acceso adicional a la historia clínica. El enlace existente del slot `homepage-dashboard-slot` se muestra al recibir ese permiso; no se duplica ni se altera el orden global.
 - Dependencias: REST `visit` con `includeInactive`, `fromStartDate`, `toStartDate`, `startIndex` y enlaces de paginación; privilegios de lectura de visitas, pacientes y relaciones. Una página fallida no se presenta como un informe completo.

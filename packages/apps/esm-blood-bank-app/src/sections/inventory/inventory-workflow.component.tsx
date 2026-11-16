@@ -9,32 +9,32 @@ import {
   SelectItem,
   TextInput,
 } from '@carbon/react';
-import { Printer } from '@carbon/react/icons';
+import { Close, Printer } from '@carbon/react/icons';
 import { openmrsFetch, restBaseUrl, useSession } from '@openmrs/esm-framework';
 import { useCallback, useRef, useState } from 'react';
 import type { InventoryApi } from '../../api/inventory.api';
 import { useApiData } from '../../api/use-api-data';
 import { notifySuccess } from '../../shared/notify-success';
+import { printDocument } from '../../shared/print-document';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import { printDocument } from '../../shared/print-document';
 import { useLiveClock } from '../../shared/use-live-clock';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
+import shared from '../applicant-selection/selection.scss';
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import { localDateTime } from '../laboratory/screening/screening-rules';
+import { disposalCauses, isDisposalCause } from './disposal-causes';
+import styles from './inventory.scss';
+import type { InventoryOperation, InventoryUnit } from './inventory.types';
 import {
   DisposalAct,
   QualitySealReprintHistory,
   QualitySeals,
   qualitySealPrintCss,
 } from './inventory-documents.component';
-import { QualitySealReprintDialog } from './quality-seal-reprint.component';
-import { InventorySelector } from './inventory-selector.component';
 import { canReprintSeal, inventoryDisplayDate, validateInventoryOperation } from './inventory-rules';
-import type { InventoryOperation, InventoryUnit } from './inventory.types';
-import styles from './inventory.scss';
-import shared from '../applicant-selection/selection.scss';
-import { disposalCauses, isDisposalCause } from './disposal-causes';
+import { InventorySelector } from './inventory-selector.component';
+import { QualitySealReprintDialog } from './quality-seal-reprint.component';
 
 export function InventoryWorkflow({
   initial,
@@ -54,7 +54,17 @@ export function InventoryWorkflow({
   t: ProcessingTranslate;
 }) {
   const [storedOperation, setOperation] = useState(initial);
-  const [step, setStep] = useState(initial.stage === 'draft' ? 0 : 1);
+  const [step, setStep] = useState(
+    initial.kind === 'qualitySeal'
+      ? initial.stage === 'draft'
+        ? 0
+        : 1
+      : initial.stage === 'completed' || initial.disposalStep === 'review'
+        ? 2
+        : initial.disposalStep === 'causes'
+          ? 1
+          : 0,
+  );
   const [dirty, setDirty] = useState(!initial.id && initial.units.length > 0);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -79,7 +89,12 @@ export function InventoryWorkflow({
     '';
   const personUuid = person?.uuid;
   const liveSeal = isSeal && (storedOperation.stage === 'draft' || storedOperation.stage === 'ready');
-  const lookupOperator = isSeal && !sessionName && Boolean(personUuid) && (liveSeal || reprint);
+  const pendingSealConfirmation = isSeal && storedOperation.stage === 'printRequested';
+  const liveDisposal = !isSeal && !finalized && step === 1;
+  const lookupOperator =
+    !sessionName &&
+    Boolean(personUuid) &&
+    (liveSeal || pendingSealConfirmation || reprint || (!isSeal && !finalized && step > 0));
   const [operatorLookupAttempt, setOperatorLookupAttempt] = useState(0);
   const loadOperator = useCallback(async () => {
     if (!personUuid) throw new Error('INVENTORY_OPERATOR_UNAVAILABLE');
@@ -95,7 +110,10 @@ export function InventoryWorkflow({
     sessionName ||
     (lookupOperator && operatorProfile.data?.uuid === personUuid ? (operatorProfile.data?.display?.trim() ?? '') : '');
   const loadingOperator = lookupOperator && !operator && !operatorProfile.error;
-  const clock = useLiveClock(liveSeal);
+  const loadSignatories = useCallback(() => api.getDisposalSignatories(), [api]);
+  const [signatoryLookupAttempt, setSignatoryLookupAttempt] = useState(0);
+  const signatories = useApiData(liveDisposal ? loadSignatories : null, signatoryLookupAttempt);
+  const clock = useLiveClock(liveSeal || liveDisposal);
   const currentTime = localDateTime(clock);
   const operation =
     isSeal && storedOperation.stage === 'draft'
@@ -105,7 +123,16 @@ export function InventoryWorkflow({
           time: currentTime.slice(11),
           serviceResponsible: operator,
         }
-      : storedOperation;
+      : liveDisposal
+        ? {
+            ...storedOperation,
+            date: currentTime.slice(0, 10),
+            time: currentTime.slice(11),
+            witnesses: operator,
+            serviceResponsible: signatories.data?.serviceResponsible ?? '',
+            epidemiologyResponsible: signatories.data?.epidemiologyResponsible ?? '',
+          }
+        : storedOperation;
   const printLabel = t(operation.units.length === 1 ? 'inventoryPrintSeal' : 'inventoryPrintSeals');
   const reprintIds = units.filter((unit) => canReprintSeal(operation, unit)).map(({ id }) => id);
   const steps = isSeal
@@ -116,7 +143,7 @@ export function InventoryWorkflow({
     setDirty(true);
     setFailed('');
   };
-  const execute = async (action: (op: InventoryOperation) => Promise<InventoryOperation>, success: string) => {
+  const execute = async (action: (op: InventoryOperation) => Promise<InventoryOperation>, success?: string) => {
     if (requestInFlight.current) return null;
     requestInFlight.current = true;
     setSaving(true);
@@ -126,7 +153,7 @@ export function InventoryWorkflow({
       setOperation(result);
       setDirty(false);
       onSaved();
-      if (result.revision !== operation.revision) notifySuccess(t(success));
+      if (success && result.revision !== operation.revision) notifySuccess(t(success));
       return result;
     } catch {
       setFailed('inventorySaveFailed');
@@ -153,13 +180,21 @@ export function InventoryWorkflow({
     if (missing.length) return;
     if (step < steps.length - 1) {
       const result = await execute(
-        isSeal ? api.prepareSeal : api.saveDraft,
+        isSeal ? api.prepareSeal : step === 0 ? api.saveDisposalSelection : api.saveDisposalDetails,
         isSeal ? 'inventorySealPrepared' : 'inventoryDraftSaved',
       );
       if (result) setStep(step + 1);
     } else if (isSeal) {
       if (operation.stage !== 'printRequested' || !confirmedPrint) return;
-      if (await execute(api.confirmSeal, 'inventorySealsCompleted')) onClose();
+      if (!operator) {
+        setErrors([loadingOperator ? 'inventoryOperatorLoading' : 'inventoryOperatorUnavailable']);
+        return;
+      }
+      if (await execute((op) => api.confirmSeal(op, operator), 'inventorySealsCompleted')) onClose();
+    } else if (!operator) setErrors(['inventoryOperatorUnavailable']);
+    else if (operation.witnesses !== operator) {
+      setStep(1);
+      setErrors(['inventoryDisposalOperatorChanged']);
     } else setConfirmDisposal(true);
   };
   const renderSeals = (requested: InventoryOperation, unitIds?: string[]) => {
@@ -227,7 +262,13 @@ export function InventoryWorkflow({
       setFailed('printFailed');
     }
   };
-  const textInput = (
+  const removeUnit = async (unitId: string) => {
+    const result = await execute((op) => api.saveDraft({ ...op, units: op.units.filter(({ id }) => id !== unitId) }));
+    if (!result) return;
+    setErrors([]);
+    if (!result.units.length) setStep(0);
+  };
+  const disposalField = (
     field: 'date' | 'time' | 'witnesses' | 'serviceResponsible' | 'epidemiologyResponsible',
     key: string,
   ) => (
@@ -235,16 +276,14 @@ export function InventoryWorkflow({
       key={field}
       id={`inventory-${field}`}
       labelText={t(key)}
-      value={operation[field]}
-      disabled={saving || operation.stage !== 'draft'}
-      type={field === 'date' ? 'date' : field === 'time' ? 'time' : 'text'}
-      onChange={(event) => change({ [field]: event.target.value })}
+      value={field === 'date' ? inventoryDisplayDate(operation.date) : operation[field]}
+      readOnly
     />
   );
   return (
     <>
       <ProcessingModal
-        title={`${t(isSeal ? 'inventoryQualitySeal' : 'inventoryDispose')}${operation.id ? ` — ${operation.id}` : ''}`}
+        title={`${t(isSeal ? 'inventoryQualitySeal' : 'inventoryDispose')}${operation.id ? `${isSeal ? ' — ' : ' - '}${operation.id}` : ''}`}
         steps={steps}
         step={step}
         completed={steps.slice(0, step)}
@@ -268,7 +307,10 @@ export function InventoryWorkflow({
           step < steps.length - 1 ? 'next' : isSeal ? 'inventoryConfirmPrinting' : 'inventoryRegisterAct',
         )}
         advanceDisabled={
-          step === 1 && isSeal && (operation.stage !== 'printRequested' || !confirmedPrint || failed === 'printFailed')
+          (step === 1 &&
+            isSeal &&
+            (operation.stage !== 'printRequested' || !confirmedPrint || failed === 'printFailed')) ||
+          (liveDisposal && (signatories.isLoading || loadingOperator))
         }
         footerClassName={styles.printFooter}
         extraActions={
@@ -308,6 +350,7 @@ export function InventoryWorkflow({
                     units={units}
                     selected={operation.units}
                     kind={operation.kind}
+                    operationId={operation.id}
                     prefix="inventory-workflow"
                     busy={saving}
                     onChange={(selected) =>
@@ -332,6 +375,7 @@ export function InventoryWorkflow({
                             <th key={key}>{t(key)}</th>
                           ),
                         )}
+                        <th scope="col">{t('actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -366,6 +410,17 @@ export function InventoryWorkflow({
                                 ))}
                               </Select>
                             </td>
+                            <td>
+                              <Button
+                                kind="ghost"
+                                size="sm"
+                                hasIconOnly
+                                renderIcon={Close}
+                                iconDescription={`${t('inventoryRemoveDisposalUnit')} ${unit.id}`}
+                                disabled={saving}
+                                onClick={() => void removeUnit(unit.id)}
+                              />
+                            </td>
                           </tr>
                         );
                       })}
@@ -379,11 +434,38 @@ export function InventoryWorkflow({
                     sealFields()
                   ) : (
                     <div className={styles.form}>
-                      {textInput('date', 'inventoryDate')}
-                      {textInput('time', 'inventoryTime')}
-                      {textInput('serviceResponsible', 'inventoryServiceResponsible')}
-                      {textInput('epidemiologyResponsible', 'inventoryEpidemiologyResponsible')}
-                      {textInput('witnesses', 'inventoryWitnesses')}
+                      {disposalField('date', 'inventoryDate')}
+                      {disposalField('time', 'inventoryTime')}
+                      {disposalField('serviceResponsible', 'inventoryServiceResponsible')}
+                      {disposalField('epidemiologyResponsible', 'inventoryEpidemiologyResponsible')}
+                      {disposalField('witnesses', 'inventoryWitnesses')}
+                      {!operator && (
+                        <p role="status">
+                          {t(loadingOperator ? 'inventoryOperatorLoading' : 'inventoryOperatorUnavailable')}
+                        </p>
+                      )}
+                      {lookupOperator && operatorProfile.error && (
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          onClick={() => setOperatorLookupAttempt((attempt) => attempt + 1)}
+                        >
+                          {t('retry')}
+                        </Button>
+                      )}
+                      {!signatories.isLoading &&
+                        (!operation.serviceResponsible || !operation.epidemiologyResponsible) && (
+                          <p role="status">{t('inventoryDisposalSignatoriesUnavailable')}</p>
+                        )}
+                      {signatories.error && (
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          onClick={() => setSignatoryLookupAttempt((attempt) => attempt + 1)}
+                        >
+                          {t('retry')}
+                        </Button>
+                      )}
                     </div>
                   )}
                   {isSeal && (
@@ -489,7 +571,7 @@ export function InventoryWorkflow({
             }}
           />
           <ModalBody>
-            <p>{t('inventoryDisposalWarning')}</p>
+            <p>{t(operation.units.length === 1 ? 'inventoryDisposalWarningSingle' : 'inventoryDisposalWarning')}</p>
           </ModalBody>
           <ModalFooter>
             <Button kind="secondary" disabled={saving} onClick={() => setConfirmDisposal(false)}>

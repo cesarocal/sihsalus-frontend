@@ -97,6 +97,11 @@ describe('transfer workflow UI and documents', () => {
     expect(screen.getByRole('tab', { name: t('transferIncomingTab') })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'Historial de solicitudes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Registrar solicitud' })).toBeInTheDocument();
+    const incomingInstitutions = screen.getByLabelText(t('transferRequestingInstitution'));
+    expect(within(incomingInstitutions).getByRole('option', { name: 'Banco destino DEMO' })).toBeInTheDocument();
+    fireEvent.change(incomingInstitutions, { target: { value: 'Banco destino DEMO' } });
+    expect(screen.getByText(t('transferEmptyInbox'))).toBeInTheDocument();
+    fireEvent.change(incomingInstitutions, { target: { value: '' } });
     fireEvent.change(screen.getByRole('searchbox', { name: t('transferSearchInbox') }), {
       target: { value: 'OFICIO-DEMO-2' },
     });
@@ -104,6 +109,10 @@ describe('transfer workflow UI and documents', () => {
     expect(screen.getByRole('searchbox', { name: t('transferSearchInbox') })).toHaveValue('');
     expect(screen.queryByRole('button', { name: t('transferAttend') })).not.toBeInTheDocument();
     expect(screen.getByText('SALIDA-UI-DEMO')).toBeInTheDocument();
+    const outgoingInstitutions = screen.getByLabelText(t('transferDestinationInstitution'));
+    expect(
+      within(outgoingInstitutions).getByRole('option', { name: /Establecimiento solicitante DEMO 3/ }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: t('transferDestinationInstitution') })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: t('transferIncomingTab') }));
     expect(screen.getByRole('searchbox', { name: t('transferSearchInbox') })).toHaveValue('OFICIO-DEMO-2');

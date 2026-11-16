@@ -12,6 +12,10 @@ login, barra lateral global, privilegios del backend ni tablas de OpenMRS.
   de Estado, una escoba pequeña permite limpiar la búsqueda y todos los filtros,
   incluidos los aplicados desde Inicio. No se muestra el mensaje de filtros de Inicio;
   se conserva el aviso si una unidad enlazada ya no existe en el inventario.
+- Inventario, Sello de calidad y Eliminar unidades ofrecen el catálogo de
+  hemocomponentes y los ocho grupos ABO/Rh. El filtro de estado de eliminación
+  ofrece los estados admitidos por ese proceso. Una combinación sin coincidencias
+  muestra el mensaje de tabla vacía.
 - Selección múltiple y Deseleccionar. Seleccionar resultados filtrados aparece
   solo dentro de los popups, no en el listado principal.
   Sello de calidad y Eliminar unidades abren sin selección o precargan las
@@ -42,14 +46,18 @@ login, barra lateral global, privilegios del backend ni tablas de OpenMRS.
 - Eliminar unidades: tres pasos, Seleccionar unidades → Causas de eliminación
   (una opción del desplegable por unidad, fecha/hora, personas presentes y
   responsables del servicio/Epidemiología) → Revisión del acta `EG010-FR02`.
-  Cada avance guarda el borrador; seleccionar unidades no exige aún los datos
-  del segundo paso. Anterior conserva lo ingresado. La revisión permite imprimir
-  el acta como borrador, sin eliminar unidades ni simular una firma.
+  Guardar la selección aplica el estado En proceso de eliminación. Quitar una
+  unidad desde Causas de eliminación guarda el retiro de la selección y libera
+  ese bloqueo. Fecha y hora se muestran en vivo y se fijan al guardar las causas.
+  Las personas firmantes y el operador de la sesión se muestran en solo lectura.
+  La revisión permite imprimir el formato con el logo, grupo ABO y Rh completo.
   Solo Registrar acta y su confirmación final ejecutan la salida del stock.
   El lote recibe `ELIMINADAS` y sale del stock activo. Se conservan la instantánea
   original, causas, acta y responsables; no se borran extracciones ni resultados.
-- Historial de sellos y actas: búsqueda, filtro de proceso, detalle, reanudación
-  y vuelta con flecha. Las actas finalizadas se imprimen con líneas para firmas
+- Historia de sellos y actas de eliminación: búsqueda, filtro de proceso,
+  detalle, reanudación y vuelta con flecha. En proceso y Completado son los
+  estados de la operación. Responsable identifica a quien confirma la
+  aplicación del sello o a quien registra el acta en la sesión. Las actas llevan líneas para firmas
   físicas. Solo la X cierra el historial, sin otro Cerrar en el pie.
 - Cierre de procesos: Seguir editando / Salir y casilla para guardar antes de
   salir. Guardar un borrador idéntico no escribe ni muestra un éxito ficticio.
@@ -75,7 +83,7 @@ usuario siguen escapadas y los errores visibles no muestran trazas.
   traducidas; no inventa UUIDs/conceptos clínicos.
 - `disposal-act-print.ts`: estilos exclusivos del acta impresa A4, tabla de cinco
   columnas, filas en blanco y dos espacios para firmas físicas. Las tablas largas
-  repiten cabecera y la numeración de páginas usa el soporte del navegador.
+  repiten cabecera. Las cajas de margen de impresión quedan vacías.
 - `inventory-history.component.tsx`: consulta y reanudación.
 - `inventory.types.ts` / `inventory-rules.ts`: contratos y validación.
 - `../../api/inventory.api.ts`: interfaz y endpoints OMOD propuestos.
@@ -88,18 +96,19 @@ usuario siguen escapadas y los errores visibles no muestran trazas.
 Una transición usa un único `setItem`; una escritura fallida no deja movimientos
 parciales. Revisiones e identidad canónica rechazan ediciones antiguas o
 manipuladas. Repetir la finalización no duplica movimientos.
-Los campos de responsables y personas presentes no tienen límites de texto
-arbitrarios mientras se define el contrato de persistencia real. Las causas nuevas
-se guardan como códigos del catálogo. Las causas de texto libre de actas anteriores
+Las causas nuevas se guardan como códigos del catálogo. Las causas de texto libre de actas anteriores
 siguen siendo legibles e imprimibles, sin migración destructiva; al retomar un
 borrador antiguo se muestra su causa previa y se exige elegir una del catálogo
 antes de finalizar. El adaptador mock también rechaza causas desconocidas.
 
-Unidades en laboratorio/reservadas no se eliminan. Sellos pendientes bloquean
-Fraccionamiento; las eliminadas no se muestran en su cola y su API rechaza
-peticiones antiguas. Un PFC con sello finalizado puede fraccionarse: sus nuevos
-componentes entran en cuarentena y no heredan el sello. Un acta puede retirar una
-unidad con impresión pendiente; esa unidad ya no puede confirmarse como apta.
+El mock permite seleccionar unidades en Cuarentena, En fraccionamiento, Sello
+pendiente, Apta, No apta, Reservada para transferencia, En pruebas de
+compatibilidad y Reservada para transfusión. Durante la eliminación se conservan
+las asignaciones de origen, y se impide confirmar sello, finalizar
+fraccionamiento, validar compatibilidad o entregar la unidad. Al quitarla del
+acta se vuelve a proyectar el estado del flujo de origen. El registro final
+retira el stock y conserva las referencias históricas. Un PFC con sello
+finalizado puede fraccionarse. Sus nuevos componentes entran en cuarentena.
 
 Los PFC de demostración preexistentes no tienen tamizaje vinculado y se muestran
 como pendientes, fuera del popup de sello, sin inventar resultados. Para nuevas extracciones se completa
@@ -140,12 +149,12 @@ esta fixture son ilustrativos, no reglas clínicas de conservación.
   mantienen las comprobaciones posteriores de compatibilidad y liberación.
 
 El sello es una propuesta de UI, no un formato oficial validado. Los imprimibles
-incluyen marca DEMO/no válido para uso clínico y escapan texto del usuario.
+escapan texto del usuario y conservan los identificadores de las unidades.
 No implementan firma electrónica, ISBT 128, impresora validada, archivo PDF
 documental ni auditoría clínica. Actas extensas pueden ocupar varias páginas:
 no se recortan filas para forzar el “Hoja 1 de 1” de la captura. Se conserva la
 distribución del formato, no se afirma aprobación institucional ni equivalencia
-documental. Los borradores impresos se identifican como pendientes de registro.
+documental. La revisión en pantalla distingue el borrador del acta registrada.
 
 El navegador no verifica impresión física: cancelar y `afterprint` no prueban
 éxito. Se conserva la primera solicitud y se registra cada reintento en esta
@@ -154,6 +163,16 @@ después de inspeccionar la etiqueta. `sessionStorage` se pierde al cerrar la
 pestaña; la persistencia clínica y la auditoría entre sesiones dependen del OMOD.
 
 ## Backend y validación pendientes
+
+Para el mock integrado, `inventoryDisposalSignatories.servicePersonUuid` y
+`inventoryDisposalSignatories.epidemiologyPersonUuid` identifican a las personas
+designadas en el establecimiento. El frontend consulta el nombre preferido
+en REST `/person/{uuid}` con la sesión de OpenMRS. Ambos nombres y el nombre
+del operador son obligatorios para guardar las causas. En la integración
+clínica el backend debe resolver las designaciones vigentes por establecimiento
+y conservar sus nombres e identidades en el acta. Los códigos de concepto de
+los estados quedan pendientes del catálogo. También queda pendiente definir
+la reposición de una unidad eliminada que ya estuviera comprometida en otro flujo.
 
 `useMockData=false`: el nuevo adaptador falla de forma segura, sin escrituras.
 El GET legado conserva su contrato pero no habilita estos flujos. Los endpoints

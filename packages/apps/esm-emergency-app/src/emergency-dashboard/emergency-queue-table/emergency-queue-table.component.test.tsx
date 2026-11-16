@@ -67,6 +67,20 @@ it('finds a patient when a pasted search has surrounding whitespace', async () =
   expect(screen.queryByText('Synthetic patient 2')).not.toBeInTheDocument();
 });
 
+it('offers every identification status before any patient has that status', async () => {
+  const user = userEvent.setup();
+  render(<EmergencyQueueTable />);
+  const dropdown = screen.getByRole('combobox', { name: 'Identification' });
+  await user.click(dropdown);
+  for (const option of ['Pendiente', 'Parcial', 'Confirmado', 'Fusionado']) {
+    expect(screen.getByRole('option', { name: option })).toBeInTheDocument();
+  }
+  await user.click(screen.getByRole('option', { name: 'Fusionado' }));
+  expect(screen.getByText('No patients to display')).toBeInTheDocument();
+  await user.click(dropdown);
+  expect(screen.getByRole('option', { name: 'Parcial' })).toBeInTheDocument();
+});
+
 it.each([
   ['Status', 'Waiting'],
   ['Priority', 'Emergency'],

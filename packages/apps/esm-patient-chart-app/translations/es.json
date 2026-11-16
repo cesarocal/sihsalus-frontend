@@ -81,6 +81,7 @@
   "encounters_title": "Atenciones",
   "encounterSuccessfullyDeleted": "La atención ha sido eliminada exitosamente",
   "encounterType": "Tipo de atención",
+  "encounterTypeCatalogError": "No se pudo cargar el catálogo completo de tipos de atención.",
   "encounterWithError": "No se pudo eliminar la atención. Si el error persiste, contacte al administrador del sistema.",
   "end": "Finalizar",
   "endActiveVisitConfirmation": "¿Está seguro de que desea finalizar esta consulta activa?",

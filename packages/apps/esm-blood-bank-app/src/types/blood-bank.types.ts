@@ -41,6 +41,7 @@ export interface InventorySummary {
     | 'No apta'
     | 'APTO'
     | 'Por transferir'
+    | 'En proceso de eliminación'
     | 'En pruebas de compatibilidad'
     | 'Reservados para transfusión';
 }

@@ -32,12 +32,13 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { careLogbookBasePath, careLogbookPrivilege, moduleName } from '../constants';
-import { useAdmissions } from '../resources/admissions.resource';
+import { admissionStatuses, useAdmissionFilterCatalogs, useAdmissions } from '../resources/admissions.resource';
 import styles from './admission-home.scss';
 
 const EXCEL_CSV_PREAMBLE = '\uFEFFsep=,\r\n';
 
 interface AdmissionConfig {
+  admissionReportLocationTag?: string;
   admissionReportPageSize?: number;
 }
 
@@ -129,25 +130,37 @@ export default function AdmissionHome() {
   const range = period === 'today' ? { from: today, to: today } : { from, to };
   const invalidRange = Boolean(range.from && range.to && range.from > range.to);
   const { admissions, error, isLoading } = useAdmissions(config.admissionReportPageSize ?? 50, range);
+  const catalogs = useAdmissionFilterCatalogs(config.admissionReportLocationTag?.trim() || 'Care UPSS');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const availableServices = Array.from(new Set(admissions.map((item) => item.service).filter(Boolean))).sort();
-  const availableLocations = Array.from(new Set(admissions.map((item) => item.location).filter(Boolean))).sort();
+  const availableServices = [
+    ...new Set(
+      [
+        ...catalogs.services,
+        ...admissions.map((item) => item.service),
+        serviceFilter !== 'all' ? serviceFilter : '',
+      ].filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+  const availableLocations = [
+    ...new Set(
+      [
+        ...catalogs.locations,
+        ...admissions.map((item) => item.location),
+        locationFilter !== 'all' ? locationFilter : '',
+      ].filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
   const sexLabels = useMemo(
     () => ({
       female: t('femaleInitial', 'F'),
       male: t('maleInitial', 'M'),
     }),
     [t],
-  );
-
-  const availableStatuses = useMemo(
-    () => Array.from(new Set(admissions.map((admission) => admission.status).filter(Boolean))).sort(),
-    [admissions],
   );
 
   const filteredAdmissions = useMemo(() => {
@@ -199,8 +212,8 @@ export default function AdmissionHome() {
   const reportSummary = useMemo(
     () => ({
       total: filteredAdmissions.length,
-      active: filteredAdmissions.filter((admission) => admission.status === 'Activa').length,
-      finished: filteredAdmissions.filter((admission) => admission.status === 'Finalizada').length,
+      active: filteredAdmissions.filter((admission) => admission.status === admissionStatuses.active).length,
+      finished: filteredAdmissions.filter((admission) => admission.status === admissionStatuses.finished).length,
       visitTypes: new Set(filteredAdmissions.map((admission) => admission.service).filter(Boolean)).size,
     }),
     [filteredAdmissions],
@@ -403,9 +416,8 @@ export default function AdmissionHome() {
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
                 <SelectItem value="all" text={t('allStatuses', 'Todos los estados')} />
-                {availableStatuses.map((status) => (
-                  <SelectItem key={status} value={status} text={status} />
-                ))}
+                <SelectItem value={admissionStatuses.active} text={t('activeAdmissionStatus', 'Activa')} />
+                <SelectItem value={admissionStatuses.finished} text={t('finishedAdmissionStatus', 'Finalizada')} />
               </Select>
               <Button
                 kind="primary"
@@ -417,6 +429,13 @@ export default function AdmissionHome() {
               </Button>
             </section>
 
+            {catalogs.error && (
+              <InlineNotification
+                hideCloseButton
+                kind="warning"
+                title={t('admissionFilterCatalogError', 'No se pudieron cargar todos los catálogos de filtros.')}
+              />
+            )}
             {error ? (
               <InlineNotification
                 kind="error"

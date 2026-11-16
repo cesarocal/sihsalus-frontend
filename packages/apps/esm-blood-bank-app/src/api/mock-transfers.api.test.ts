@@ -190,27 +190,29 @@ describe('transfer requests, stock commitments and administrative logbook', () =
     };
     expect(completeTransferSelection(mixed, workspace.units)).toBe(false);
   });
-  it('reserves atomically, exposes Por transferir in stock and excludes all competing workflows', async () => {
+  it('reserves atomically and blocks delivery while its units are selected for disposal', async () => {
     const api = createMockTransfersApi();
-    const selected = await preparation(api);
-    const reserved = await api.reserve(selected.id, selected.revision);
+    const reserved = await delivery(api);
     expect(reserved.status).toBe('prepared');
     expect(reserved.preparation.certificateOffice).toBe('CONSTANCIA-MANUAL-2026');
     expect(reserved.certificateUnits).toHaveLength(2);
     const inventory = createMockInventoryApi();
-    const units = (await inventory.list()).units.filter((unit) => selected.preparation.unitIds.includes(unit.id));
-    expect(units.every((unit) => unit.status === 'Por transferir' && !unit.canDispose)).toBe(true);
-    await expect(inventory.dispose(disposalOperation(units))).rejects.toThrow('INVENTORY_NOT_ELIGIBLE');
+    const units = (await inventory.list()).units.filter((unit) => reserved.preparation.unitIds.includes(unit.id));
+    expect(units.every((unit) => unit.status === 'Por transferir' && unit.canDispose)).toBe(true);
+    const disposal = await inventory.saveDisposalSelection(disposalOperation(units));
+    await expect(api.deliver(reserved.id, reserved.revision)).rejects.toThrow('TRANSFER_STOCK_CONFLICT');
     const fractions = await createMockFractionationApi().list();
-    expect(fractions.units.some((unit) => selected.preparation.unitIds.includes(unit.id))).toBe(false);
+    expect(fractions.units.some((unit) => reserved.preparation.unitIds.includes(unit.id))).toBe(false);
     const other = (await api.list()).requests[1];
     const contender = await api.savePreparation(other.id, other.revision, {
-      ...selected.preparation,
-      unitIds: [selected.preparation.unitIds[0]],
+      ...reserved.preparation,
+      unitIds: [reserved.preparation.unitIds[0]],
       certificateOffice: 'OTRA-CONSTANCIA',
     });
     await expect(api.reserve(contender.id, contender.revision)).rejects.toThrow('INVALID_TRANSFER_PREPARATION');
-    expect(await api.reserve(selected.id, selected.revision)).toEqual(reserved);
+    expect(await api.reserve(reserved.id, reserved.revision)).toEqual(reserved);
+    await inventory.saveDraft({ ...disposal, units: [] });
+    await expect(api.deliver(reserved.id, reserved.revision)).resolves.toMatchObject({ status: 'delivered' });
   });
   it('rejection releases the complete reservation and retains its reason and historical certificate', async () => {
     const api = createMockTransfersApi();

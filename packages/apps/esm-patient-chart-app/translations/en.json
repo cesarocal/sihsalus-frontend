@@ -81,6 +81,7 @@
   "encounters_title": "Encounters",
   "encounterSuccessfullyDeleted": "The encounter has been deleted successfully",
   "encounterType": "Encounter type",
+  "encounterTypeCatalogError": "The full encounter type catalog could not be loaded.",
   "encounterWithError": "The encounter could not be deleted successfully. If the error persists, please contact your system administrator.",
   "end": "End",
   "endActiveVisitConfirmation": "Are you sure you want to end this active visit?",

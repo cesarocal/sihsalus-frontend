@@ -25,6 +25,7 @@ Un cambio pequeno aqui puede romper multiples apps porque muchas extensiones dep
 - El banner del paciente debe ser estable: `Mostrar mas` no debe ocultar el resumen ni romper el layout.
 - El left sidebar debe mostrar labels traducidos; keys como `caseMonitoringEncounters` son defectos.
 - El right sidebar debe conservar acciones criticas: ordenes, FUA, notas de visita, formularios y listas de pacientes.
+- El filtro de tipos de atención de Visitas anteriores consulta el catálogo paginado de `encountertype` cuando hay conexión y respeta el privilegio de lectura de cada tipo. También admite los tipos de los registros históricos cargados. Si falla el catálogo, se informa y la tabla sigue disponible.
 
 En escritorio, el contenedor compartido de workspaces participa en la grilla del
 shell y reserva el ancho de la barra de acciones y del workspace abierto. El

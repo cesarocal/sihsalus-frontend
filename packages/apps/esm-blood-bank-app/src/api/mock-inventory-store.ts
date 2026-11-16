@@ -1,9 +1,9 @@
 import type { InventoryStore } from '../sections/inventory/inventory.types';
+import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
+import { globalScreeningResult } from '../sections/laboratory/screening/screening-rules';
 import type { ProcessingState } from './mock-processing-store';
 import { transferUnitState } from './mock-transfers-store';
 import { transfusionUnitState } from './mock-transfusions-store';
-import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
-import { globalScreeningResult } from '../sections/laboratory/screening/screening-rules';
 
 /** Same atomic session-storage document as extraction, screening and fractionation. */
 export function inventoryStore(state: ProcessingState): InventoryStore {
@@ -19,9 +19,11 @@ export function inventoryStore(state: ProcessingState): InventoryStore {
         !Number.isInteger(op.revision) ||
         op.revision < 1 ||
         !Array.isArray(op.units) ||
-        !op.units.length ||
+        (!op.units.length && (op.kind !== 'disposal' || op.stage !== 'draft' || op.disposalStep !== undefined)) ||
         new Set(op.units.map((unit) => unit.id)).size !== op.units.length ||
         (op.kind === 'disposal' && !['draft', 'completed'].includes(op.stage)) ||
+        (op.disposalStep !== undefined &&
+          (op.kind !== 'disposal' || !['causes', 'review'].includes(op.disposalStep))) ||
         (op.stage === 'completed' &&
           (!op.completedAt || op.outcome !== (op.kind === 'qualitySeal' ? 'APTO' : 'ELIMINADAS'))) ||
         (op.stage === 'printRequested' && !op.requestedAt),
@@ -34,9 +36,35 @@ export function inventoryStore(state: ProcessingState): InventoryStore {
   const disposed = store.operations
     .filter((op) => op.kind === 'disposal' && op.stage === 'completed')
     .flatMap((op) => op.units.map((unit) => unit.id));
-  if (new Set(sealed).size !== sealed.length || new Set(disposed).size !== disposed.length)
+  const disposalUnits = [...disposed, ...activeDisposalUnits(store).keys()];
+  if (
+    new Set(sealed).size !== sealed.length ||
+    new Set(disposed).size !== disposed.length ||
+    new Set(disposalUnits).size !== disposalUnits.length
+  )
     throw new Error('INVALID_INVENTORY_STORAGE');
   return store;
+}
+
+export function activeDisposalUnits(store: InventoryStore) {
+  const units = new Map<string, string>();
+  for (const op of store.operations) {
+    if (op.kind !== 'disposal' || op.stage !== 'draft' || !op.disposalStep) continue;
+    for (const { id } of op.units) {
+      if (units.has(id)) throw new Error('INVALID_INVENTORY_STORAGE');
+      units.set(id, op.id);
+    }
+  }
+  return units;
+}
+
+export function inventoryBlocksFractionationCompletion(state: ProcessingState, code: string): boolean {
+  return inventoryStore(state).operations.some(
+    (op) =>
+      op.kind === 'disposal' &&
+      (op.stage === 'completed' || !!op.disposalStep) &&
+      op.units.some((unit) => unit.id === code),
+  );
 }
 export function inventoryBlocksFractionation(state: ProcessingState, code: string): boolean {
   return (
@@ -45,7 +73,9 @@ export function inventoryBlocksFractionation(state: ProcessingState, code: strin
     inventoryStore(state).operations.some(
       (op) =>
         op.units.some((unit) => unit.id === code) &&
-        (op.kind === 'qualitySeal' ? ['ready', 'printRequested'].includes(op.stage) : op.stage === 'completed'),
+        (op.kind === 'qualitySeal'
+          ? ['ready', 'printRequested'].includes(op.stage)
+          : op.stage === 'completed' || !!op.disposalStep),
     )
   );
 }

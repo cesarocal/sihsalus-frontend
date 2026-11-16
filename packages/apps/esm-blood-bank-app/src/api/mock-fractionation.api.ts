@@ -1,31 +1,35 @@
 import spanish from '../../translations/es.json';
 import {
+  type ComponentLabel,
+  type FractionationBatch,
+  type FractionationStore,
+  type FractionationUnit,
+  fractionationSteps,
+} from '../sections/laboratory/fractionation/fractionation.types';
+import {
   componentDefinitions,
   eligibleSource,
   finalNodes,
   isFractionationRemainder,
   newBatch,
   positiveVolume,
-  validTree,
   validateFractionation,
+  validTree,
 } from '../sections/laboratory/fractionation/fractionation-rules';
-import {
-  fractionationSteps,
-  type ComponentLabel,
-  type FractionationBatch,
-  type FractionationStore,
-  type FractionationUnit,
-} from '../sections/laboratory/fractionation/fractionation.types';
 import { consolidatedScreening } from '../sections/laboratory/screening/screening-repeat-rules';
-import type { InventorySummary } from '../types/blood-bank.types';
 import { observationsExceedLimit } from '../shared/text-field-contracts';
+import type { InventorySummary } from '../types/blood-bank.types';
 import type { FractionationApi } from './fractionation.api';
-import { inventoryBlocksFractionation, screeningBlocksFractionation } from './mock-inventory-store';
 import {
-  readProcessingState,
-  writeProcessingState,
+  inventoryBlocksFractionation,
+  inventoryBlocksFractionationCompletion,
+  screeningBlocksFractionation,
+} from './mock-inventory-store';
+import {
   type MockStorage,
   type ProcessingState,
+  readProcessingState,
+  writeProcessingState,
 } from './mock-processing-store';
 
 const emptyLabel = (): ComponentLabel => ({
@@ -346,6 +350,7 @@ export function createMockFractionationApi(
       if (
         next.sources.some(
           (source) =>
+            inventoryBlocksFractionationCompletion(state, source.code) ||
             !store.units.some(
               (unit) => unit.id === source.id && unit.state === 'inLaboratory' && unit.batchId === next.id,
             ),

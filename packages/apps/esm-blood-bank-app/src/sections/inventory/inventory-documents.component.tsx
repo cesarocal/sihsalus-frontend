@@ -1,19 +1,19 @@
-import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { BloodGroupLabel } from '../../shared/blood-group-label.component';
 import { processingPrintCss } from '../../shared/print-document';
+import type { ProcessingTranslate } from '../../shared/processing-page.component';
+import shared from '../applicant-selection/selection.scss';
+import hospitalLogo from '../collection/hospital-santa-clotilde.png';
 import {
-  finalComponentLabelFields,
   FinalComponentLabelNotes,
   FinalComponentTransfusionInstructions,
+  finalComponentLabelFields,
 } from '../laboratory/fractionation/fractionation-documents.component';
 import { formatScreeningCollectionTime } from '../laboratory/screening/screening-rules';
-import hospitalLogo from '../collection/hospital-santa-clotilde.png';
-import { inventoryDisplayDate, qualitySealCode } from './inventory-rules';
-import type { InventoryOperation } from './inventory.types';
-import shared from '../applicant-selection/selection.scss';
-import styles from './inventory.scss';
-import { disposalCauseText } from './disposal-causes';
 import { disposalActPrintCss } from './disposal-act-print';
+import { disposalCauseText } from './disposal-causes';
+import styles from './inventory.scss';
+import type { InventoryOperation } from './inventory.types';
+import { inventoryDisplayDate, qualitySealCode } from './inventory-rules';
 
 // Stable positions of the empty ruled rows in the printed form, not editable records.
 const emptyActRows = Array.from({ length: 20 }, (_, index) => `blank-${index + 1}`);
@@ -149,9 +149,11 @@ export function DisposalAct({
   return (
     <article className={styles.review} data-disposal-act>
       {print && <style>{disposalActPrintCss}</style>}
-      {print && <p data-demo>{t('printPrototype')}</p>}
-      {operation.stage !== 'completed' && <p data-act-draft>{t('inventoryDraftAct')}</p>}
-      <h2>EG010-FR02: {t('inventoryActTitle')}</h2>
+      {!print && operation.stage !== 'completed' && <p data-act-draft>{t('inventoryDraftAct')}</p>}
+      <header className={styles.actHeader}>
+        <img src={hospitalLogo} width={185} height={185} alt={t('certificateHospital')} />
+        <h2>EG010-FR02: {t('inventoryActTitle')}</h2>
+      </header>
       <p data-act-date className={styles.help}>
         {t('inventoryActDateLead')} <strong>{inventoryDisplayDate(operation.date)}</strong>, {t('inventoryActTimeLead')}{' '}
         <strong>{operation.time || '—'}</strong> {t('inventoryActWitnessLead')}
@@ -167,9 +169,9 @@ export function DisposalAct({
           <colgroup>
             <col style={{ width: '16%' }} />
             <col style={{ width: '12%' }} />
-            <col style={{ width: '9%' }} />
+            <col style={{ width: '15%' }} />
             <col style={{ width: '27%' }} />
-            <col style={{ width: '36%' }} />
+            <col style={{ width: '30%' }} />
           </colgroup>
           <thead>
             <tr>
@@ -185,15 +187,18 @@ export function DisposalAct({
             </tr>
           </thead>
           <tbody>
-            {operation.units.map((unit) => (
-              <tr key={unit.id}>
-                <td>{unit.id}</td>
-                <td>{unit.bloodGroup.replace(/[+−-]$/, '') || '—'}</td>
-                <td>{/[+−-]$/.exec(unit.bloodGroup)?.[0] || '—'}</td>
-                <td>{unit.component}</td>
-                <td>{disposalCauseText(operation.causes[unit.id], t)}</td>
-              </tr>
-            ))}
+            {operation.units.map((unit) => {
+              const rh = /[+−-]$/.exec(unit.bloodGroup)?.[0];
+              return (
+                <tr key={unit.id}>
+                  <td>{unit.id}</td>
+                  <td>{unit.bloodGroup.replace(/[+−-]$/, '') || '—'}</td>
+                  <td>{rh === '+' ? `${t('labelRhPositive')} (+)` : rh ? `${t('labelRhNegative')} (-)` : '—'}</td>
+                  <td>{print ? labelText(unit.component) : unit.component}</td>
+                  <td>{disposalCauseText(operation.causes[unit.id], t)}</td>
+                </tr>
+              );
+            })}
             {print &&
               emptyActRows.slice(operation.units.length).map((rowId) => (
                 <tr key={rowId} data-act-blank>

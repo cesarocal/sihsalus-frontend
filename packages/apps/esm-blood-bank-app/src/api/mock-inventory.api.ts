@@ -8,24 +8,25 @@ import type {
 } from '../sections/inventory/inventory.types';
 import {
   canReprintSeal,
+  disposalEligibleStatuses,
   inventoryExpiry,
   qualitySealCode,
   validateInventoryOperation,
 } from '../sections/inventory/inventory-rules';
 import {
-  globalScreeningResult,
-  localDateTime,
-  validateScreening,
-} from '../sections/laboratory/screening/screening-rules';
-import {
   consolidatedScreening,
   hasConfirmedReactiveScreening,
   pendingScreeningRepeatTests,
 } from '../sections/laboratory/screening/screening-repeat-rules';
+import {
+  globalScreeningResult,
+  localDateTime,
+  validateScreening,
+} from '../sections/laboratory/screening/screening-rules';
 import type { InventorySummary } from '../types/blood-bank.types';
 import type { InventoryApi } from './inventory.api';
 import { fractionationInventory, fractionationStore } from './mock-fractionation.api';
-import { inventoryStore } from './mock-inventory-store';
+import { activeDisposalUnits, inventoryStore } from './mock-inventory-store';
 import {
   type MockStorage,
   type ProcessingState,
@@ -119,6 +120,7 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
     ...fractionationInventory(state),
   ];
   const { operations } = inventoryStore(state);
+  const disposing = activeDisposalUnits({ operations });
   const units: InventoryUnit[] = base
     .filter(
       (unit) =>
@@ -191,9 +193,10 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
       if (transfusion === 'testing') status = 'En pruebas de compatibilidad';
       else if (transfusion === 'reserved') status = 'Reservados para transfusión';
       else if (transfer === 'prepared') status = 'Por transferir';
+      const disposalOperationId = disposing.get(unit.id);
       return {
         ...summary(unit),
-        status,
+        status: disposalOperationId ? 'En proceso de eliminación' : status,
         originalCode,
         screeningResult,
         qualityIssues,
@@ -202,7 +205,8 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
           : fixtureSealId
             ? { sealId: fixtureSealId }
             : {}),
-        canDispose: !transfer && !transfusion && !['En fraccionamiento', 'Reservada'].includes(unit.status),
+        canDispose: !disposalOperationId && disposalEligibleStatuses.has(status),
+        ...(disposalOperationId && { disposalOperationId }),
       };
     });
   if (new Set(units.map((unit) => unit.id)).size !== units.length) throw new Error('INVALID_INVENTORY_IDENTITY');
@@ -237,11 +241,22 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
       if (JSON.stringify(mutable(previous)) !== JSON.stringify(mutable(input))) throw new Error('INVENTORY_LOCKED');
       return structuredClone(previous);
     }
-    if (!input.units.length || new Set(input.units.map((unit) => unit.id)).size !== input.units.length)
+    if (
+      (!input.units.length && !(previous?.kind === 'disposal' && previous.disposalStep)) ||
+      new Set(input.units.map((unit) => unit.id)).size !== input.units.length
+    )
       throw new Error('INVALID_INVENTORY_SELECTION');
     const units = input.units.map((selected) => {
       const current = workspace.units.find((unit) => unit.id === selected.id);
       if (!current || !sameUnit(current, selected)) throw new Error('INVENTORY_CONFLICT');
+      if (input.kind === 'disposal') {
+        if (current.disposalOperationId && current.disposalOperationId === previous?.id) {
+          const original = previous.units.find(({ id }) => id === current.id);
+          if (!original) throw new Error('INVENTORY_CONFLICT');
+          return original;
+        }
+        if (!current.canDispose) throw new Error('INVENTORY_NOT_ELIGIBLE');
+      }
       return summary(current);
     });
     const sequence = String(workspace.operations.length + 1).padStart(5, '0');
@@ -253,8 +268,10 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
       id: previous?.id ?? (input.kind === 'qualitySeal' ? `SC-${sequence}` : `E-DEMO-${sequence}`),
       revision: previous?.revision ?? 0,
       stage: 'draft',
+      disposalStep: previous?.disposalStep,
       requestedAt: null,
       completedAt: null,
+      completedBy: undefined,
       outcome: undefined,
       sealLabels: undefined,
       sealReprints: undefined,
@@ -270,7 +287,7 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
           ? current.status !== 'Sello pendiente' ||
             current.qualityIssues.length ||
             (current.sealId && current.sealId !== op.id)
-          : !current.canDispose
+          : current.disposalOperationId !== op.id
       )
         throw new Error('INVENTORY_NOT_ELIGIBLE');
     }
@@ -291,7 +308,10 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
     if (op.kind !== kind) throw new Error('INVALID_INVENTORY_OPERATION');
     const required =
       action === 'ready' || kind === 'disposal' ? 'draft' : action === 'printRequested' ? 'ready' : 'printRequested';
-    if (op.stage !== required) throw new Error('INVENTORY_LOCKED');
+    if (op.stage !== required || (kind === 'disposal' && op.disposalStep !== 'review'))
+      throw new Error('INVENTORY_LOCKED');
+    if (kind === 'disposal' && stored && JSON.stringify(mutable(op)) !== JSON.stringify(mutable(stored)))
+      throw new Error('INVENTORY_CONFLICT');
     eligible(op, workspace);
     op.stage = action;
     op.revision += 1;
@@ -309,22 +329,57 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
     if (action === 'completed') {
       op.completedAt = op.updatedAt;
       op.outcome = kind === 'qualitySeal' ? 'APTO' : 'ELIMINADAS';
+      if (kind === 'qualitySeal') op.completedBy = operator?.trim() || op.serviceResponsible;
     }
+    return persist(state, store, op);
+  }
+  function saveDraft(input: InventoryOperation, disposalStep?: InventoryOperation['disposalStep']) {
+    const { state, workspace, store } = load();
+    const op = prepare(input, workspace);
+    const previous = workspace.operations.find((item) => item.id === op.id);
+    if (disposalStep && (op.kind !== 'disposal' || op.stage !== 'draft' || !op.units.length))
+      throw new Error('INVALID_INVENTORY_SELECTION');
+    if (!op.units.length) op.disposalStep = undefined;
+    else if (disposalStep) op.disposalStep = disposalStep;
+    else if (previous?.disposalStep === 'review' && JSON.stringify(mutable(op)) !== JSON.stringify(mutable(previous)))
+      op.disposalStep = 'causes';
+    if (disposalStep === 'review') {
+      if (
+        !previous?.disposalStep ||
+        op.units.length !== previous.units.length ||
+        op.units.some(({ id }) => !previous.units.some((unit) => unit.id === id))
+      )
+        throw new Error('INVALID_INVENTORY_SELECTION');
+      const now = localDateTime();
+      op.date = now.slice(0, 10);
+      op.time = now.slice(11);
+      if (validateInventoryOperation(op).length) throw new Error('INVALID_INVENTORY_FIELDS');
+    }
+    if (
+      previous &&
+      op.disposalStep === previous.disposalStep &&
+      JSON.stringify(mutable(op)) === JSON.stringify(mutable(previous))
+    )
+      return structuredClone(previous);
+    op.revision += 1;
+    op.updatedAt = new Date().toISOString();
     return persist(state, store, op);
   }
   return {
     async list() {
       return load().workspace;
     },
+    async getDisposalSignatories() {
+      return null;
+    },
     async saveDraft(input) {
-      const { state, workspace, store } = load();
-      const op = prepare(input, workspace);
-      const previous = workspace.operations.find((item) => item.id === op.id);
-      if (previous && JSON.stringify(mutable(op)) === JSON.stringify(mutable(previous)))
-        return structuredClone(previous);
-      op.revision += 1;
-      op.updatedAt = new Date().toISOString();
-      return persist(state, store, op);
+      return saveDraft(input);
+    },
+    async saveDisposalSelection(input) {
+      return saveDraft(input, 'causes');
+    },
+    async saveDisposalDetails(input) {
+      return saveDraft(input, 'review');
     },
     async prepareSeal(input) {
       return transition(input, 'ready', 'qualitySeal');
@@ -366,8 +421,8 @@ export function createMockInventoryApi(getStorage: () => MockStorage = () => glo
       op.updatedAt = now;
       return persist(state, store, op);
     },
-    async confirmSeal(input) {
-      return transition(input, 'completed', 'qualitySeal');
+    async confirmSeal(input, operator) {
+      return transition(input, 'completed', 'qualitySeal', operator);
     },
     async dispose(input) {
       return transition(input, 'completed', 'disposal');

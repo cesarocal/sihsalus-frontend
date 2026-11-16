@@ -13,6 +13,8 @@ se conservan en la misma clave de `sessionStorage` de los demás procesos.
   para remitir a otro banco. Cada una conserva su búsqueda, filtros, métricas e
   historial independientes. Historial de solicitudes y Registrar solicitud usan
   el mismo tamaño Carbon y ancho compartido, también al apilarse en móvil.
+- El filtro de institución ofrece todas las instituciones registradas como
+  origen o destino entre las solicitudes actuales y las del historial.
 - La bandeja de recibidas conserva sus tres solicitudes sintéticas y el registro
   manual de documentos recibidos por correo o en físico.
 - Solicitadas permite guardar borradores, revisar, generar e imprimir FR09,

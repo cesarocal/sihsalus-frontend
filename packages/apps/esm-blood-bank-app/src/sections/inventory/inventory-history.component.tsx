@@ -11,14 +11,17 @@ import {
 } from '@carbon/react';
 import { ArrowLeft, Printer } from '@carbon/react/icons';
 import { useState } from 'react';
-import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import { printDocument } from '../../shared/print-document';
-import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
-import { DisposalAct, QualitySealReprintHistory, QualitySeals } from './inventory-documents.component';
-import type { InventoryOperation } from './inventory.types';
-import { inventoryDisplayDate } from './inventory-rules';
+import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
+import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import styles from './inventory.scss';
+import type { InventoryOperation } from './inventory.types';
+import { DisposalAct, QualitySealReprintHistory, QualitySeals } from './inventory-documents.component';
+import { inventoryDisplayDate } from './inventory-rules';
+
+const responsibleFor = (operation: InventoryOperation) =>
+  operation.kind === 'disposal' ? operation.witnesses : (operation.completedBy ?? operation.serviceResponsible);
 
 export function InventoryHistory({
   operations,
@@ -39,7 +42,7 @@ export function InventoryHistory({
     .filter(
       (op) =>
         (!kind || op.kind === kind) &&
-        normalizeSearch(`${op.id} ${op.serviceResponsible} ${op.units.map((unit) => unit.id).join(' ')}`).includes(
+        normalizeSearch(`${op.id} ${responsibleFor(op)} ${op.units.map((unit) => unit.id).join(' ')}`).includes(
           normalizeSearch(search),
         ),
     )
@@ -109,7 +112,7 @@ export function InventoryHistory({
                   'inventoryOperationType',
                   'fractionationCode',
                   'inventoryDate',
-                  'inventoryProcedureResponsible',
+                  'inventoryHistoryResponsible',
                   'status',
                   'actions',
                 ]}
@@ -120,14 +123,8 @@ export function InventoryHistory({
                     t(op.kind === 'qualitySeal' ? 'inventoryQualitySeal' : 'inventoryDispose'),
                     op.units.map((unit) => unit.id).join(', '),
                     `${inventoryDisplayDate(op.date)} ${op.time}`,
-                    op.serviceResponsible || '—',
-                    t(
-                      op.stage === 'completed'
-                        ? op.kind === 'disposal'
-                          ? 'inventoryEliminated'
-                          : 'inventorySuitable'
-                        : `inventoryStage_${op.stage}`,
-                    ),
+                    responsibleFor(op) || '—',
+                    t(op.stage === 'completed' ? 'inventoryOperationCompleted' : 'inventoryOperationInProgress'),
                     <div key="actions">
                       <Button kind="ghost" size="sm" onClick={() => setDetail(op)}>
                         {t('inventoryView')}
