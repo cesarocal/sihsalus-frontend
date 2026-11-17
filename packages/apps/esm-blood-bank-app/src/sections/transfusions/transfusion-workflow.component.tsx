@@ -28,6 +28,7 @@ import {
   requestComplete,
   sampleValid,
   selectionComplete,
+  transfusionOperatorName,
 } from './transfusions-rules';
 import { useTransfusionReceipt } from './use-transfusion-receipt';
 
@@ -70,19 +71,8 @@ export function TransfusionWorkflow({
   const [confirm, setConfirm] = useState<'assign' | 'deliver' | null>(null);
   const inFlight = useRef(false);
   const receipt = useTransfusionReceipt(orderConfig, issued);
-  const { authenticated, user } = useSession();
-  const person = authenticated ? user?.person : undefined;
-  const name = person?.preferredName;
-  const [operator] = useState(
-    () =>
-      [name?.givenName, name?.middleName, name?.familyName, name?.familyName2]
-        .map((part) => part?.trim())
-        .filter(Boolean)
-        .join(' ') ||
-      name?.display?.trim() ||
-      person?.display?.trim() ||
-      '',
-  );
+  const session = useSession();
+  const [operator] = useState(() => transfusionOperatorName(session));
   const draft = request.status === 'pending' ? { ...request.draft, reviewer: operator } : request.draft;
   const change = (patch: Partial<TransfusionDraft>) => {
     setRequest({ ...request, draft: { ...draft, ...patch } });

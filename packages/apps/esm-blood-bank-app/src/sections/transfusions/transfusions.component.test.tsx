@@ -17,7 +17,7 @@ import { CompatibilityWorkflow } from '../laboratory/compatibility/compatibility
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { Fr08Document } from './fr08-document.component';
 import { TransfusionHistory } from './transfusion-history.component';
-import { compatibilityReportPrintCss, TransfusionLabels } from './transfusion-print.component';
+import { compatibilityLabelPrintCss, compatibilityReportPrintCss, TransfusionLabels } from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
@@ -313,7 +313,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(button.textContent?.trim()).toBe('');
     expect(screen.getByText(t('txCandidateHelp'))).not.toHaveTextContent(/prototipo|prototype/i);
   });
-  it('shows one recipient–unit pair per pending red-cell sample and requires all results before confirmation', async () => {
+  it('links one recipient to the unit samples and registers the selected results under the session operator', async () => {
     const { api, request } = await assigned();
     const closed = vi.fn();
     const round = request.rounds[0];
@@ -330,21 +330,46 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(screen.getByRole('button', { name: t('txRegisterResults') })).toBeDisabled();
     expect(screen.getAllByRole('group')).toHaveLength(2);
     const workflow = screen.getByRole('dialog', {
-      name: `${t('txCompatibilityWorkflowTitle')} · ${request.order.number}`,
+      name: `${t('txCompatibilityWorkflowTitle')}: ${round.id}`,
     });
-    expect(workflow.querySelectorAll('svg[data-sample-icon="test-tube"]')).toHaveLength(4);
-    fireEvent.change(screen.getByLabelText(t('txTestedBy')), { target: { value: 'Laboratorio DEMO' } });
+    const modal = within(workflow);
+    expect(modal.getAllByText(t('txCompatibilityPairs'), { exact: true })).toHaveLength(1);
+    expect(workflow.querySelectorAll('svg[data-sample-icon="test-tube"]')).toHaveLength(3);
+    const operator = modal.getByLabelText(t('txTestedBy'));
+    expect(operator).toHaveValue('Rosa Calderón');
+    expect(operator).toHaveAttribute('readonly');
+    const recipientCard = within(modal.getByRole('region', { name: t('txRecipientSample') }));
+    expect(recipientCard.getByText(t('sampleCode')).nextElementSibling).toHaveTextContent(round.sample.code);
+    expect(recipientCard.getByText(t('txSampleHistoryNumber')).nextElementSibling).toHaveTextContent(
+      round.sample.historyNumber,
+    );
+    const unitCard = within(modal.getAllByRole('region', { name: t('txUnitSample') })[0]);
+    expect(unitCard.getByText(t('unitCode')).nextElementSibling).toHaveTextContent(code(1));
+    expect(unitCard.getByText(t('txReportBloodGroup')).nextElementSibling).toHaveTextContent('O POSITIVO (+)');
+    fireEvent.click(modal.getByRole('button', { name: t('txPrintLabels') }));
+    const [content, , , css] = vi.mocked(printDocument).mock.calls[0];
+    expect(css).toBe(compatibilityLabelPrintCss);
+    const labels = render(content);
+    expect(labels.container.querySelectorAll('[data-label]')).toHaveLength(2);
+    expect(labels.container).not.toHaveTextContent(round.sample.code);
+    for (const item of request.assignments.filter((assignment) => assignment.roundId === round.id)) {
+      expect(labels.container).toHaveTextContent(item.unitSampleCode ?? '');
+    }
+    labels.unmount();
     fireEvent.click(screen.getByRole('checkbox', { name: t('txLabIdentity') }));
     fireEvent.click(screen.getByRole('checkbox', { name: t('txPretransfusionCheck') }));
-    fireEvent.click(
-      within(screen.getByRole('group', { name: `${t('txResult')} ${code(1)}` })).getByRole('radio', {
-        name: t('txCompatible'),
-      }),
-    );
+    const firstResult = within(screen.getByRole('group', { name: `${t('txResult')} ${code(1)}` }));
+    const compatibleOption = firstResult.getByRole('radio', { name: t('txCompatible') });
+    const incompatibleOption = firstResult.getByRole('radio', { name: t('txIncompatibleOption') });
+    fireEvent.click(incompatibleOption);
+    expect(incompatibleOption).toBeChecked();
+    fireEvent.click(compatibleOption);
+    expect(compatibleOption).toBeChecked();
+    expect(incompatibleOption).not.toBeChecked();
     expect(screen.getByRole('button', { name: t('txRegisterResults') })).toBeDisabled();
     fireEvent.click(
       within(screen.getByRole('group', { name: `${t('txResult')} ${code(2)}` })).getByRole('radio', {
-        name: t('txIncompatible'),
+        name: t('txIncompatibleOption'),
       }),
     );
     fireEvent.click(screen.getByRole('button', { name: t('txRegisterResults') }));
@@ -354,7 +379,10 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(confirmation.querySelector('svg[data-warning-icon]')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: t('txConfirm') }));
     await waitFor(() => expect(closed).toHaveBeenCalledOnce());
-    expect((await api.list()).requests[0].status).toBe('incompatible');
+    const saved = (await api.list()).requests[0];
+    expect(saved.status).toBe('incompatible');
+    expect(saved.rounds[0].operator).toBe('Rosa Calderón');
+    expect(saved.assignments[0]).toMatchObject({ result: 'compatible', testedBy: 'Rosa Calderón' });
   });
   it('prints results before handover and commits stock and book only after pickup confirmation', async () => {
     const { api, request, units } = await compatible();
@@ -369,6 +397,10 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const [content, title, , css] = vi.mocked(printDocument).mock.calls[0];
     expect(title).toBe(t('txCompatibilityReport'));
     expect(css).toBe(compatibilityReportPrintCss);
+    expect(css).toContain('@top-left { content: ""; }');
+    expect(css).toContain('@top-right { content: ""; }');
+    expect(css).toContain('@bottom-left { content: ""; }');
+    expect(css).toContain('@bottom-right { content: ""; }');
     const printed = render(content);
     const report = within(printed.container);
     expect(report.getByRole('img', { name: t('certificateHospital') })).toBeInTheDocument();
@@ -549,7 +581,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     });
     request.draft.selectedUnitIds = [code(13)];
     request.draft.selectionVerified = true;
-    render(
+    const selection = render(
       <TransfusionWorkflow
         initial={request}
         units={(await api.list()).units}
@@ -568,5 +600,19 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect((await api.list()).requests[2].status).toBe('sampleReady');
     fireEvent.click(within(warning).getByRole('button', { name: t('txConfirm') }));
     await waitFor(async () => expect((await api.list()).requests[2].status).toBe('compatible'));
+    selection.unmount();
+    const workspace = await api.list();
+    render(
+      <TransfusionWorkflow
+        initial={workspace.requests[2]}
+        units={workspace.units}
+        api={api}
+        onSaved={vi.fn()}
+        onClose={vi.fn()}
+        t={t}
+      />,
+    );
+    expect(screen.getByRole('button', { name: t('txPrintResults') })).toBeDisabled();
+    expect(screen.getByText(t('txNotRequired'))).toBeInTheDocument();
   });
 });

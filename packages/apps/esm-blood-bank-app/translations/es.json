@@ -168,6 +168,7 @@
     "txSampleCount": "Muestras de unidad",
     "txUnitSample": "Muestra de la unidad",
     "txResult": "Resultado",
+    "txIncompatibleOption": "Incompatible",
     "txResultPending": "Pendiente de resultado",
     "txTestedBy": "Pruebas realizadas por",
     "txResultAt": "Fecha y hora del resultado",

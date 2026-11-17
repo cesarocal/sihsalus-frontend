@@ -1,3 +1,4 @@
+import type { Session } from '@openmrs/esm-framework';
 import { inventoryExpiry } from '../inventory/inventory-rules';
 import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
 import { screeningTests } from '../laboratory/screening/screening.types';
@@ -35,7 +36,24 @@ export const needsCrossmatch = (component: ComponentType | null) =>
 export const lockedAssignments = (request: TransfusionRequest) =>
   request.assignments.filter((item) => item.active && item.result !== 'pending');
 export const compatibilityReportReady = (request: TransfusionRequest) =>
-  request.assignments.length > 0 && request.assignments.every((item) => item.result !== 'pending');
+  request.assignments.length > 0 &&
+  request.rounds.length > 0 &&
+  request.rounds.every((round) => !!round.completedAt) &&
+  request.assignments.every((item) => item.result !== 'pending');
+
+export function transfusionOperatorName({ authenticated, user }: Session) {
+  const person = authenticated ? user?.person : undefined;
+  const name = person?.preferredName;
+  return (
+    [name?.givenName, name?.middleName, name?.familyName, name?.familyName2]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ') ||
+    name?.display?.trim() ||
+    person?.display?.trim() ||
+    ''
+  );
+}
 
 export function requestComplete(order: TransfusionOrder): boolean {
   return !!(

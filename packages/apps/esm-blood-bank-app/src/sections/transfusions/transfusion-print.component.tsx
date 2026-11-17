@@ -17,7 +17,20 @@ export const transfusionLabelPrintCss = `${processingPrintCss}
   [data-label] p { margin: 1.5mm 0; }
 `;
 
-export const compatibilityReportPrintCss = `${processingPrintCss}
+const compatibilityPrintMargins = `
+  @page {
+    @top-left { content: ""; }
+    @top-center { content: ""; }
+    @top-right { content: ""; }
+    @bottom-left { content: ""; }
+    @bottom-center { content: ""; }
+    @bottom-right { content: ""; }
+  }
+`;
+
+export const compatibilityLabelPrintCss = `${transfusionLabelPrintCss}${compatibilityPrintMargins}`;
+
+export const compatibilityReportPrintCss = `${processingPrintCss}${compatibilityPrintMargins}
   [data-compatibility-report] header {
     display: flex; align-items: center; gap: 5mm; padding-block-end: 4mm;
     border-bottom: 2px solid #185b5d; break-after: avoid;
@@ -55,34 +68,33 @@ export function TransfusionLabels({
   sample,
   round,
   t,
-}: {
-  request: TransfusionRequest;
-  sample: RecipientSample;
-  round?: CompatibilityRound;
-  t: ProcessingTranslate;
-}) {
-  const labels = [
-    {
-      code: sample.code,
-      name: request.order.patientName,
-      historyNumber: sample.historyNumber,
-      bloodGroup: request.order.bloodGroup,
-      seal: '',
-      date: sample.collectedAt,
-      operator: sample.collectedBy,
-    },
-    ...request.assignments
-      .filter((item) => item.roundId === round?.id && !!item.unitSampleCode)
-      .map((item) => ({
-        code: item.unitSampleCode ?? '',
-        name: item.unit.id,
-        historyNumber: '',
-        bloodGroup: item.unit.bloodGroup,
-        seal: inventoryUnitSealCode(item.unit),
-        date: item.assignedAt,
-        operator: request.draft.reviewer,
-      })),
-  ];
+}: { request: TransfusionRequest; t: ProcessingTranslate } & (
+  | { sample: RecipientSample; round?: never }
+  | { round: CompatibilityRound; sample?: never }
+)) {
+  const labels = round
+    ? request.assignments
+        .filter((item) => item.roundId === round.id && !!item.unitSampleCode)
+        .map((item) => ({
+          code: item.unitSampleCode ?? '',
+          name: item.unit.id,
+          historyNumber: '',
+          bloodGroup: item.unit.bloodGroup,
+          seal: inventoryUnitSealCode(item.unit),
+          date: item.assignedAt,
+          operator: request.draft.reviewer,
+        }))
+    : [
+        {
+          code: sample.code,
+          name: request.order.patientName,
+          historyNumber: sample.historyNumber,
+          bloodGroup: request.order.bloodGroup,
+          seal: '',
+          date: sample.collectedAt,
+          operator: sample.collectedBy,
+        },
+      ];
   return (
     <article className={styles.document}>
       {labels.map((label) => (
@@ -152,7 +164,7 @@ export function CompatibilityReport({
           </div>
         ))}
       </dl>
-      {!print && !compatibilityReportReady(request) && (
+      {!print && request.rounds.length > 0 && !compatibilityReportReady(request) && (
         <p className={styles.reportStatus} role="status">
           {t('txReportPendingPrint')}
         </p>

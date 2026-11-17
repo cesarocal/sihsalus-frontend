@@ -168,6 +168,7 @@
     "txSampleCount": "Unit samples",
     "txUnitSample": "Unit sample",
     "txResult": "Result",
+    "txIncompatibleOption": "Incompatible",
     "txResultPending": "Result pending",
     "txTestedBy": "Tests performed by",
     "txResultAt": "Result date and time",

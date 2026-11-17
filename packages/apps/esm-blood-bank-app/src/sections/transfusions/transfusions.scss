@@ -162,20 +162,166 @@
 .notice {
   margin-block: layout.$spacing-05;
 }
-.pair {
-  display: flex;
-  flex-wrap: wrap;
+.compatibilitySummary {
+  background: $ui-01;
+  border: 1px solid $ui-03;
+  padding: layout.$spacing-05;
+}
+.compatibilitySamples {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.75fr);
   align-items: center;
-  gap: layout.$spacing-05;
+  column-gap: layout.$spacing-05;
+  margin-block: layout.$spacing-05;
+}
+.recipientCard {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    inset-inline-start: 100%;
+    inline-size: layout.$spacing-05;
+    border-block-start: 1px solid $ui-04;
+  }
+}
+.unitSamples {
+  list-style: none;
+  min-inline-size: 0;
+}
+.unitSampleRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: clamp(1.25rem, 4vw, 3.5rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: layout.$spacing-03;
+  padding-block: layout.$spacing-03;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    border-inline-start: 1px solid $ui-04;
+  }
+
+  &:first-child::before {
+    inset-block-start: 50%;
+  }
+
+  &:last-child::before {
+    inset-block-end: 50%;
+  }
+}
+.sampleConnector {
+  display: flex;
+  align-items: center;
+  color: $ui-04;
+
+  &::before {
+    content: "";
+    flex: 1;
+    border-block-start: 1px solid currentColor;
+  }
+
+  svg {
+    flex: none;
+    margin-inline-start: -3px;
+  }
+}
+.sampleCard {
+  min-inline-size: 0;
+  border: 1px solid $ui-03;
+  background: $ui-02;
+  padding: layout.$spacing-04;
+
+  h4 {
+    @include type.type-style("heading-compact-02");
+    display: flex;
+    align-items: center;
+    gap: layout.$spacing-03;
+    margin-block-end: layout.$spacing-03;
+  }
+
+  dl {
+    display: grid;
+    gap: layout.$spacing-03;
+  }
+
+  dt {
+    @include type.type-style("label-01");
+    color: $text-02;
+  }
+
+  dd {
+    @include type.type-style("body-compact-01");
+    overflow-wrap: anywhere;
+  }
 }
 .sampleIcon {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
   color: colors.$red-60;
   flex-shrink: 0;
 }
-.result {
-  flex: 1 1 15rem;
+.compatibilityResult {
+  :global(.cds--radio-button-group) {
+    align-items: stretch;
+    gap: layout.$spacing-03;
+  }
+
+  :global(.cds--radio-button-wrapper) {
+    margin: 0;
+  }
+
+  :global(.cds--radio-button__label) {
+    inline-size: 100%;
+    margin: 0;
+    padding: layout.$spacing-03;
+    border: 1px solid $ui-03;
+    background: $ui-02;
+  }
+
+  :global(.cds--radio-button__label-text) {
+    display: flex;
+    align-items: center;
+    gap: layout.$spacing-03;
+  }
+
+  :global(.cds--radio-button__appearance),
+  :global(.cds--radio-button:checked + .cds--radio-button__label .cds--radio-button__appearance) {
+    display: none;
+  }
+
+  input[value="compatible"] + label svg {
+    color: colors.$green-70;
+  }
+
+  input[value="incompatible"] + label svg {
+    color: colors.$red-70;
+  }
+
+  input[value="compatible"]:checked + label {
+    border-color: colors.$green-70;
+    background: colors.$green-10;
+  }
+
+  input[value="incompatible"]:checked + label {
+    border-color: colors.$red-70;
+    background: colors.$red-10;
+  }
+
+  input:checked + label {
+    font-weight: 600;
+  }
+
+  input:focus-visible + label {
+    outline: 2px solid colors.$blue-60;
+    outline-offset: 1px;
+  }
 }
-.printButton:global(.cds--btn--tertiary) {
+.printButton:global(.cds--btn--tertiary):not(:disabled) {
   color: colors.$blue-60;
   border-color: colors.$blue-60;
   &:hover {
@@ -553,7 +699,28 @@
     margin: layout.$spacing-07 10% layout.$spacing-03 auto;
   }
 }
+@media (max-width: 56rem) {
+  .compatibilitySamples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recipientCard::after {
+    display: none;
+  }
+
+  .unitSampleRow:first-child::before {
+    inset-block-start: 0;
+  }
+}
 @media (max-width: 42rem) {
+  .unitSampleRow {
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+  }
+
+  .compatibilityResult {
+    grid-column: 2;
+  }
+
   .fr08HistoryRow,
   .fr08IdentityRow,
   .fr08Schedule,

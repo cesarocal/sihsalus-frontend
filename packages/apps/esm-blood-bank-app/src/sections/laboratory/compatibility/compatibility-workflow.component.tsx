@@ -1,18 +1,41 @@
-import { inventoryUnitSealCode } from '../../inventory/inventory-rules';
 import { Button, Checkbox, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react';
-import { ArrowRight, Printer } from '@carbon/react/icons';
-import { useRef, useState } from 'react';
+import { ArrowRight, Checkmark, Close, Printer } from '@carbon/react/icons';
+import { useSession } from '@openmrs/esm-framework';
+import { useId, useRef, useState } from 'react';
 import type { TransfusionsApi } from '../../../api/transfusions.api';
 import { notifySuccess } from '../../../shared/notify-success';
 import { printDocument } from '../../../shared/print-document';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { WarningConfirmation } from '../../../shared/warning-confirmation.component';
-import { TransfusionLabels, transfusionLabelPrintCss } from '../../transfusions/transfusion-print.component';
+import { inventoryUnitSealCode } from '../../inventory/inventory-rules';
+import { transfusionBloodGroupLabel } from '../../transfusions/transfusion-blood-group';
+import { compatibilityLabelPrintCss, TransfusionLabels } from '../../transfusions/transfusion-print.component';
 import styles from '../../transfusions/transfusions.scss';
 import type { CompatibilityRound, TransfusionRequest } from '../../transfusions/transfusions.types';
+import { transfusionOperatorName } from '../../transfusions/transfusions-rules';
 import { FractionationContent } from '../fractionation/fractionation-content.component';
 import { SampleTubeIcon } from './sample-tube-icon.component';
+
+function SampleCard({ title, fields }: { title: string; fields: [string, string | null][] }) {
+  const heading = useId();
+  return (
+    <section className={styles.sampleCard} aria-labelledby={heading}>
+      <h4 id={heading}>
+        <SampleTubeIcon className={styles.sampleIcon} />
+        {title}
+      </h4>
+      <dl>
+        {fields.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value || '—'}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
 
 export function CompatibilityWorkflow({
   initial,
@@ -35,9 +58,13 @@ export function CompatibilityWorkflow({
   const [dirty, setDirty] = useState(false);
   const [failed, setFailed] = useState('');
   const [confirm, setConfirm] = useState(false);
+  const session = useSession();
+  const [operator] = useState(() => transfusionOperatorName(session));
   const inFlight = useRef(false);
+  const { order } = request;
+  const assignments = request.assignments.filter((item) => item.roundId === round.id);
   const complete =
-    !!round.operator.trim() &&
+    !!operator &&
     round.identityVerified &&
     round.pretransfusionVerified &&
     Object.values(round.results).every(Boolean);
@@ -52,7 +79,12 @@ export function CompatibilityWorkflow({
     setSaving(true);
     setFailed('');
     try {
-      const result = await api.saveCompatibility(request.id, request.revision, round, finalize);
+      const result = await api.saveCompatibility(
+        request.id,
+        request.revision,
+        { ...round, operator: operator || round.operator },
+        finalize,
+      );
       setRequest(result);
       setRound(result.rounds.find((item) => item.id === round.id) ?? round);
       setDirty(false);
@@ -72,10 +104,10 @@ export function CompatibilityWorkflow({
     setFailed('');
     try {
       printDocument(
-        <TransfusionLabels request={request} sample={round.sample} round={round} t={t} />,
+        <TransfusionLabels request={request} round={round} t={t} />,
         t('txPrintLabels'),
         () => setFailed('printFailed'),
-        transfusionLabelPrintCss,
+        compatibilityLabelPrintCss,
       );
     } catch {
       setFailed('printFailed');
@@ -84,7 +116,7 @@ export function CompatibilityWorkflow({
   return (
     <>
       <ProcessingModal
-        title={`${t('txCompatibilityWorkflowTitle')} · ${request.order.number}`}
+        title={`${t('txCompatibilityWorkflowTitle')}: ${round.id}`}
         steps={['txCompatibilityPairs']}
         step={0}
         completed={[]}
@@ -102,6 +134,7 @@ export function CompatibilityWorkflow({
         advanceDisabled={!complete}
         footerClassName={styles.printFooter}
         compactHeader
+        hideStepHeading
         extraActions={
           <Button
             kind="tertiary"
@@ -118,84 +151,106 @@ export function CompatibilityWorkflow({
       >
         <div className={styles.responsive}>
           <FractionationContent>
-            <p>
-              {request.order.patientName} · {request.order.historyNumber} · {request.order.bloodGroup}
-            </p>
-            <p>
-              {t('txRound')}: {round.id}
-            </p>
-            <TextInput
-              id="tx-compatibility-operator"
-              labelText={t('txTestedBy')}
-              value={round.operator}
-              disabled={saving}
-              onChange={(event) => change({ operator: event.target.value })}
-            />
-            <Checkbox
-              id="tx-lab-identity"
-              labelText={t('txLabIdentity')}
-              checked={round.identityVerified}
-              disabled={saving}
-              onChange={(_e, { checked }) => change({ identityVerified: checked })}
-            />
-            <Checkbox
-              id="tx-pretransfusion"
-              labelText={t('txPretransfusionCheck')}
-              checked={round.pretransfusionVerified}
-              disabled={saving}
-              onChange={(_e, { checked }) => change({ pretransfusionVerified: checked })}
-            />
-            {request.assignments
-              .filter((item) => item.roundId === round.id)
-              .map((item) => (
-                <section key={item.unit.id} className={styles.panel}>
-                  <div className={styles.pair}>
-                    <SampleTubeIcon className={styles.sampleIcon} />
-                    <div>
-                      <h4>{t('txRecipientSample')}</h4>
-                      <p>{round.sample.code}</p>
-                      <p>{request.order.patientName}</p>
-                      <p>{round.sample.historyNumber}</p>
-                    </div>
-                    <ArrowRight size={24} aria-hidden="true" />
-                    <SampleTubeIcon className={styles.sampleIcon} />
-                    <div>
-                      <h4>{t('txUnitSample')}</h4>
-                      <p>{item.unitSampleCode}</p>
-                      <p>
-                        {item.unit.id} · {item.unit.bloodGroup}
-                      </p>
-                      <p>
-                        {t('txSeal')}: {inventoryUnitSealCode(item.unit)}
-                      </p>
-                    </div>
-                    <div className={styles.result}>
-                      <RadioButtonGroup
-                        name={`result-${item.unit.id}`}
-                        legendText={`${t('txResult')} ${item.unit.id}`}
-                        orientation="vertical"
-                        valueSelected={round.results[item.unit.id]}
-                        disabled={saving}
-                        onChange={(value) => {
-                          if (value === 'compatible' || value === 'incompatible')
-                            change({ results: { ...round.results, [item.unit.id]: value } });
-                        }}
-                      >
-                        <RadioButton
-                          id={`tx-compatible-${item.unit.id}`}
-                          value="compatible"
-                          labelText={t('txCompatible')}
-                        />
-                        <RadioButton
-                          id={`tx-incompatible-${item.unit.id}`}
-                          value="incompatible"
-                          labelText={t('txIncompatible')}
-                        />
-                      </RadioButtonGroup>
-                    </div>
-                  </div>
-                </section>
+            <dl className={`${styles.summary} ${styles.compatibilitySummary}`}>
+              {[
+                ['txRecipientName', order.patientName],
+                ['txReportBloodGroup', transfusionBloodGroupLabel(order.bloodGroup, t)],
+                ['txSampleHistoryNumber', order.historyNumber],
+                ['txRound', round.id],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt>{t(label)}</dt>
+                  <dd>{value || '—'}</dd>
+                </div>
               ))}
+            </dl>
+            <div className={styles.reviewChecks}>
+              <TextInput
+                id="tx-compatibility-operator"
+                labelText={t('txTestedBy')}
+                value={operator}
+                readOnly
+                invalid={!operator}
+                invalidText={t('txOperatorUnavailable')}
+              />
+              <Checkbox
+                id="tx-lab-identity"
+                labelText={t('txLabIdentity')}
+                checked={round.identityVerified}
+                disabled={saving}
+                onChange={(_e, { checked }) => change({ identityVerified: checked })}
+              />
+              <Checkbox
+                id="tx-pretransfusion"
+                labelText={t('txPretransfusionCheck')}
+                checked={round.pretransfusionVerified}
+                disabled={saving}
+                onChange={(_e, { checked }) => change({ pretransfusionVerified: checked })}
+              />
+            </div>
+            <div className={styles.compatibilitySamples}>
+              <div className={styles.recipientCard}>
+                <SampleCard
+                  title={t('txRecipientSample')}
+                  fields={[
+                    [t('sampleCode'), round.sample.code],
+                    [t('txRecipientName'), order.patientName],
+                    [t('txSampleHistoryNumber'), round.sample.historyNumber],
+                  ]}
+                />
+              </div>
+              <ul className={styles.unitSamples}>
+                {assignments.map((item) => (
+                  <li key={item.unit.id} className={styles.unitSampleRow}>
+                    <div className={styles.sampleConnector} aria-hidden="true">
+                      <ArrowRight size={18} />
+                    </div>
+                    <SampleCard
+                      title={t('txUnitSample')}
+                      fields={[
+                        [t('sampleCode'), item.unitSampleCode],
+                        [t('unitCode'), item.unit.id],
+                        [t('txReportBloodGroup'), transfusionBloodGroupLabel(item.unit.bloodGroup, t)],
+                        [t('txSeal'), inventoryUnitSealCode(item.unit)],
+                      ]}
+                    />
+                    <RadioButtonGroup
+                      className={styles.compatibilityResult}
+                      name={`result-${item.unit.id}`}
+                      aria-label={`${t('txResult')} ${item.unit.id}`}
+                      orientation="vertical"
+                      valueSelected={round.results[item.unit.id]}
+                      disabled={saving}
+                      onChange={(value) => {
+                        if (value === 'compatible' || value === 'incompatible')
+                          change({ results: { ...round.results, [item.unit.id]: value } });
+                      }}
+                    >
+                      <RadioButton
+                        id={`tx-compatible-${item.unit.id}`}
+                        value="compatible"
+                        labelText={
+                          <>
+                            <Checkmark size={18} aria-hidden="true" />
+                            {t('txCompatible')}
+                          </>
+                        }
+                      />
+                      <RadioButton
+                        id={`tx-incompatible-${item.unit.id}`}
+                        value="incompatible"
+                        labelText={
+                          <>
+                            <Close size={18} aria-hidden="true" />
+                            {t('txIncompatibleOption')}
+                          </>
+                        }
+                      />
+                    </RadioButtonGroup>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </FractionationContent>
         </div>
       </ProcessingModal>

@@ -122,9 +122,15 @@ el procesamiento de Compatibilidad. La opción del modal propio permanece
 desactivada por defecto para los demás flujos del ESM.
 
 Los títulos identifican el contexto: `Atención de la Solicitud transfusional · TX-DEMO-0001`,
-`Entrega de unidades · TX-DEMO-0001` y `Pruebas de compatibilidad · TX-DEMO-0001`.
+`Entrega de unidades · TX-DEMO-0001` y `Pruebas de compatibilidad: PC-ORDER-TX-DEMO-0001-1`.
 Compatibilidad reutiliza en la cabecera el símbolo `IbmDevopsTest` del menú.
-Los pares receptor–unidad muestran tubos de ensayo SVG decorativos en rojo.
+El procesamiento muestra la muestra del receptor una sola vez, enlazada con
+las muestras de las unidades y sus opciones de resultado. Al guardar se registra
+el nombre de la persona de la sesión que abrió el procesamiento.
+La impresión de etiquetas desde Compatibilidad incluye solo las muestras de las
+unidades de la ronda. El informe se habilita cuando se completan todas las rondas
+de la solicitud. Las etiquetas y el informe de compatibilidad suprimen los
+encabezados y pies automáticos de impresión.
 
 `src/shared/warning-confirmation.component.tsx` reutiliza Carbon para las tres
 confirmaciones operativas de este flujo. Incluye triángulo, descripción accesible,
