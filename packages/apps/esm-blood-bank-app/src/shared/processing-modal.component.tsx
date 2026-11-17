@@ -40,6 +40,7 @@ export function ProcessingModal({
   footerClassName,
   compactHeader = false,
   hideStepHeading = false,
+  preserveContentScroll = false,
   t,
 }: {
   title: string;
@@ -65,6 +66,7 @@ export function ProcessingModal({
   footerClassName?: string;
   compactHeader?: boolean;
   hideStepHeading?: boolean;
+  preserveContentScroll?: boolean;
   t: ProcessingTranslate;
 }) {
   const [confirm, setConfirm] = useState(false);
@@ -106,6 +108,15 @@ export function ProcessingModal({
         onClose={requestClose}
         preventCloseOnClickOutside
         selectorsFloatingMenus={warningDialogs}
+        onBlurCapture={
+          preserveContentScroll
+            ? (event) => {
+                // Carbon recenters the newly focused control inside a scrollable modal body.
+                if (event.relatedTarget instanceof Node && bodyRef.current?.contains(event.relatedTarget))
+                  event.stopPropagation();
+              }
+            : undefined
+        }
         aria-label={title}
       >
         <ModalHeader title={title} iconDescription={t('close')} closeModal={requestClose}>

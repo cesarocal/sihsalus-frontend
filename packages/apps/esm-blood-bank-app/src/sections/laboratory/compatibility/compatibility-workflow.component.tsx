@@ -1,7 +1,7 @@
 import { Button, Checkbox, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react';
 import { ArrowRight, Checkmark, Close, Printer } from '@carbon/react/icons';
 import { useSession } from '@openmrs/esm-framework';
-import { useId, useRef, useState } from 'react';
+import { type ReactNode, useId, useRef, useState } from 'react';
 import type { TransfusionsApi } from '../../../api/transfusions.api';
 import { notifySuccess } from '../../../shared/notify-success';
 import { printDocument } from '../../../shared/print-document';
@@ -14,10 +14,17 @@ import { compatibilityLabelPrintCss, TransfusionLabels } from '../../transfusion
 import styles from '../../transfusions/transfusions.scss';
 import type { CompatibilityRound, TransfusionRequest } from '../../transfusions/transfusions.types';
 import { transfusionOperatorName } from '../../transfusions/transfusions-rules';
-import { FractionationContent } from '../fractionation/fractionation-content.component';
 import { SampleTubeIcon } from './sample-tube-icon.component';
 
-function SampleCard({ title, fields }: { title: string; fields: [string, string | null][] }) {
+function SampleCard({
+  title,
+  fields,
+  children,
+}: {
+  title: string;
+  fields: [string, string | null][];
+  children?: ReactNode;
+}) {
   const heading = useId();
   return (
     <section className={styles.sampleCard} aria-labelledby={heading}>
@@ -33,6 +40,7 @@ function SampleCard({ title, fields }: { title: string; fields: [string, string 
           </div>
         ))}
       </dl>
+      {children}
     </section>
   );
 }
@@ -64,10 +72,7 @@ export function CompatibilityWorkflow({
   const { order } = request;
   const assignments = request.assignments.filter((item) => item.roundId === round.id);
   const complete =
-    !!operator &&
-    round.identityVerified &&
-    round.pretransfusionVerified &&
-    Object.values(round.results).every(Boolean);
+    !!operator && round.identityVerified && round.pretransfusionVerified && Object.values(round.results).every(Boolean);
   const change = (patch: Partial<CompatibilityRound>) => {
     setRound({ ...round, ...patch });
     setDirty(true);
@@ -135,6 +140,7 @@ export function CompatibilityWorkflow({
         footerClassName={styles.printFooter}
         compactHeader
         hideStepHeading
+        preserveContentScroll
         extraActions={
           <Button
             kind="tertiary"
@@ -150,75 +156,73 @@ export function CompatibilityWorkflow({
         t={t}
       >
         <div className={styles.responsive}>
-          <FractionationContent>
-            <dl className={`${styles.summary} ${styles.compatibilitySummary}`}>
-              {[
-                ['txRecipientName', order.patientName],
-                ['txReportBloodGroup', transfusionBloodGroupLabel(order.bloodGroup, t)],
-                ['txSampleHistoryNumber', order.historyNumber],
-                ['txRound', round.id],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt>{t(label)}</dt>
-                  <dd>{value || '—'}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className={styles.reviewChecks}>
-              <TextInput
-                id="tx-compatibility-operator"
-                labelText={t('txTestedBy')}
-                value={operator}
-                readOnly
-                invalid={!operator}
-                invalidText={t('txOperatorUnavailable')}
-              />
-              <Checkbox
-                id="tx-lab-identity"
-                labelText={t('txLabIdentity')}
-                checked={round.identityVerified}
-                disabled={saving}
-                onChange={(_e, { checked }) => change({ identityVerified: checked })}
-              />
-              <Checkbox
-                id="tx-pretransfusion"
-                labelText={t('txPretransfusionCheck')}
-                checked={round.pretransfusionVerified}
-                disabled={saving}
-                onChange={(_e, { checked }) => change({ pretransfusionVerified: checked })}
+          <dl className={`${styles.summary} ${styles.compatibilitySummary}`}>
+            {[
+              ['txRecipientName', order.patientName],
+              ['txReportBloodGroup', transfusionBloodGroupLabel(order.bloodGroup, t)],
+              ['txSampleHistoryNumber', order.historyNumber],
+              ['txRound', round.id],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{t(label)}</dt>
+                <dd>{value || '—'}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className={styles.reviewChecks}>
+            <TextInput
+              id="tx-compatibility-operator"
+              labelText={t('txTestedBy')}
+              value={operator}
+              readOnly
+              invalid={!operator}
+              invalidText={t('txOperatorUnavailable')}
+            />
+            <Checkbox
+              id="tx-lab-identity"
+              labelText={t('txLabIdentity')}
+              checked={round.identityVerified}
+              disabled={saving}
+              onChange={(_e, { checked }) => change({ identityVerified: checked })}
+            />
+            <Checkbox
+              id="tx-pretransfusion"
+              labelText={t('txPretransfusionCheck')}
+              checked={round.pretransfusionVerified}
+              disabled={saving}
+              onChange={(_e, { checked }) => change({ pretransfusionVerified: checked })}
+            />
+          </div>
+          <div className={styles.compatibilitySamples}>
+            <div className={styles.recipientCard}>
+              <SampleCard
+                title={t('txRecipientSample')}
+                fields={[
+                  [t('sampleCode'), round.sample.code],
+                  [t('txRecipientName'), order.patientName],
+                  [t('txSampleHistoryNumber'), round.sample.historyNumber],
+                ]}
               />
             </div>
-            <div className={styles.compatibilitySamples}>
-              <div className={styles.recipientCard}>
-                <SampleCard
-                  title={t('txRecipientSample')}
-                  fields={[
-                    [t('sampleCode'), round.sample.code],
-                    [t('txRecipientName'), order.patientName],
-                    [t('txSampleHistoryNumber'), round.sample.historyNumber],
-                  ]}
-                />
-              </div>
-              <ul className={styles.unitSamples}>
-                {assignments.map((item) => (
-                  <li key={item.unit.id} className={styles.unitSampleRow}>
-                    <div className={styles.sampleConnector} aria-hidden="true">
-                      <ArrowRight size={18} />
-                    </div>
-                    <SampleCard
-                      title={t('txUnitSample')}
-                      fields={[
-                        [t('sampleCode'), item.unitSampleCode],
-                        [t('unitCode'), item.unit.id],
-                        [t('txReportBloodGroup'), transfusionBloodGroupLabel(item.unit.bloodGroup, t)],
-                        [t('txSeal'), inventoryUnitSealCode(item.unit)],
-                      ]}
-                    />
+            <ul className={styles.unitSamples}>
+              {assignments.map((item) => (
+                <li key={item.unit.id} className={styles.unitSampleRow}>
+                  <div className={styles.sampleConnector} aria-hidden="true">
+                    <ArrowRight size={18} />
+                  </div>
+                  <SampleCard
+                    title={t('txUnitSample')}
+                    fields={[
+                      [t('sampleCode'), item.unitSampleCode],
+                      [t('unitCode'), item.unit.id],
+                      [t('txSeal'), inventoryUnitSealCode(item.unit)],
+                      [t('txReportBloodGroup'), transfusionBloodGroupLabel(item.unit.bloodGroup, t)],
+                    ]}
+                  >
                     <RadioButtonGroup
                       className={styles.compatibilityResult}
                       name={`result-${item.unit.id}`}
                       aria-label={`${t('txResult')} ${item.unit.id}`}
-                      orientation="vertical"
                       valueSelected={round.results[item.unit.id]}
                       disabled={saving}
                       onChange={(value) => {
@@ -247,11 +251,11 @@ export function CompatibilityWorkflow({
                         }
                       />
                     </RadioButtonGroup>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </FractionationContent>
+                  </SampleCard>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </ProcessingModal>
       {confirm && (

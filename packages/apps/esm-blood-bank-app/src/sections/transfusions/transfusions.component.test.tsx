@@ -358,7 +358,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     labels.unmount();
     fireEvent.click(screen.getByRole('checkbox', { name: t('txLabIdentity') }));
     fireEvent.click(screen.getByRole('checkbox', { name: t('txPretransfusionCheck') }));
-    const firstResult = within(screen.getByRole('group', { name: `${t('txResult')} ${code(1)}` }));
+    const firstResult = within(unitCard.getByRole('group', { name: `${t('txResult')} ${code(1)}` }));
     const compatibleOption = firstResult.getByRole('radio', { name: t('txCompatible') });
     const incompatibleOption = firstResult.getByRole('radio', { name: t('txIncompatibleOption') });
     fireEvent.click(incompatibleOption);

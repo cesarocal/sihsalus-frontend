@@ -169,10 +169,12 @@
 }
 .compatibilitySamples {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.75fr);
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
   align-items: center;
   column-gap: layout.$spacing-05;
+  max-inline-size: 50rem;
   margin-block: layout.$spacing-05;
+  margin-inline: auto;
 }
 .recipientCard {
   position: relative;
@@ -193,7 +195,7 @@
 .unitSampleRow {
   position: relative;
   display: grid;
-  grid-template-columns: clamp(1.25rem, 4vw, 3.5rem) minmax(0, 1fr) auto;
+  grid-template-columns: 2rem minmax(0, 1fr);
   align-items: center;
   gap: layout.$spacing-03;
   padding-block: layout.$spacing-03;
@@ -265,13 +267,31 @@
   color: colors.$red-60;
   flex-shrink: 0;
 }
+.unitSampleRow .sampleCard dl {
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  column-gap: layout.$spacing-04;
+}
 .compatibilityResult {
+  margin-block-start: layout.$spacing-04;
+  padding-block-start: layout.$spacing-03;
+  border-block-start: 1px solid $ui-03;
+
   :global(.cds--radio-button-group) {
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
     gap: layout.$spacing-03;
+    inline-size: 100%;
+    max-inline-size: 18rem;
   }
 
   :global(.cds--radio-button-wrapper) {
+    position: relative;
+    margin: 0;
+  }
+
+  :global(.cds--radio-button) {
+    inset-block-start: 50%;
+    inset-inline-start: layout.$spacing-03;
     margin: 0;
   }
 
@@ -286,6 +306,7 @@
   :global(.cds--radio-button__label-text) {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: layout.$spacing-03;
   }
 
@@ -702,6 +723,7 @@
 @media (max-width: 56rem) {
   .compatibilitySamples {
     grid-template-columns: minmax(0, 1fr);
+    max-inline-size: 33rem;
   }
 
   .recipientCard::after {
@@ -717,8 +739,8 @@
     grid-template-columns: 1.25rem minmax(0, 1fr);
   }
 
-  .compatibilityResult {
-    grid-column: 2;
+  .unitSampleRow .sampleCard dl {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .fr08HistoryRow,
