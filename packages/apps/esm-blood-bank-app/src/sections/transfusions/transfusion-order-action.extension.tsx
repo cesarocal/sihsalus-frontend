@@ -485,19 +485,7 @@ function TransfusionOrderForm({
                   </div>
                 </section>
                 <section>
-                  <div className={styles.fr08RequirementHeading}>
-                    <h3>{t('txRequirement')}</h3>
-                    <Select
-                      id={`${formId}-priority`}
-                      labelText={t('txPriority')}
-                      value={fields.priority}
-                      onChange={(event) => update('priority', event.target.value as TransfusionPriority)}
-                    >
-                      <SelectItem value="scheduled" text={t(priorityKeys.scheduled)} />
-                      <SelectItem value="urgent" text={t(priorityKeys.urgent)} />
-                      <SelectItem value="veryUrgent" text={t('fr08VeryUrgent')} />
-                    </Select>
-                  </div>
+                  <h3>{t('txRequirement')}</h3>
                   <div className={styles.fr08Requirements}>
                     {requirements.map((row) => (
                       <div key={row.id} className={styles.fr08RequirementRow}>
@@ -567,25 +555,39 @@ function TransfusionOrderForm({
                     </Button>
                   </div>
                 </section>
-                {fields.priority === 'scheduled' && (
-                  <div className={styles.fr08Schedule}>
-                    <TextInput
-                      id={`${formId}-scheduled-date`}
-                      type="date"
-                      labelText={t('fr08ScheduledDate')}
-                      min={localDateTime().slice(0, 10)}
-                      value={scheduledDate}
-                      onChange={(event) => setScheduledDate(event.target.value)}
-                    />
-                    <TextInput
-                      id={`${formId}-scheduled-time`}
-                      type="time"
-                      labelText={t('fr08ScheduledTime')}
-                      value={scheduledTime}
-                      onChange={(event) => setScheduledTime(event.target.value)}
-                    />
-                  </div>
-                )}
+                <section>
+                  <h3 id={`${formId}-priority-label`}>{t('txPriority')}</h3>
+                  <RadioButtonGroup
+                    className={styles.fr08PriorityOptions}
+                    name={`${formId}-priority`}
+                    aria-labelledby={`${formId}-priority-label`}
+                    valueSelected={fields.priority}
+                    onChange={(value) => update('priority', value as TransfusionPriority)}
+                  >
+                    {Object.entries(priorityKeys).map(([value, label]) => (
+                      <RadioButton key={value} id={`${formId}-priority-${value}`} value={value} labelText={t(label)} />
+                    ))}
+                  </RadioButtonGroup>
+                  {fields.priority === 'scheduled' && (
+                    <div className={styles.fr08Schedule}>
+                      <TextInput
+                        id={`${formId}-scheduled-date`}
+                        type="date"
+                        labelText={t('fr08ScheduledDate')}
+                        min={localDateTime().slice(0, 10)}
+                        value={scheduledDate}
+                        onChange={(event) => setScheduledDate(event.target.value)}
+                      />
+                      <TextInput
+                        id={`${formId}-scheduled-time`}
+                        type="time"
+                        labelText={t('fr08ScheduledTime')}
+                        value={scheduledTime}
+                        onChange={(event) => setScheduledTime(event.target.value)}
+                      />
+                    </div>
+                  )}
+                </section>
                 <div className={styles.fr08Grid}>
                   <TextInput
                     id={`${formId}-author`}

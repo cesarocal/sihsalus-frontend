@@ -355,7 +355,10 @@
   gap: layout.$spacing-03 layout.$spacing-04;
   padding-block: layout.$spacing-03;
   border-block-end: 1px solid $ui-03;
+}
 
+.fr08HistoryRow,
+.fr08PriorityOptions {
   :global(.cds--radio-button-group) {
     flex-wrap: wrap;
     gap: layout.$spacing-03 layout.$spacing-05;
@@ -432,24 +435,11 @@
   }
 }
 
-.fr08RequirementHeading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: layout.$spacing-04;
-  margin-block-end: layout.$spacing-04;
-
-  > :last-child {
-    flex: 0 1 17rem;
-    min-inline-size: 0;
-  }
-}
-
 .fr08Schedule {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: layout.$spacing-04;
+  margin-block-start: layout.$spacing-04;
 }
 
 .fr08Footer:global(.cds--modal-footer) {
@@ -566,6 +556,7 @@
 @media (max-width: 42rem) {
   .fr08HistoryRow,
   .fr08IdentityRow,
+  .fr08Schedule,
   .fr08TripleRow {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -1,4 +1,4 @@
-import { Button, Checkbox, Search, Select, SelectItem, Tag } from '@carbon/react';
+import { Button, Checkbox, Search, Select, SelectItem, Tag, type TagProps } from '@carbon/react';
 import { Clean, WarningAlt } from '@carbon/react/icons';
 import { type ReactNode, useEffect, useState } from 'react';
 import spanish from '../../../translations/es.json';
@@ -17,6 +17,38 @@ import { canSeal, disposalEligibleStatuses, inventoryDisplayDate, inventoryStatu
 
 const bloodGroups = screeningBloodGroups.flatMap((abo) => screeningRhFactors.map((rh) => `${abo}${rh}`));
 const componentName = (value: string) => normalizeSearch(value.replace(/\s*\(DEMO\)$/i, '').trim());
+
+type TagColor = NonNullable<TagProps<'div'>['type']>;
+
+const sharedStatusColors = {
+  APTO: 'green',
+  'En fraccionamiento': 'blue',
+  'No apta': 'red',
+} as const;
+const workflowStatusColors: Partial<Record<InventoryUnit['status'], TagColor>> = {
+  ...sharedStatusColors,
+  'Sello pendiente': 'warm-gray',
+};
+const inventoryStatusColors: Record<InventoryUnit['status'], TagColor> = {
+  ...sharedStatusColors,
+  Cuarentena: 'purple',
+  'Sello pendiente': 'cyan',
+  Reservada: 'teal',
+  'Por transferir': 'teal',
+  'Reservados para transfusión': 'teal',
+  'En pruebas de compatibilidad': 'blue',
+  'En proceso de eliminación': 'magenta',
+};
+const workflowScreeningColors = {
+  nonReactive: 'green',
+  reactive: 'red',
+  inProgress: 'blue',
+} as const;
+const inventoryScreeningColors: Record<InventoryUnit['screeningResult'], TagColor> = {
+  ...workflowScreeningColors,
+  pending: 'cyan',
+  inconclusive: 'purple',
+};
 
 export function InventorySelector({
   units,
@@ -84,6 +116,10 @@ export function InventorySelector({
     setGroup('');
   };
   const sealWorkflow = kind === 'qualitySeal';
+  const statusColors = kind ? workflowStatusColors : inventoryStatusColors;
+  const screeningColors: Partial<Record<InventoryUnit['screeningResult'], TagColor>> = kind
+    ? workflowScreeningColors
+    : inventoryScreeningColors;
   const components = Object.entries(componentDefinitions).map(([id, { key }]) => ({
     id,
     label: t(key),
@@ -280,34 +316,10 @@ export function InventorySelector({
                   </span>
                 )}
               </div>,
-              <Tag
-                key="status"
-                type={
-                  unit.status === 'APTO'
-                    ? 'green'
-                    : unit.status === 'En fraccionamiento'
-                      ? 'blue'
-                      : unit.status === 'Sello pendiente'
-                        ? 'warm-gray'
-                        : unit.status === 'No apta'
-                          ? 'red'
-                          : 'gray'
-                }
-              >
+              <Tag key="status" type={statusColors[unit.status] ?? 'gray'}>
                 {t(inventoryStatusKey[unit.status])}
               </Tag>,
-              <Tag
-                key="screening"
-                type={
-                  unit.screeningResult === 'nonReactive'
-                    ? 'green'
-                    : unit.screeningResult === 'reactive'
-                      ? 'red'
-                      : unit.screeningResult === 'inProgress'
-                        ? 'blue'
-                        : 'gray'
-                }
-              >
+              <Tag key="screening" type={screeningColors[unit.screeningResult] ?? 'gray'}>
                 {t(`inventoryResult_${unit.screeningResult}`)}
               </Tag>,
             ],

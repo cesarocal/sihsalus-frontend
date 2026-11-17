@@ -105,7 +105,13 @@ describe('inventory selection, seals and disposal UI', () => {
     vi.spyOn(api.inventory, 'list').mockResolvedValue({
       ...workspace,
       units: [
-        { ...unit, id: 'EXPIRY-TODAY', expiresAt: '2026-11-13' },
+        {
+          ...unit,
+          id: 'EXPIRY-TODAY',
+          expiresAt: '2026-11-13',
+          status: 'Cuarentena',
+          screeningResult: 'pending',
+        },
         {
           ...unit,
           id: 'EXPIRY-IN-7-DAYS',
@@ -113,7 +119,13 @@ describe('inventory selection, seals and disposal UI', () => {
           status: 'No apta',
           screeningResult: 'reactive',
         },
-        { ...unit, id: 'EXPIRY-IN-8-DAYS', expiresAt: '2026-11-21' },
+        {
+          ...unit,
+          id: 'EXPIRY-IN-8-DAYS',
+          expiresAt: '2026-11-21',
+          status: 'Cuarentena',
+          screeningResult: 'inconclusive',
+        },
         { ...unit, id: 'EXPIRY-PAST', expiresAt: '2026-11-12' },
         { ...unit, id: 'EXPIRY-PAST-HOUR', expiresAt: '2026-11-13T10:00' },
         { ...unit, id: 'EXPIRY-UNKNOWN', expiresAt: '' },
@@ -127,6 +139,8 @@ describe('inventory selection, seals and disposal UI', () => {
       expect(row).toHaveClass('expiringRow');
       expect(within(row).getByText('Próxima a vencer')).toBeInTheDocument();
     }
+    expect(within(today).getByText('Cuarentena').closest('.cds--tag')).toHaveClass('cds--tag--purple');
+    expect(within(today).getByText('Pendiente').closest('.cds--tag')).toHaveClass('cds--tag--cyan');
     expect(within(lastDay).getByText('No apta').closest('.cds--tag')).toHaveClass('cds--tag--red');
     expect(within(lastDay).getByText('Reactiva').closest('.cds--tag')).toHaveClass('cds--tag--red');
     for (const id of ['EXPIRY-IN-8-DAYS', 'EXPIRY-PAST', 'EXPIRY-PAST-HOUR', 'EXPIRY-UNKNOWN']) {
@@ -134,10 +148,14 @@ describe('inventory selection, seals and disposal UI', () => {
       expect(row).not.toHaveClass('expiringRow');
       expect(within(row).queryByText('Próxima a vencer')).not.toBeInTheDocument();
     }
+    const outsideWindow = screen.getByRole('row', { name: /EXPIRY-IN-8-DAYS/ });
+    expect(within(outsideWindow).getByText('Indeterminada').closest('.cds--tag')).toHaveClass('cds--tag--purple');
 
     fireEvent.click(screen.getByRole('button', { name: t('inventoryDispose') }));
     const modal = within(screen.getByRole('dialog'));
-    expect(modal.getByRole('row', { name: /EXPIRY-TODAY/ })).not.toHaveClass('expiringRow');
+    const disposalRow = modal.getByRole('row', { name: /EXPIRY-TODAY/ });
+    expect(disposalRow).not.toHaveClass('expiringRow');
+    expect(within(disposalRow).getByText('Cuarentena').closest('.cds--tag')).toHaveClass('cds--tag--gray');
   });
 
   it('combines search, component/group/status filters, multi-selection and deselection', async () => {
