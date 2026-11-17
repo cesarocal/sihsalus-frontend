@@ -356,7 +356,7 @@ export function TransfusionWorkflow({
               </>
             ) : (
               <>
-                <TransfusionDetails request={request} t={t} history componentCards={!replacement} />
+                <TransfusionDetails request={request} t={t} history componentCards />
                 {delivery || readOnly || replacement ? (
                   <CompatibilityReport request={request} t={t} />
                 ) : (

@@ -54,6 +54,9 @@
     min-width: 0;
   }
 }
+:global(.cds--modal-scroll-content):has(.picker) {
+  mask-image: none;
+}
 .pickerPanel {
   display: flex;
   flex-direction: column;

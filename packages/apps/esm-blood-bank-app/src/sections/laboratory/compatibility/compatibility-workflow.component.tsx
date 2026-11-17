@@ -246,7 +246,7 @@ export function CompatibilityWorkflow({
                         labelText={
                           <>
                             <Close size={18} aria-hidden="true" />
-                            {t('txIncompatibleOption')}
+                            {t('txIncompatible')}
                           </>
                         }
                       />

@@ -77,14 +77,14 @@ queda pendiente.
 
 ## Estados, muestras y stock
 
-| Operación confirmada                        | Solicitud                                                   | Unidades                                                                    |
-| ------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Revisar identificación y documentación      | Revisada                                                    | Sin reserva                                                                 |
-| Continuar desde muestra del receptor        | Muestra registrada                                          | Sin reserva                                                                 |
-| Asignar cantidades completas por componente | En pruebas de compatibilidad                                | Sangre total/paquete globular en pruebas; otros componentes reservados      |
-| Registrar todos los resultados de una ronda | Compatible si todos aprueban; No compatible si alguno falla | Compatibles reservadas; incompatibles desasignadas y APTO                   |
-| Reasignar faltantes                         | En pruebas de compatibilidad                                | Solo unidades nuevas en pruebas; aprobadas anteriores permanecen reservadas |
-| Confirmar entrega                           | Entregada; solicitante ATENDIDA                             | Entregadas y fuera del inventario activo                                    |
+| Operación confirmada                        | Solicitud                                                  | Unidades                                                                    |
+| ------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Revisar identificación y documentación      | Revisada                                                   | Sin reserva                                                                 |
+| Continuar desde muestra del receptor        | Muestra registrada                                         | Sin reserva                                                                 |
+| Asignar cantidades completas por componente | En pruebas de compatibilidad                               | Sangre total/paquete globular en pruebas; otros componentes reservados      |
+| Registrar todos los resultados de una ronda | Compatible si todos aprueban; Incompatible si alguno falla | Compatibles reservadas; incompatibles desasignadas y APTO                   |
+| Reasignar faltantes                         | En pruebas de compatibilidad                               | Solo unidades nuevas en pruebas; aprobadas anteriores permanecen reservadas |
+| Confirmar entrega                           | Entregada; solicitante ATENDIDA                            | Entregadas y fuera del inventario activo                                    |
 
 El responsable de la atención y quien registra una toma nueva se obtienen de la
 persona vinculada a la sesión al abrir Atender. Las revisiones y muestras guardadas

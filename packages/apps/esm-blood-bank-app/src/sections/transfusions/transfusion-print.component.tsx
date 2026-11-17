@@ -197,10 +197,7 @@ export function CompatibilityReport({
                 </td>
                 <td>{transfusionBloodGroupLabel(item.unit.bloodGroup, t)}</td>
                 <td>{item.unitSampleCode || '—'}</td>
-                <td>
-                  {t(compatibilityResultKeys[item.result])}
-                  {!item.active && ` · ${t('txReleased')}`}
-                </td>
+                <td>{t(compatibilityResultKeys[item.result])}</td>
                 <td>{item.testedBy || '—'}</td>
                 <td>{item.resultAt ? formatDatetime(new Date(item.resultAt), { noToday: true }) : '—'}</td>
               </tr>

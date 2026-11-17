@@ -360,7 +360,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: t('txPretransfusionCheck') }));
     const firstResult = within(unitCard.getByRole('group', { name: `${t('txResult')} ${code(1)}` }));
     const compatibleOption = firstResult.getByRole('radio', { name: t('txCompatible') });
-    const incompatibleOption = firstResult.getByRole('radio', { name: t('txIncompatibleOption') });
+    const incompatibleOption = firstResult.getByRole('radio', { name: t('txIncompatible') });
     fireEvent.click(incompatibleOption);
     expect(incompatibleOption).toBeChecked();
     fireEvent.click(compatibleOption);
@@ -369,7 +369,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(screen.getByRole('button', { name: t('txRegisterResults') })).toBeDisabled();
     fireEvent.click(
       within(screen.getByRole('group', { name: `${t('txResult')} ${code(2)}` })).getByRole('radio', {
-        name: t('txIncompatibleOption'),
+        name: t('txIncompatible'),
       }),
     );
     fireEvent.click(screen.getByRole('button', { name: t('txRegisterResults') }));
@@ -435,7 +435,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     await waitFor(() => expect(closed).toHaveBeenCalledOnce());
     expect((await api.list()).bookEntries).toHaveLength(3);
   });
-  it('shows cards in View tests and blocks printing draft results, including replacements in history', async () => {
+  it('shows cards and report results when reviewing tests and blocks printing while rounds are pending', async () => {
     const { api, request, units } = await assigned();
     const round = {
       ...request.rounds[0],
@@ -459,6 +459,25 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     view.unmount();
 
     const rejected = await api.saveCompatibility(draft.id, draft.revision, round, true);
+    const review = render(
+      <TransfusionWorkflow initial={rejected} units={units} api={api} onSaved={vi.fn()} onClose={vi.fn()} t={t} />,
+    );
+    expect(screen.getByText(t('status'), { exact: true }).nextElementSibling).toHaveTextContent('Incompatible');
+    const requested = screen.getByRole('region', { name: t('txRequirement') });
+    expect(requested.previousElementSibling).toHaveTextContent(t('txRequestDetails'));
+    expect(requested.nextElementSibling).toHaveTextContent(t('txPatientHistory'));
+    expect(within(requested).getByText('×2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('txPrintResults') }));
+    expect(printDocument).toHaveBeenCalledOnce();
+    const printed = render(vi.mocked(printDocument).mock.calls[0][0]);
+    const results = within(printed.container).getByRole('table', { name: t('txCompatibilityReport') });
+    const unitResult = within(results).getByRole('row', { name: new RegExp(code(2)) });
+    expect(within(unitResult).getByRole('cell', { name: /^Incompatible$/ })).toBeInTheDocument();
+    expect(unitResult).not.toHaveTextContent('Retirada de la asignación');
+    printed.unmount();
+    review.unmount();
+    vi.mocked(printDocument).mockClear();
+
     const replacement = await api.assign(rejected.id, rejected.revision, [code(3)], true);
     render(<TransfusionHistory requests={[replacement]} entries={[]} onClose={vi.fn()} t={t} compatibility />);
     fireEvent.click(screen.getByRole('button', { name: t('txViewDetail') }));
