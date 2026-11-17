@@ -36,7 +36,11 @@ export const configSchema = {
     orderTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de orden transfusional.' },
     conceptUuid: { _type: Type.String, _default: '', _description: 'UUID del concepto de la solicitud transfusional.' },
     encounterTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de encuentro de órdenes.' },
-    careSettingUuid: { _type: Type.String, _default: '', _description: 'UUID del ámbito de atención de la orden.' },
+    careSettingUuid: {
+      _type: Type.String,
+      _default: '',
+      _description: 'Ámbito de atención de respaldo. El FR08 utiliza el ámbito configurado en Órdenes.',
+    },
     historyIdentifierTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de historia clínica.' },
     documentIdentifierTypeUuids: {
       _type: Type.Array,

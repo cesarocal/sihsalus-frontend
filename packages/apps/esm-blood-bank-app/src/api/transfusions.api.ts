@@ -2,12 +2,15 @@ import type {
   CompatibilityRound,
   RecipientSample,
   TransfusionDraft,
+  TransfusionOrder,
   TransfusionRequest,
   TransfusionWorkspace,
 } from '../sections/transfusions/transfusions.types';
 
 export interface TransfusionsApi {
   list(): Promise<TransfusionWorkspace>;
+  /** Starts the local stock workflow for an OpenMRS order in mock mode. */
+  prepareIssuedRequest?(order: TransfusionOrder): Promise<TransfusionRequest>;
   saveDraft(id: string, revision: number, draft: TransfusionDraft): Promise<TransfusionRequest>;
   review(id: string, revision: number, draft: TransfusionDraft): Promise<TransfusionRequest>;
   saveSample(id: string, revision: number, sample: RecipientSample): Promise<TransfusionRequest>;
@@ -20,7 +23,7 @@ export interface TransfusionsApi {
   ): Promise<TransfusionRequest>;
   deliver(id: string, revision: number, draft: TransfusionDraft): Promise<TransfusionRequest>;
 }
-/** Proposed OMOD routes. The frontend does not insert SQL or create actual Orders. */
+/** Proposed OMOD routes for inventory, compatibility and dispatch of existing orders. */
 export const transfusionEndpoints = {
   requests: '/ws/rest/v1/bloodbank/transfusion-requests',
   request: '/ws/rest/v1/bloodbank/transfusion-requests/:uuid',

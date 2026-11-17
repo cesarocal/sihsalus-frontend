@@ -17,9 +17,8 @@ del circuito de prueba operan con datos sintéticos.
   compatibles si corresponde → revisar resultados → identificar a quien recoge
   → confirmar entrega → historial y egresos del libro.
 
-Una solicitud urgente sintética permite comprobar el orden de prioridad con su
-acción deshabilitada. El adaptador de prueba permite atender solicitudes
-programadas.
+Una solicitud urgente sintética permite comprobar el orden de prioridad y
+consultar su detalle. El adaptador de prueba permite atender solicitudes programadas.
 
 El acceso de Inicio de Laboratorio `?round=<id>` en Compatibilidad revalida
 una ronda exacta no completada y abre el formulario existente, bajo su guard.
@@ -29,11 +28,12 @@ vez para evitar reapertura al refrescar; recargar la URL vuelve a validarla.
 
 ## Solicitudes programadas desde Órdenes
 
-El bloque **Solicitudes transfusionales de Órdenes** consulta las órdenes
-de OpenMRS del tipo configurado. En la ficha filtra por UUID del paciente.
-En Banco de Sangre permite revisar el FR08 y registrar la recepción; ambas
-vistas leen el estado de cumplimiento de esa misma orden. El FR08 se puede
-imprimir al generar la solicitud o al abrirla desde el historial.
+La canasta de Órdenes permite emitir el FR08. La ficha muestra la orden en
+su lista habitual. En Banco de Sangre las órdenes programadas del tipo
+configurado aparecen en la misma bandeja que usa el flujo de atención.
+**Atender** abre el paso correspondiente al estado de la solicitud. En
+**Verificación de la solicitud** están **Imprimir FR08** y **Registrar
+recepción**. **Ver solicitud** abre las solicitudes disponibles para consulta.
 
 La acción de la canasta requiere una visita activa, un proveedor asociado a la
 sesión y el número de historia clínica configurado. Un POST a `/encounter`
@@ -44,8 +44,9 @@ FR08 es Programada y la urgencia de la orden es `ROUTINE`. La recepción usa
 `/order/{uuid}/fulfillerdetails/` y registra `RECEIVED`.
 
 Configure `transfusionOrders` en `@sihsalus/esm-blood-bank-app` con un tipo
-de orden activo de clase `org.openmrs.Order`, su concepto, el tipo de encuentro,
-el ámbito de atención y el tipo de identificador de historia clínica. Confirme
+de orden activo de clase `org.openmrs.Order`, su concepto, el tipo de encuentro
+y el tipo de identificador de historia clínica. El FR08 se guarda con el ámbito
+de atención que usa la lista nativa de Órdenes. Confirme
 estos UUID en el servidor de destino. Para probar en local, use la configuración
 temporal del navegador en las herramientas de implementación de OpenMRS y
 agregue únicamente el bloque del módulo. Esta configuración se conserva para el
@@ -57,10 +58,18 @@ y `Add Encounters`. El Banco necesita sus permisos de módulo y Transfusiones
 junto con `Get Orders`, `Get Concepts`, `Get Patients`, `Get Encounters` y
 `Get Providers` para resolver las referencias de la orden, y `Edit Orders`
 para registrar la recepción. El REST de OpenMRS valida los permisos al ejecutar
-cada operación. El circuito real
-cubre la emisión y la recepción; la selección de unidades, las rondas y el
-egreso siguen en el circuito de prueba separado mientras se integra el
-inventario operativo.
+cada operación. Con `useMockData`, **Atender** abre el flujo existente para el
+FR08 y guarda su avance en el almacenamiento de la pestaña. La selección, las
+rondas y la entrega usan las unidades de prueba. Para una orden nueva, la
+verificación habilita el registro de recepción y la recepción confirmada
+habilita el avance hacia la muestra. Al avanzar se guarda una fecha y hora
+en el registro local de atención.
+
+EG05-PC10 ubica la revisión de la integridad y legibilidad de la solicitud y
+el registro de fecha y hora de recepción antes de la toma de muestra. La API
+de órdenes usada en este módulo persiste el estado de recepción. El campo
+dedicado a la fecha y hora de recepción en el backend de Banco de Sangre
+queda pendiente.
 
 ## Estados, muestras y stock
 
@@ -211,23 +220,19 @@ cruzada. Solo se admiten cantidades completas, no atención parcial.
 El DDL aportado relaciona `banco_solicitud_transfusional.order_id` con `orders`,
 además de encuentro, detalles, muestras, órdenes/pruebas de compatibilidad,
 reservas y entrega. La solicitud clínica puede basarse en Order, mientras estos
-registros de dominio conservan la atención y trazabilidad del banco. No se
-modifica el esquema SQL ni se crea un Order desde este prototipo.
+registros de dominio conservan la atención y trazabilidad del banco.
 
 El contrato propone `GET /ws/rest/v1/bloodbank/transfusion-requests` y operaciones
 de borrador, revisión, muestra, asignación, compatibilidad y entrega, documentadas
 en `transfusions.api.ts`. **No hay un endpoint servidor desplegado**. Al desactivar
-`useMockData`, todas las operaciones nuevas fallan de forma segura sin enviar
-peticiones. Antes de habilitarlas: acordar payload/UUIDs, permisos de servidor,
+`useMockData`, las órdenes configuradas admiten emisión, consulta y recepción.
+Antes de habilitar la atención con stock operativo: acordar payload/UUIDs, permisos de servidor,
 transacciones y bloqueos entre operadores, auditoría, idempotencia, identidad,
 consentimiento, reglas clínicas y política de datos sensibles.
 
-Para la futura generación médica, reutilizar las extensiones existentes de
-`esm-patient-orders-app` (`patient-chart-orders-dashboard-slot`,
-`order-item-additional-info-slot` y workspaces `order-basket` /
-`patient-orders-form-workspace`) con una extensión propia vinculada a paciente y
-encuentro. El tipo/conceptos de orden y su relación con el OMOD requieren acuerdo
-de backend; no duplicar una barra global ni crear usuarios desde este ESM.
+La emisión médica usa la extensión `order-basket-slot` vinculada al paciente y
+su visita. La relación entre la orden de OpenMRS y el OMOD de Banco de Sangre
+requiere la integración de backend.
 
 ## Validación y reversión
 

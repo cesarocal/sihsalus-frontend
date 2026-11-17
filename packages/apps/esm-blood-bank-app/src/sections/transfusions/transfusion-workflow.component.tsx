@@ -1,4 +1,4 @@
-import { Button, Checkbox, TextInput } from '@carbon/react';
+import { Button, Checkbox, InlineNotification, TextInput } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { useSession } from '@openmrs/esm-framework';
 import { useRef, useState } from 'react';
@@ -10,7 +10,9 @@ import type { ProcessingTranslate } from '../../shared/processing-page.component
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import type { TransferUnit } from '../transfers/transfers.types';
+import { PrintFr08 } from './fr08-document.component';
 import { TransfusionDetails } from './transfusion-details.component';
+import type { IssuedTransfusionOrder, TransfusionOrderConfig } from './transfusion-order.resource';
 import {
   CompatibilityReport,
   compatibilityReportPrintCss,
@@ -27,9 +29,12 @@ import {
   sampleValid,
   selectionComplete,
 } from './transfusions-rules';
+import { useTransfusionReceipt } from './use-transfusion-receipt';
 
 export function TransfusionWorkflow({
   initial,
+  issued,
+  orderConfig,
   units,
   api,
   onSaved,
@@ -37,6 +42,8 @@ export function TransfusionWorkflow({
   t,
 }: {
   initial: TransfusionRequest;
+  issued?: IssuedTransfusionOrder;
+  orderConfig?: TransfusionOrderConfig;
   units: TransferUnit[];
   api: TransfusionsApi;
   onSaved: () => void;
@@ -62,6 +69,7 @@ export function TransfusionWorkflow({
   const [errors, setErrors] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<'assign' | 'deliver' | null>(null);
   const inFlight = useRef(false);
+  const receipt = useTransfusionReceipt(orderConfig, issued);
   const { authenticated, user } = useSession();
   const person = authenticated ? user?.person : undefined;
   const name = person?.preferredName;
@@ -110,6 +118,9 @@ export function TransfusionWorkflow({
   };
   const selectionStep = !delivery && !readOnly && step === steps.length - 1;
   const sampleStep = step === 1 && !delivery && !replacement;
+  const reviewStep = steps[step] === 'txReview';
+  const awaitingReceipt =
+    reviewStep && request.status === 'pending' && Boolean(request.issuedOrder) && !receipt.received;
   const reportReady = compatibilityReportReady(request);
   const sample = request.sample ?? draft.sample;
   const sampleReady =
@@ -142,6 +153,7 @@ export function TransfusionWorkflow({
       return;
     }
     if (step === 0) {
+      if (awaitingReceipt || receipt.saving) return;
       if (request.status !== 'pending') {
         setStep(1);
         return;
@@ -217,9 +229,9 @@ export function TransfusionWorkflow({
         step={step}
         completed={steps.slice(0, step)}
         finalized={readOnly}
-        saving={saving || printingSample}
+        saving={saving || printingSample || receipt.saving}
         errors={errors}
-        failed={failed}
+        failed={reviewStep && receipt.failed ? 'fr08ReceiveFailed' : failed}
         saveErrorText={t('txSaveFailed')}
         onClose={onClose}
         closeDisabled={!!confirm}
@@ -235,13 +247,28 @@ export function TransfusionWorkflow({
         advanceDisabled={
           (selectionStep && !selectionComplete(request, units)) ||
           (sampleStep && !sampleReady) ||
+          awaitingReceipt ||
           (step === 0 && request.status === 'pending' && !operator)
         }
         footerClassName={styles.printFooter}
         compactHeader
         hideStepHeading={selectionStep}
         extraActions={
-          selectionStep ? (
+          reviewStep ? (
+            <div className={styles.receiptActions}>
+              <PrintFr08 order={request.order} t={t} label={t('fr08PrintForm')} disabled={saving || receipt.saving} />
+              {receipt.canReceive && (
+                <Button
+                  kind="tertiary"
+                  size="sm"
+                  disabled={!draft.reviewVerified || saving || receipt.saving}
+                  onClick={() => void receipt.register()}
+                >
+                  {t('fr08Receive')}
+                </Button>
+              )}
+            </div>
+          ) : selectionStep ? (
             <Checkbox
               id="tx-selection-check"
               labelText={t('txSelectionCheck')}
@@ -268,6 +295,9 @@ export function TransfusionWorkflow({
       >
         <div className={styles.responsive}>
           <FractionationContent>
+            {request.issuedOrder && (
+              <InlineNotification lowContrast hideCloseButton kind="info" title={t('fr08MockInventory')} />
+            )}
             {selectionStep ? (
               <TransfusionUnitPicker
                 request={request}
@@ -344,6 +374,9 @@ export function TransfusionWorkflow({
                   <CompatibilityReport request={request} t={t} />
                 ) : (
                   <div className={styles.reviewChecks}>
+                    {receipt.received && (
+                      <InlineNotification kind="success" hideCloseButton title={t('fr08ReceiptRegistered')} />
+                    )}
                     <TextInput
                       id="tx-reviewer"
                       labelText={t('txReviewer')}
@@ -356,14 +389,14 @@ export function TransfusionWorkflow({
                       id="tx-review-check"
                       labelText={t('txReviewCheck')}
                       checked={draft.reviewVerified}
-                      disabled={saving || request.status !== 'pending'}
+                      disabled={saving || receipt.saving || request.status !== 'pending'}
                       onChange={(_e, { checked }) => change({ reviewVerified: checked })}
                     />
                     <Checkbox
                       id="tx-consent-check"
                       labelText={t('txConsentCheck')}
                       checked={draft.consentVerified}
-                      disabled={saving || request.status !== 'pending'}
+                      disabled={saving || receipt.saving || request.status !== 'pending'}
                       onChange={(_e, { checked }) => change({ consentVerified: checked })}
                     />
                   </div>

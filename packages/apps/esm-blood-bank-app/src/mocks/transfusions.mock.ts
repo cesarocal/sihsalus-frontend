@@ -1,22 +1,13 @@
 import type { TransfusionRequest } from '../sections/transfusions/transfusions.types';
+import { initialTransfusionRequest } from '../sections/transfusions/transfusions-rules';
 
 /** Orders already received; no real patients, provider UUIDs or medical-order writes. */
 export function transfusionRequestsMock(): TransfusionRequest[] {
   return [1, 2, 3, 4].map((number) => {
     const code = `TX-DEMO-${String(number).padStart(4, '0')}`;
     const group = number === 2 ? 'A+' : number === 3 ? 'AB+' : 'O+';
-    return {
-      id: code,
-      revision: 1,
-      status: 'pending',
-      requesterStatus: 'PENDIENTE',
-      receivedAt: null,
-      sample: null,
-      assignments: [],
-      rounds: [],
-      events: [],
-      deliveredAt: null,
-      order: {
+    return initialTransfusionRequest(
+      {
         id: `ORDER-${code}`,
         number: code,
         patientId: `PATIENT-DEMO-${number}`,
@@ -65,23 +56,7 @@ export function transfusionRequestsMock(): TransfusionRequest[] {
               ]
             : [],
       },
-      draft: {
-        reviewer: '',
-        reviewVerified: false,
-        consentVerified: false,
-        selectedUnitIds: [],
-        selectionVerified: false,
-        sample: {
-          code: `M-REC-${code}`,
-          historyNumber: `HC-TX-DEMO-${number}`,
-          collectedAt: '',
-          collectedBy: '',
-        },
-        collectorName: '',
-        collectorDocument: '',
-        deliveredBy: '',
-        releaseVerified: false,
-      },
-    };
+      code,
+    );
   });
 }

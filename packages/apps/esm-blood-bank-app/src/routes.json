@@ -22,15 +22,6 @@
       "offline": false
     },
     {
-      "component": "patientTransfusionOrders",
-      "name": "patient-transfusion-orders",
-      "slot": "patient-chart-orders-dashboard-slot",
-      "privileges": "app:hoja.clinica.ordenes",
-      "meta": { "fullWidth": true },
-      "online": true,
-      "offline": false
-    },
-    {
       "component": "bloodBankHomeDashboardLink",
       "name": "blood-bank-home-dashboard-link",
       "slot": "homepage-dashboard-slot",

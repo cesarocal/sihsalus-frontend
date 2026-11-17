@@ -6,6 +6,7 @@ import type {
   TransfusionStore,
 } from '../sections/transfusions/transfusions.types';
 import {
+  initialTransfusionRequest,
   lockedAssignments,
   needsCrossmatch,
   requestComplete,
@@ -74,6 +75,17 @@ export function createMockTransfusionsApi(
     async list() {
       const { store, units } = load();
       return structuredClone({ ...store, units });
+    },
+    async prepareIssuedRequest(order) {
+      const { state, store } = load();
+      const existing = store.requests.find((request) => request.id === order.id);
+      if (existing?.issuedOrder) return existing;
+      if (existing || !order.id || order.priority !== 'scheduled' || !requestComplete(order))
+        throw new Error('INVALID_ISSUED_TRANSFUSION_REQUEST');
+      const request: TransfusionRequest = { ...initialTransfusionRequest(order), issuedOrder: true };
+      store.requests.push(request);
+      writeProcessingState(getStorage, { ...state, transfusions: store });
+      return structuredClone(request);
     },
     async saveDraft(id, revision, draft) {
       const { state, store } = load();

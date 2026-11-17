@@ -1,4 +1,5 @@
 import { IbmDevopsTest } from '@carbon/react/icons';
+import { type FetchResponse, openmrsFetch } from '@openmrs/esm-framework';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -21,6 +22,9 @@ import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
 
 vi.mock('@openmrs/esm-framework', () => ({
+  openmrsFetch: vi.fn(),
+  restBaseUrl: '/ws/rest/v1',
+  userHasAccess: () => true,
   useSession: () => ({
     authenticated: true,
     user: { person: { preferredName: { givenName: 'Rosa', familyName: 'Calderón' } } },
@@ -92,22 +96,85 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.clearAllMocks();
+    vi.mocked(openmrsFetch).mockReset();
   });
   it('formats list dates with abbreviated months and only includes a stored time', () => {
     expect(formatListDate('2026-11-12T15:35')).toBe('12 nov 2026, 15:35');
     expect(formatListDate('12/11/2026')).toBe('12 nov 2026');
     expect(formatListDate('2026-02-30')).toBe('—');
   });
-  it('sorts urgency then date, filters and leaves urgent actions unavailable', async () => {
+  it('sorts urgency then date and gives urgent rows a consultation action', async () => {
     render(<TransfusionsPage api={createMockTransfusionsApi()} />);
     expect(await screen.findAllByRole('button', { name: t('txAttend') })).toHaveLength(3);
     const rows = within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row');
     expect(rows[1]).toHaveTextContent('TX-DEMO-0004');
     expect(rows.find((row) => row.textContent?.includes('TX-DEMO-0003'))).toHaveTextContent('AB POSITIVO (+)');
-    expect(screen.getByRole('button', { name: t('txUrgentPending') })).toBeDisabled();
+    expect(within(rows[1]).getByRole('button', { name: t('fr08Open') })).toBeEnabled();
     fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: 'TX-DEMO-0001' } });
     expect(screen.getAllByRole('button', { name: t('txAttend') })).toHaveLength(1);
     expect(screen.getByRole('button', { name: t('txHistory') }).querySelector('svg')).toBeTruthy();
+  });
+  it('uses the existing inbox and workflow for an issued order without duplicating its row', async () => {
+    const api = createMockTransfusionsApi();
+    const { order } = (await api.list()).requests[0];
+    const config = {
+      orderTypeUuid: 'fr08-type',
+      conceptUuid: 'fr08-concept',
+      encounterTypeUuid: 'fr08-encounter-type',
+      careSettingUuid: 'care-setting',
+      historyIdentifierTypeUuid: 'history-type',
+      documentIdentifierTypeUuids: [],
+    };
+    const issued = {
+      uuid: 'fr08-order',
+      orderNumber: 'ORD-42',
+      dateActivated: order.requestedAt,
+      fulfillerStatus: null,
+      concept: { uuid: config.conceptUuid },
+      orderType: { uuid: config.orderTypeUuid },
+      patient: { uuid: order.patientId },
+      encounter: { uuid: order.encounterId },
+      orderer: { display: order.orderer },
+      instructions: JSON.stringify({ format: 'EG05-FR08/v1', request: order }),
+    };
+    let registered = false;
+    vi.mocked(openmrsFetch).mockImplementation(async (url, options) => {
+      if (options?.method === 'POST') registered = true;
+      const backendOrder = { ...issued, fulfillerStatus: registered ? 'RECEIVED' : null };
+      return {
+        data: String(url).includes('/order?') ? { results: [backendOrder] } : backendOrder,
+      } as FetchResponse<unknown>;
+    });
+    render(<TransfusionsPage api={api} orderConfig={config} />);
+
+    const row = await screen.findByRole('row', { name: /ORD-42/ });
+    expect(screen.getAllByRole('table')).toHaveLength(1);
+    expect(screen.getByRole('row', { name: /TX-DEMO-0001/ })).toBeInTheDocument();
+    const inbox = screen.getByRole('table', { name: t('txInbox') });
+    fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: 'ORD-42' } });
+    expect(within(inbox).getAllByRole('row')).toHaveLength(2);
+
+    expect(within(row).queryByRole('button', { name: t('fr08Open') })).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole('button', { name: t('txAttend') }));
+    expect(await screen.findByRole('dialog', { name: /ORD-42/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: t('fr08Receive') })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: t('fr08PrintForm') }));
+    expect(printDocument).toHaveBeenCalled();
+    expect(registered).toBe(false);
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txReviewCheck') }));
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txConsentCheck') }));
+    expect(screen.getByRole('button', { name: t('txContinue') })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: t('fr08Receive') }));
+    expect(await screen.findByText(t('fr08ReceiptRegistered'))).toBeInTheDocument();
+    expect(openmrsFetch).toHaveBeenCalledWith(
+      '/ws/rest/v1/order/fr08-order/fulfillerdetails/',
+      expect.objectContaining({ method: 'POST', body: { fulfillerStatus: 'RECEIVED' } }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
+    expect(await screen.findByRole('button', { name: t('txPrintSample') })).toBeInTheDocument();
+    expect((await api.list()).requests.find((request) => request.id === issued.uuid)?.receivedAt).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('row', { name: /ORD-42/ })).toHaveTextContent(t('txReviewed')));
+    expect(within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row')).toHaveLength(2);
   });
   it('reviews the received order and history, prints without registering, then registers the sample on Continue', async () => {
     const api = createMockTransfusionsApi();

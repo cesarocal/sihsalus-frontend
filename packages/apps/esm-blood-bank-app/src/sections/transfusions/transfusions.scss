@@ -257,19 +257,65 @@
   padding-block: layout.$spacing-04;
   @include type.type-style("heading-compact-01");
 }
-.fr08List {
-  margin: layout.$spacing-05;
-  min-width: 0;
-  overflow-x: auto;
-}
-.fr08ListHeading {
+.fr08OrderTile:global(.cds--tile) {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: layout.$spacing-04;
-  margin-block-end: layout.$spacing-04;
+  min-block-size: 0;
+  padding: 0;
+  border-block-start: 1px solid $ui-03;
+  border-inline-end: 1px solid $ui-03;
+  border-inline-start: layout.$spacing-02 solid colors.$cyan-70;
+  background-color: $ui-02;
+  text-align: start;
 }
+
+.fr08OrderIdentity {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+  gap: layout.$spacing-03;
+  margin: layout.$spacing-04;
+
+  svg {
+    flex: 0 0 auto;
+    fill: currentColor;
+  }
+}
+
+.fr08OrderHeading {
+  @include type.type-style("heading-compact-02");
+  color: $text-02;
+}
+
+.fr08OrderActions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.fr08OrderAction:global(.cds--btn) {
+  svg {
+    fill: currentColor;
+  }
+}
+
+.fr08Modal:global(.cds--modal) {
+  z-index: 9002;
+  block-size: 100dvh;
+}
+
+.fr08Modal .fr08ModalContainer:global(.cds--modal-container) {
+  position: relative;
+  inline-size: min(calc(100% - 2rem), 64rem);
+  max-block-size: calc(100% - 2rem);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fr08ModalBody {
+  overscroll-behavior: contain;
+}
+
 .fr08Form {
   border: 0;
   min-width: 0;
@@ -291,48 +337,212 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: layout.$spacing-04;
 }
+.fr08Warning:global(.cds--inline-notification) {
+  inline-size: 100%;
+  max-inline-size: none;
+}
+
+.fr08ClinicalFields,
+.fr08Requirements {
+  display: grid;
+  gap: layout.$spacing-04;
+}
+
+.fr08HistoryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+  align-items: center;
+  gap: layout.$spacing-03 layout.$spacing-04;
+  padding-block: layout.$spacing-03;
+  border-block-end: 1px solid $ui-03;
+
+  :global(.cds--radio-button-group) {
+    flex-wrap: wrap;
+    gap: layout.$spacing-03 layout.$spacing-05;
+  }
+
+  :global(.cds--radio-button__label) {
+    margin-inline-end: 0;
+  }
+}
+
+.fr08HistoryLabel {
+  color: $text-02;
+}
+
+.fr08DateField {
+  max-inline-size: 10rem;
+}
+
+.fr08IdentityRow,
+.fr08TripleRow {
+  display: grid;
+  gap: layout.$spacing-04;
+}
+
+.fr08IdentityRow {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.fr08TripleRow {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fr08Diagnosis,
+.fr08CatalogError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: layout.$spacing-03;
+
+  > :first-child {
+    flex: 1 1 16rem;
+  }
+}
+
+.fr08DiagnosisSearch {
+  ul {
+    max-block-size: 13rem;
+    overflow-y: auto;
+    border: 1px solid $ui-03;
+  }
+
+  li + li {
+    border-block-start: 1px solid $ui-03;
+  }
+
+  li button {
+    inline-size: 100%;
+    max-inline-size: none;
+  }
+
+  p {
+    margin-block-start: layout.$spacing-03;
+  }
+}
+
+.fr08RequirementRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 11rem) auto;
+  align-items: end;
+  gap: layout.$spacing-04;
+
+  > * {
+    min-inline-size: 0;
+  }
+}
+
 .fr08Footer:global(.cds--modal-footer) {
   align-items: center;
 }
+
+.receiptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+}
+
 .fr08Document {
+  background: colors.$white-0;
+  padding: layout.$spacing-05;
   overflow-wrap: anywhere;
 
-  header {
+  [data-fr08-identifiers],
+  [data-fr08-choices],
+  [data-fr08-labs],
+  li {
     display: flex;
     align-items: center;
-    gap: layout.$spacing-05;
-    margin-block-end: layout.$spacing-05;
+    flex-wrap: wrap;
+    gap: layout.$spacing-03 layout.$spacing-04;
   }
 
-  dl {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border: 1px solid $ui-03;
+  [data-fr08-identifiers],
+  [data-fr08-labs],
+  li {
+    justify-content: space-between;
   }
 
-  dl > div,
-  th,
-  td {
-    padding: layout.$spacing-03 layout.$spacing-04;
-    border: 1px solid $ui-03;
+  h2 {
+    @include type.type-style("heading-03");
   }
 
-  dt {
+  small {
+    font-size: .75rem;
+  }
+
+  h3 {
     @include type.type-style("heading-compact-01");
+    margin-block-start: layout.$spacing-05;
   }
 
   table {
+    inline-size: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
-    width: 100%;
   }
 
-  h3,
-  footer {
-    @include type.type-style("heading-compact-01");
-    margin-block: layout.$spacing-05 layout.$spacing-03;
+  td {
+    border: 1px solid colors.$gray-80;
+    padding: layout.$spacing-03 layout.$spacing-04;
+    vertical-align: top;
+  }
+
+  [data-fr08-identifiers],
+  [data-fr08-labs] {
+    margin-block-start: layout.$spacing-04;
+  }
+
+  [data-fr08-mark],
+  [data-fr08-count] {
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid currentColor;
+    min-inline-size: 1rem;
+    min-block-size: 1rem;
+  }
+
+  [data-fr08-date-group] {
+    display: inline-flex;
+    margin-inline-end: layout.$spacing-02;
+
+    span + span {
+      border-inline-start: 0;
+    }
+  }
+
+  [data-fr08-count] {
+    min-inline-size: 1.5rem;
+  }
+
+  li {
+    min-block-size: 1.75rem;
+  }
+
+  [data-fr08-signature] {
+    block-size: 4rem;
+  }
+
+  [data-fr08-signature-line] {
+    text-align: center;
+    border-block-start: 1px solid currentColor;
+    inline-size: 64%;
+    margin: layout.$spacing-07 auto layout.$spacing-03;
   }
 }
 @media (max-width: 42rem) {
+  .fr08HistoryRow,
+  .fr08IdentityRow,
+  .fr08TripleRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fr08RequirementRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    > :first-child {
+      grid-column: 1 / -1;
+    }
+  }
   .fields,
   .summary,
   .picker {

@@ -27,9 +27,12 @@ export interface TransfusionOrder {
   sex: 'M' | 'F';
   bloodGroup: string;
   service: string;
+  serviceUuid?: string;
   ward: string;
   bed: string;
   diagnosis: string;
+  diagnosisConceptUuid?: string;
+  diagnosisCode?: string;
   hemoglobin: string;
   hematocrit: string;
   platelets: string;
@@ -84,6 +87,7 @@ export interface CompatibilityRound {
 }
 export interface TransfusionRequest {
   id: string;
+  issuedOrder?: true;
   revision: number;
   status: TransfusionStatus;
   order: TransfusionOrder;

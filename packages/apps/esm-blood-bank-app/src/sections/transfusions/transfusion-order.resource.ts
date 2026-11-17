@@ -13,9 +13,12 @@ export type Fr08Fields = Pick<
   Snapshot,
   | 'bloodGroup'
   | 'service'
+  | 'serviceUuid'
   | 'ward'
   | 'bed'
   | 'diagnosis'
+  | 'diagnosisConceptUuid'
+  | 'diagnosisCode'
   | 'hemoglobin'
   | 'hematocrit'
   | 'platelets'
@@ -62,15 +65,27 @@ export const transfusionOrdersChanged = 'sihsalus:transfusion-orders-changed';
 
 export function configuredTransfusionOrders(config?: TransfusionOrderConfig): config is TransfusionOrderConfig {
   return Boolean(
-    config?.orderTypeUuid &&
-      config.conceptUuid &&
-      config.encounterTypeUuid &&
-      config.careSettingUuid &&
-      config.historyIdentifierTypeUuid,
+    config?.orderTypeUuid && config.conceptUuid && config.encounterTypeUuid && config.historyIdentifierTypeUuid,
   );
 }
 
 const answers = new Set(['yes', 'no', 'unknown']);
+const fr08NumericFields = {
+  pregnancies: /^\d*$/,
+  abortions: /^\d*$/,
+  hemoglobin: /^(?:\d+(?:[.,]\d+)?|[.,]\d+)?$/,
+  hematocrit: /^(?:\d+(?:[.,]\d+)?|[.,]\d+)?$/,
+  platelets: /^\d*$/,
+};
+
+export function validFr08ClinicalValues(fields: Fr08Fields) {
+  return (
+    Object.entries(fr08NumericFields).every(([name, pattern]) =>
+      pattern.test(fields[name as keyof typeof fr08NumericFields]),
+    ) &&
+    (!fields.maternalIncompatibility || answers.has(fields.maternalIncompatibility))
+  );
+}
 const textFields = [
   'bloodGroup',
   'service',
@@ -213,12 +228,14 @@ export async function createTransfusionOrder(
 ): Promise<IssuedTransfusionOrder> {
   const { recipient, visitUuid, locationUuid, providerUuid, registration } = context;
   if (
+    !config.careSettingUuid ||
     !recipient.historyNumber ||
     !recipient.name ||
     !visitUuid ||
     !locationUuid ||
     !providerUuid ||
-    !validFr08(fields)
+    !validFr08(fields) ||
+    !validFr08ClinicalValues(fields)
   ) {
     throw new Error('INVALID_FR08');
   }
@@ -274,24 +291,20 @@ export async function createTransfusionOrder(
   return saved;
 }
 
+export const issuedOrderStatusKeys: Readonly<Record<string, string>> = {
+  RECEIVED: 'fr08Received',
+  IN_PROGRESS: 'fr08InProgress',
+  COMPLETED: 'fr08Fulfilled',
+  DECLINED: 'fr08Declined',
+  ON_HOLD: 'fr08OnHold',
+  EXCEPTION: 'fr08Exception',
+};
+
 export function issuedOrderStatus({ stopped, fulfillerStatus }: IssuedTransfusionOrder) {
   if (stopped) return 'fr08Cancelled';
-  switch (fulfillerStatus) {
-    case 'RECEIVED':
-      return 'fr08Received';
-    case 'IN_PROGRESS':
-      return 'fr08InProgress';
-    case 'COMPLETED':
-      return 'fr08Fulfilled';
-    case 'DECLINED':
-      return 'fr08Declined';
-    case 'ON_HOLD':
-      return 'fr08OnHold';
-    case 'EXCEPTION':
-      return 'fr08Exception';
-    default:
-      return 'fr08Sent';
-  }
+  return fulfillerStatus && Object.hasOwn(issuedOrderStatusKeys, fulfillerStatus)
+    ? issuedOrderStatusKeys[fulfillerStatus]
+    : 'fr08Sent';
 }
 
 export async function receiveTransfusionOrder(config: TransfusionOrderConfig, uuid: string) {

@@ -52,6 +52,40 @@ export function requestComplete(order: TransfusionOrder): boolean {
     order.items.every((item) => Number.isSafeInteger(item.quantity) && item.quantity > 0)
   );
 }
+
+export function initialTransfusionRequest(order: TransfusionOrder, id = order.id): TransfusionRequest {
+  return {
+    id,
+    order,
+    revision: 1,
+    status: 'pending',
+    requesterStatus: 'PENDIENTE',
+    receivedAt: null,
+    sample: null,
+    assignments: [],
+    rounds: [],
+    events: [],
+    deliveredAt: null,
+    draft: {
+      reviewer: '',
+      reviewVerified: false,
+      consentVerified: false,
+      selectedUnitIds: [],
+      selectionVerified: false,
+      sample: {
+        code: `M-REC-${order.number}`,
+        historyNumber: order.historyNumber,
+        collectedAt: '',
+        collectedBy: '',
+      },
+      collectorName: '',
+      collectorDocument: '',
+      deliveredBy: '',
+      releaseVerified: false,
+    },
+  };
+}
+
 const bloodGroupPattern = /^(A|B|AB|O)([+−-])$/;
 const redCellDonors: Readonly<Record<string, readonly string[]>> = {
   O: ['O'],
