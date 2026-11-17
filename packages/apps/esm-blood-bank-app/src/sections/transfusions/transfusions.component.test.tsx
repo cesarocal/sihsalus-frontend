@@ -15,6 +15,7 @@ import { WarningConfirmation } from '../../shared/warning-confirmation.component
 import { CompatibilityPage } from '../laboratory/compatibility/compatibility-page.component';
 import { CompatibilityWorkflow } from '../laboratory/compatibility/compatibility-workflow.component';
 import { localDateTime } from '../laboratory/screening/screening-rules';
+import { Fr08Document } from './fr08-document.component';
 import { TransfusionHistory } from './transfusion-history.component';
 import { compatibilityReportPrintCss, TransfusionLabels } from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
@@ -102,6 +103,25 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(formatListDate('2026-11-12T15:35')).toBe('12 nov 2026, 15:35');
     expect(formatListDate('12/11/2026')).toBe('12 nov 2026');
     expect(formatListDate('2026-02-30')).toBe('—');
+  });
+  it('prints catalogued components outside the seven FR08 lines under Other with their quantities', async () => {
+    const { order } = (await createMockTransfusionsApi().list()).requests[0];
+    render(
+      <Fr08Document
+        order={{
+          ...order,
+          items: [
+            { component: 'redCells', quantity: 1 },
+            { component: 'plasma24', quantity: 2 },
+          ],
+        }}
+        t={t}
+      />,
+    );
+    const regular = screen.getByText(t('fr08PackedCells')).closest('li');
+    expect(regular).toHaveTextContent(/1$/);
+    const other = screen.getByText(`${t('fr08OtherComponent')}: ${t('componentPlasma24')}`).closest('li');
+    expect(other).toHaveTextContent(/2$/);
   });
   it('sorts urgency then date and gives urgent rows a consultation action', async () => {
     render(<TransfusionsPage api={createMockTransfusionsApi()} />);

@@ -20,6 +20,7 @@ export interface TransfusionOrder {
   doctorLicense: string;
   requestedAt: string;
   priority: TransfusionPriority;
+  scheduledDate?: string;
   patientName: string;
   historyNumber: string;
   document: string;
@@ -42,6 +43,8 @@ export interface TransfusionOrder {
   abortions: string;
   maternalIncompatibility: string;
   items: { component: ComponentType; quantity: number }[];
+  /** Free-text component retained for previously issued FR08 requests. */
+  otherComponent?: { description: string; quantity: number };
   history: { id: string; date: string; component: ComponentType; unit: string; reaction: string }[];
 }
 export interface RecipientSample {

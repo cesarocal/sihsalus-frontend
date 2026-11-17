@@ -1,7 +1,8 @@
 import { openmrsFetch, restBaseUrl } from '@openmrs/esm-framework';
 import type { BloodBankConfig } from '../../config-schema';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
-import type { TransfusionOrder } from './transfusions.types';
+import { localDateTime } from '../laboratory/screening/screening-rules';
+import type { TransfusionOrder, TransfusionPriority } from './transfusions.types';
 
 export type TransfusionOrderConfig = NonNullable<BloodBankConfig['transfusionOrders']>;
 type Ref = { uuid: string; display?: string };
@@ -28,6 +29,8 @@ export type Fr08Fields = Pick<
   | 'abortions'
   | 'maternalIncompatibility'
   | 'items'
+  | 'priority'
+  | 'scheduledDate'
 >;
 export interface OrderRecipient {
   uuid: string;
@@ -46,6 +49,7 @@ interface RestOrder {
   uuid: string;
   orderNumber: string;
   dateActivated: string;
+  scheduledDate?: string | null;
   action: string;
   voided: boolean;
   dateStopped: string | null;
@@ -59,7 +63,7 @@ interface RestOrder {
   orderer: Ref;
 }
 const orderRep =
-  'custom:(uuid,orderNumber,dateActivated,action,voided,dateStopped,fulfillerStatus,instructions,accessionNumber,' +
+  'custom:(uuid,orderNumber,dateActivated,scheduledDate,action,voided,dateStopped,fulfillerStatus,instructions,accessionNumber,' +
   'concept:ref,patient:ref,encounter:ref,orderType:ref,orderer:ref)';
 export const transfusionOrdersChanged = 'sihsalus:transfusion-orders-changed';
 
@@ -70,6 +74,22 @@ export function configuredTransfusionOrders(config?: TransfusionOrderConfig): co
 }
 
 const answers = new Set(['yes', 'no', 'unknown']);
+const priorities = new Set<TransfusionPriority>(['scheduled', 'urgent', 'veryUrgent']);
+
+export function fr08ScheduleFromInputs(date: string, time: string) {
+  const value = `${date}T${time}`;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return undefined;
+  const scheduled = new Date(value);
+  return Number.isFinite(scheduled.getTime()) && localDateTime(scheduled) === value
+    ? scheduled.toISOString()
+    : undefined;
+}
+
+export function validFr08Schedule({ priority, scheduledDate }: Fr08Fields) {
+  return priority === 'scheduled' ? Boolean(scheduledDate && Date.parse(scheduledDate) > Date.now()) : !scheduledDate;
+}
+
+const fr08ComponentQuantityValid = (quantity: number) => Number.isInteger(quantity) && quantity >= 1 && quantity <= 99;
 const fr08NumericFields = {
   pregnancies: /^\d*$/,
   abortions: /^\d*$/,
@@ -100,24 +120,40 @@ const textFields = [
   'maternalIncompatibility',
 ] as const;
 
-export function validFr08(fields: Fr08Fields) {
+function validFr08Fields(fields: Fr08Fields) {
   return (
     textFields.every((key) => typeof fields[key] === 'string' && fields[key].length <= 500) &&
     /^(A|B|AB|O)[+-]$/.test(fields.bloodGroup) &&
     Boolean(fields.service.trim() && fields.diagnosis.trim()) &&
     answers.has(fields.priorTransfusions) &&
     answers.has(fields.priorReactions) &&
+    priorities.has(fields.priority) &&
     Array.isArray(fields.items) &&
-    fields.items.length > 0 &&
     fields.items.every(
       (item) =>
-        item &&
-        Object.hasOwn(componentDefinitions, item.component) &&
-        Number.isInteger(item.quantity) &&
-        item.quantity >= 1 &&
-        item.quantity <= 99,
+        item && Object.hasOwn(componentDefinitions, item.component) && fr08ComponentQuantityValid(item.quantity),
     ) &&
     new Set(fields.items.map((item) => item.component)).size === fields.items.length
+  );
+}
+
+export function validFr08(fields: Fr08Fields) {
+  return validFr08Fields(fields) && fields.items.length > 0;
+}
+
+function validStoredFr08(request: Snapshot) {
+  const other = request.otherComponent;
+  return (
+    validFr08Fields(request) &&
+    (request.items.length > 0 || Boolean(other)) &&
+    (other === undefined ||
+      Boolean(
+        other &&
+          typeof other.description === 'string' &&
+          other.description.trim() &&
+          other.description.length <= 500 &&
+          fr08ComponentQuantityValid(other.quantity),
+      ))
   );
 }
 
@@ -151,11 +187,12 @@ function readOrder(row: RestOrder, config: TransfusionOrderConfig): IssuedTransf
   if (row.concept.uuid !== config.conceptUuid) return null;
   const stored: { format?: unknown; request?: Snapshot } = JSON.parse(row.instructions);
   const request = stored?.request;
+  const scheduledDate = request?.priority === 'scheduled' ? row.scheduledDate || request.scheduledDate : undefined;
   if (
     stored?.format !== 'EG05-FR08/v1' ||
     !request ||
-    !validFr08(request) ||
-    request.priority !== 'scheduled' ||
+    !validStoredFr08(request) ||
+    (scheduledDate !== undefined && !Number.isFinite(Date.parse(scheduledDate))) ||
     typeof request.patientName !== 'string' ||
     !request.patientName.trim() ||
     typeof request.historyNumber !== 'string' ||
@@ -179,6 +216,7 @@ function readOrder(row: RestOrder, config: TransfusionOrderConfig): IssuedTransf
       encounterId: row.encounter.uuid,
       orderer: row.orderer.display,
       requestedAt: row.dateActivated,
+      scheduledDate,
       history: [],
     },
     fulfillerStatus: row.fulfillerStatus,
@@ -235,7 +273,8 @@ export async function createTransfusionOrder(
     !locationUuid ||
     !providerUuid ||
     !validFr08(fields) ||
-    !validFr08ClinicalValues(fields)
+    !validFr08ClinicalValues(fields) ||
+    !validFr08Schedule(fields)
   ) {
     throw new Error('INVALID_FR08');
   }
@@ -248,7 +287,7 @@ export async function createTransfusionOrder(
   if (existing) return existing;
   const request: Snapshot = {
     ...fields,
-    priority: 'scheduled',
+    otherComponent: undefined,
     patientName: recipient.name,
     historyNumber: recipient.historyNumber,
     document: recipient.document,
@@ -274,7 +313,8 @@ export async function createTransfusionOrder(
             orderType: config.orderTypeUuid,
             concept: config.conceptUuid,
             careSetting: config.careSettingUuid,
-            urgency: 'ROUTINE',
+            urgency: fields.priority === 'scheduled' ? 'ON_SCHEDULED_DATE' : 'STAT',
+            ...(fields.scheduledDate ? { scheduledDate: fields.scheduledDate } : {}),
             accessionNumber,
             instructions: JSON.stringify({ format: 'EG05-FR08/v1', request }),
           },

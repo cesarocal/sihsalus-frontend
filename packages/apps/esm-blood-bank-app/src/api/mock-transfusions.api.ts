@@ -80,7 +80,7 @@ export function createMockTransfusionsApi(
       const { state, store } = load();
       const existing = store.requests.find((request) => request.id === order.id);
       if (existing?.issuedOrder) return existing;
-      if (existing || !order.id || order.priority !== 'scheduled' || !requestComplete(order))
+      if (existing || !order.id || order.priority !== 'scheduled' || order.otherComponent || !requestComplete(order))
         throw new Error('INVALID_ISSUED_TRANSFUSION_REQUEST');
       const request: TransfusionRequest = { ...initialTransfusionRequest(order), issuedOrder: true };
       store.requests.push(request);

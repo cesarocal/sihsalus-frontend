@@ -36,6 +36,9 @@ export function TransfusionDetails({
     txDoctor: order.orderer,
     txDoctorLicense: order.doctorLicense,
     txRequestedAt: formatDatetime(new Date(order.requestedAt), { noToday: true }),
+    ...(order.scheduledDate
+      ? { fr08ScheduledFor: formatDatetime(new Date(order.scheduledDate), { noToday: true }) }
+      : {}),
     txPriority: t(priorityKeys[order.priority]),
     status: t(transfusionStatusKeys[request.status]),
     txHemoglobin: order.hemoglobin,

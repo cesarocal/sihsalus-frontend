@@ -20,6 +20,8 @@ const config: TransfusionOrderConfig = {
   documentIdentifierTypeUuids: [],
 };
 const fields: Fr08Fields = {
+  priority: 'scheduled',
+  scheduledDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   bloodGroup: 'O+',
   service: 'Hospitalización',
   ward: '1',
@@ -70,7 +72,6 @@ const row = {
     format: 'EG05-FR08/v1',
     request: {
       ...fields,
-      priority: 'scheduled',
       patientName: context.recipient.name,
       historyNumber: context.recipient.historyNumber,
       document: '',
@@ -104,12 +105,62 @@ describe('FR08 orders', () => {
           {
             orderType: config.orderTypeUuid,
             concept: config.conceptUuid,
-            urgency: 'ROUTINE',
+            urgency: 'ON_SCHEDULED_DATE',
+            scheduledDate: fields.scheduledDate,
             orderer: 'provider',
           },
         ],
       },
     });
+  });
+
+  it.each(['urgent', 'veryUrgent'] as const)('issues %s requests without a schedule', async (priority) => {
+    const request: Fr08Fields = {
+      ...fields,
+      priority,
+      scheduledDate: undefined,
+      items: [{ component: 'plasma24', quantity: 2 }],
+    };
+    const snapshot = JSON.parse(row.instructions);
+    respond({ results: [] });
+    respond({ uuid: 'encounter' });
+    respond({
+      results: [
+        { ...row, instructions: JSON.stringify({ ...snapshot, request: { ...snapshot.request, ...request } }) },
+      ],
+    });
+    const { order } = await createTransfusionOrder(config, context, request, 'FR08-key');
+    expect(order.priority).toBe(priority);
+    expect(order.items).toEqual(request.items);
+    expect(order.scheduledDate).toBeUndefined();
+    const payload = fetch.mock.calls[1][1]?.body as { orders: { urgency: string; scheduledDate?: string }[] };
+    expect(payload.orders[0].urgency).toBe('STAT');
+    expect(payload.orders[0]).not.toHaveProperty('scheduledDate');
+  });
+
+  it('rejects a past schedule or an empty component list before writing', async () => {
+    await expect(
+      createTransfusionOrder(config, context, { ...fields, scheduledDate: '2000-01-01T10:00:00Z' }, 'past'),
+    ).rejects.toThrow('INVALID_FR08');
+    await expect(createTransfusionOrder(config, context, { ...fields, items: [] }, 'empty')).rejects.toThrow(
+      'INVALID_FR08',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps previously issued requests with a free-text component readable', async () => {
+    const snapshot = JSON.parse(row.instructions);
+    const otherComponent = { description: 'Plasma tratado', quantity: 2 };
+    respond({
+      results: [
+        {
+          ...row,
+          instructions: JSON.stringify({ ...snapshot, request: { ...snapshot.request, items: [], otherComponent } }),
+        },
+      ],
+    });
+    const [issued] = await listIssuedTransfusionOrders(config);
+    expect(issued.order.otherComponent).toEqual(otherComponent);
   });
 
   it('reconciles a retry against the existing order before writing again', async () => {
@@ -119,15 +170,18 @@ describe('FR08 orders', () => {
   });
 
   it('keeps chart history scoped to the selected patient and loads the server status', async () => {
+    const snapshot = JSON.parse(row.instructions);
+    delete snapshot.request.scheduledDate;
     respond({
       results: [
-        { ...row, fulfillerStatus: 'RECEIVED' },
+        { ...row, fulfillerStatus: 'RECEIVED', instructions: JSON.stringify(snapshot) },
         { ...row, patient: { uuid: 'different' } },
       ],
     });
     const records = await listIssuedTransfusionOrders(config, 'patient');
     expect(records).toHaveLength(1);
     expect(issuedOrderStatus(records[0])).toBe('fr08Received');
+    expect(records[0].order.scheduledDate).toBeUndefined();
     expect(String(fetch.mock.calls[0][0])).toContain('patient=patient');
   });
 

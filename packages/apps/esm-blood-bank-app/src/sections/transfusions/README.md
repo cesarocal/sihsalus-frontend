@@ -1,6 +1,6 @@
 # Atención regular de solicitudes transfusionales
 
-El módulo ofrece emisión y recepción de solicitudes programadas con órdenes de
+El módulo ofrece emisión y recepción de solicitudes transfusionales con órdenes de
 OpenMRS bajo configuración explícita. Las rondas, el inventario y la entrega
 del circuito de prueba operan con datos sintéticos.
 
@@ -26,10 +26,10 @@ Abrir o cerrar sin guardar no registra resultados ni cambia estados. Una ronda
 completada o inexistente muestra un aviso seguro. La referencia se consume una
 vez para evitar reapertura al refrescar; recargar la URL vuelve a validarla.
 
-## Solicitudes programadas desde Órdenes
+## Solicitudes desde Órdenes
 
 La canasta de Órdenes permite emitir el FR08. La ficha muestra la orden en
-su lista habitual. En Banco de Sangre las órdenes programadas del tipo
+su lista habitual. En Banco de Sangre las solicitudes del tipo
 configurado aparecen en la misma bandeja que usa el flujo de atención.
 **Atender** abre el paso correspondiente al estado de la solicitud. En
 **Verificación de la solicitud** están **Imprimir FR08** y **Registrar
@@ -39,8 +39,11 @@ La acción de la canasta requiere una visita activa, un proveedor asociado a la
 sesión y el número de historia clínica configurado. Un POST a `/encounter`
 guarda el encuentro y su orden en la misma operación. La orden conserva una
 versión estructurada del FR08 en `instructions`; el número de acceso identifica
-el intento para recuperar una respuesta de guardado perdida. La prioridad del
-FR08 es Programada y la urgencia de la orden es `ROUTINE`. La recepción usa
+el intento para recuperar una respuesta de guardado perdida. Las solicitudes
+programadas guardan la fecha y hora de programación con `ON_SCHEDULED_DATE`.
+Urgente y Muy urgente usan `STAT` y conservan la prioridad específica en el
+FR08. La impresión coloca bajo **Otro (especifique)** los componentes del
+catálogo que quedan fuera de los siete del formato. La recepción usa
 `/order/{uuid}/fulfillerdetails/` y registra `RECEIVED`.
 
 Configure `transfusionOrders` en `@sihsalus/esm-blood-bank-app` con un tipo
@@ -58,8 +61,9 @@ y `Add Encounters`. El Banco necesita sus permisos de módulo y Transfusiones
 junto con `Get Orders`, `Get Concepts`, `Get Patients`, `Get Encounters` y
 `Get Providers` para resolver las referencias de la orden, y `Edit Orders`
 para registrar la recepción. El REST de OpenMRS valida los permisos al ejecutar
-cada operación. Con `useMockData`, **Atender** abre el flujo existente para el
-FR08 y guarda su avance en el almacenamiento de la pestaña. La selección, las
+cada operación. Con `useMockData`, **Atender** abre el flujo existente de
+solicitudes programadas con componentes del catálogo y guarda su avance en el
+almacenamiento de la pestaña. La selección, las
 rondas y la entrega usan las unidades de prueba. Para una orden nueva, la
 verificación habilita el registro de recepción y la recepción confirmada
 habilita el avance hacia la muestra. Al avanzar se guarda una fecha y hora

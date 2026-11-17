@@ -104,6 +104,8 @@ export function TransfusionsPage({
         useMockData &&
           !workspaceFailed &&
           api.prepareIssuedRequest &&
+          item.order.priority === 'scheduled' &&
+          !item.order.otherComponent &&
           !item.stopped &&
           (canReceive ||
             item.fulfillerStatus === 'RECEIVED' ||
@@ -277,9 +279,11 @@ export function TransfusionsPage({
               t(item.statusKey),
               <Button key="action" kind="ghost" size="sm" disabled={preparing} onClick={() => void openRequest(item)}>
                 {t(
-                  item.order.priority === 'scheduled' &&
-                    item.request?.status !== 'testing' &&
-                    (item.request || item.canPrepare || item.canReceive)
+                  (
+                    item.request
+                      ? item.order.priority === 'scheduled' && item.request.status !== 'testing'
+                      : item.canPrepare || item.canReceive
+                  )
                     ? 'txAttend'
                     : 'fr08Open',
                 )}

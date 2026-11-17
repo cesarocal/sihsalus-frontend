@@ -295,9 +295,6 @@ export function TransfusionWorkflow({
       >
         <div className={styles.responsive}>
           <FractionationContent>
-            {request.issuedOrder && (
-              <InlineNotification lowContrast hideCloseButton kind="info" title={t('fr08MockInventory')} />
-            )}
             {selectionStep ? (
               <TransfusionUnitPicker
                 request={request}

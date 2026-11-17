@@ -30,6 +30,7 @@ import type { BloodBankConfig } from '../../config-schema';
 import { useProcessingData } from '../../shared/processing-page.component';
 import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { localDateTime } from '../laboratory/screening/screening-rules';
 import { listFr08Services } from './fr08-catalogs.resource';
 import { Fr08DiagnosisPicker } from './fr08-diagnosis-picker.component';
 import { formatFr08Date, Fr08Document, PrintFr08 } from './fr08-document.component';
@@ -38,14 +39,18 @@ import {
   configuredTransfusionOrders,
   createTransfusionOrder,
   type Fr08Fields,
+  fr08ScheduleFromInputs,
   type IssuedTransfusionOrder,
   loadOrderRecipient,
   type TransfusionOrderConfig,
   transfusionOrdersChanged,
   validFr08,
   validFr08ClinicalValues,
+  validFr08Schedule,
 } from './transfusion-order.resource';
 import styles from './transfusions.scss';
+import type { TransfusionPriority } from './transfusions.types';
+import { priorityKeys } from './transfusions-rules';
 import { useTransfusionsTranslation } from './use-transfusions-translation';
 
 const authorPrivileges = [
@@ -73,8 +78,9 @@ const components: ComponentType[] = [
   'plasma24',
   'cryoReducedPlasma',
 ];
-type DemographicAndClinicalFields = Omit<Fr08Fields, 'items'>;
+type DemographicAndClinicalFields = Omit<Fr08Fields, 'items' | 'scheduledDate'>;
 const initialFields: DemographicAndClinicalFields = {
+  priority: 'scheduled',
   bloodGroup: '',
   service: '',
   ward: '',
@@ -171,6 +177,8 @@ function TransfusionOrderForm({
   const { data: recipient, loading, failed: recipientFailed } = useProcessingData(load);
   const services = useProcessingData(listFr08Services);
   const [fields, setFields] = useState(initialFields);
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
   const [requirements, setRequirements] = useState<RequirementRow[]>([{ id: 0, ...emptyRequirement }]);
   const nextRow = useRef(1);
   const [invalidSubmissions, setInvalidSubmissions] = useState(0);
@@ -195,17 +203,19 @@ function TransfusionOrderForm({
   const enteredFields: Fr08Fields = {
     ...fields,
     maternalIncompatibility: recipient?.sex === 'F' ? fields.maternalIncompatibility : '',
+    scheduledDate: fields.priority === 'scheduled' ? fr08ScheduleFromInputs(scheduledDate, scheduledTime) : undefined,
     items: requirements.flatMap(({ component, quantity }) =>
       component ? [{ component, quantity: Number(quantity) }] : [],
     ),
   };
-  const complete =
+  const completeDetails =
     !services.failed &&
     services.data?.some((service) => service.uuid === fields.serviceUuid) &&
     fields.diagnosisConceptUuid &&
-    enteredFields.items.length === requirements.length &&
+    requirements.every((row) => row.component) &&
     validFr08(enteredFields) &&
     validFr08ClinicalValues(enteredFields);
+  const complete = completeDetails && validFr08Schedule(enteredFields);
 
   useLayoutEffect(() => {
     if (invalidSubmissions > 0) modalBody.current?.scrollTo({ top: 0 });
@@ -224,7 +234,7 @@ function TransfusionOrderForm({
       !userHasAccess(authorPrivileges, session.user)
     )
       return;
-    if (!complete) {
+    if (!completeDetails || !validFr08Schedule(enteredFields)) {
       setInvalidSubmissions((previous) => previous + 1);
       return;
     }
@@ -311,7 +321,7 @@ function TransfusionOrderForm({
                 className={styles.fr08Warning}
                 kind="warning"
                 hideCloseButton
-                title={t('fr08Required')}
+                title={t(completeDetails ? 'fr08FutureScheduleRequired' : 'fr08Required')}
               />
             )}
             <form id={formId} onSubmit={submit} noValidate>
@@ -475,7 +485,19 @@ function TransfusionOrderForm({
                   </div>
                 </section>
                 <section>
-                  <h3>{t('txRequirement')}</h3>
+                  <div className={styles.fr08RequirementHeading}>
+                    <h3>{t('txRequirement')}</h3>
+                    <Select
+                      id={`${formId}-priority`}
+                      labelText={t('txPriority')}
+                      value={fields.priority}
+                      onChange={(event) => update('priority', event.target.value as TransfusionPriority)}
+                    >
+                      <SelectItem value="scheduled" text={t(priorityKeys.scheduled)} />
+                      <SelectItem value="urgent" text={t(priorityKeys.urgent)} />
+                      <SelectItem value="veryUrgent" text={t('fr08VeryUrgent')} />
+                    </Select>
+                  </div>
                   <div className={styles.fr08Requirements}>
                     {requirements.map((row) => (
                       <div key={row.id} className={styles.fr08RequirementRow}>
@@ -484,7 +506,7 @@ function TransfusionOrderForm({
                           labelText={t('fractionationComponent')}
                           value={row.component}
                           onChange={(event) =>
-                            updateRequirement(row.id, { component: event.target.value as ComponentType })
+                            updateRequirement(row.id, { component: event.target.value as RequirementRow['component'] })
                           }
                         >
                           <SelectItem value="" text={t('fr08SelectComponent')} disabled />
@@ -545,8 +567,26 @@ function TransfusionOrderForm({
                     </Button>
                   </div>
                 </section>
+                {fields.priority === 'scheduled' && (
+                  <div className={styles.fr08Schedule}>
+                    <TextInput
+                      id={`${formId}-scheduled-date`}
+                      type="date"
+                      labelText={t('fr08ScheduledDate')}
+                      min={localDateTime().slice(0, 10)}
+                      value={scheduledDate}
+                      onChange={(event) => setScheduledDate(event.target.value)}
+                    />
+                    <TextInput
+                      id={`${formId}-scheduled-time`}
+                      type="time"
+                      labelText={t('fr08ScheduledTime')}
+                      value={scheduledTime}
+                      onChange={(event) => setScheduledTime(event.target.value)}
+                    />
+                  </div>
+                )}
                 <div className={styles.fr08Grid}>
-                  <TextInput id={`${formId}-priority`} labelText={t('txPriority')} value={t('txScheduled')} readOnly />
                   <TextInput
                     id={`${formId}-author`}
                     labelText={t('txDoctor')}

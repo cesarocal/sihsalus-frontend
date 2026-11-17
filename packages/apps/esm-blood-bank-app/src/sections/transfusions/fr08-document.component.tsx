@@ -5,6 +5,7 @@ import { printDocument } from '../../shared/print-document';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
+import { transfusionRhLabel } from './transfusion-blood-group';
 import styles from './transfusions.scss';
 import type { TransfusionOrder } from './transfusions.types';
 
@@ -21,6 +22,9 @@ const fr08PrintCss = `
   [data-fr08] tr { break-inside: avoid; }
   [data-fr08] [data-fr08-choices] { display: flex; flex-wrap: wrap; gap: 2mm 5mm; align-items: center; }
   [data-fr08] [data-fr08-sex] { column-gap: 2mm; }
+  [data-fr08] [data-fr08-priorities] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-fr08] [data-fr08-priorities] > :nth-child(2) { justify-self: center; }
+  [data-fr08] [data-fr08-priorities] > :last-child { justify-self: end; }
   [data-fr08] [data-fr08-mark] { display: inline-grid; place-items: center; border: 1px solid; width: 3.5mm; height: 3.5mm; }
   [data-fr08] [data-fr08-date-group] { display: inline-flex; margin-inline-end: 1mm; }
   [data-fr08] [data-fr08-date-group] span + span { border-inline-start: 0; }
@@ -29,7 +33,7 @@ const fr08PrintCss = `
   [data-fr08] [data-fr08-lines] li { display: flex; justify-content: space-between; gap: 2mm; align-items: center; min-height: 6.3mm; }
   [data-fr08] [data-fr08-count] { flex: none; display: inline-grid; min-width: 7mm; min-height: 4.5mm; border: 1px solid; place-items: center; }
   [data-fr08] [data-fr08-signature] { height: 20mm; }
-  [data-fr08] [data-fr08-signature-line] { margin: 22mm auto 1mm; width: 64%; border-top: 1px solid; text-align: center; padding-top: 1mm; }
+  [data-fr08] [data-fr08-signature-line] { margin: 22mm 10% 1mm auto; width: 42%; border-top: 1px solid; text-align: center; padding-top: 1mm; }
   [data-fr08] .cds--visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 `;
 
@@ -63,6 +67,7 @@ function mark(label: string, checked: boolean) {
 export function Fr08Document({ order, t }: { order: TransfusionOrder; t: ProcessingTranslate }) {
   const timestamp = new Date(order.requestedAt);
   const date = formatFr08Date(timestamp);
+  const scheduled = order.scheduledDate ? new Date(order.scheduledDate) : undefined;
   const quantityByComponent = new Map(order.items.map(({ component, quantity }) => [component, quantity]));
   const additional = order.items.filter(({ component }) => !printedComponents.has(component));
   const diagnosis = order.diagnosisCode ? `${order.diagnosisCode} · ${order.diagnosis}` : order.diagnosis;
@@ -126,7 +131,8 @@ export function Fr08Document({ order, t }: { order: TransfusionOrder; t: Process
               {t('txAge')}: {order.age}
             </td>
             <td colSpan={2}>
-              {t('fr08Group')}: {order.bloodGroup.slice(0, -1)} &nbsp; Rh: {order.bloodGroup.slice(-1)}
+              {t('fr08Group')}: {order.bloodGroup.slice(0, -1)} &nbsp; Rh:{' '}
+              {transfusionRhLabel(order.bloodGroup.slice(-1), t)}
             </td>
           </tr>
           <tr>
@@ -193,26 +199,33 @@ export function Fr08Document({ order, t }: { order: TransfusionOrder; t: Process
             <td colSpan={3}>
               <ul data-fr08-lines>
                 {requirementsRight.map(componentLine)}
-                {additional.length
-                  ? additional.map(({ component, quantity }) =>
-                      requirement(
-                        component,
-                        `${t('fr08OtherComponent')}: ${t(componentDefinitions[component].key)}`,
-                        quantity,
-                      ),
+                {additional.map(({ component, quantity }) =>
+                  requirement(
+                    component,
+                    `${t('fr08OtherComponent')}: ${t(componentDefinitions[component].key)}`,
+                    quantity,
+                  ),
+                )}
+                {order.otherComponent
+                  ? requirement(
+                      'other',
+                      `${t('fr08OtherComponent')}: ${order.otherComponent.description}`,
+                      order.otherComponent.quantity,
                     )
-                  : requirement('other', t('fr08OtherComponent'))}
+                  : !additional.length && requirement('other', t('fr08OtherComponent'))}
               </ul>
             </td>
           </tr>
-          <tr>
-            <td colSpan={3}>
-              {t('fr08Date')}: {date}
-            </td>
-            <td colSpan={3}>
-              {t('fr08Time')}: {timeFormat.format(timestamp)}
-            </td>
-          </tr>
+          {order.priority === 'scheduled' && (
+            <tr data-fr08-scheduled>
+              <td colSpan={3}>
+                {t('fr08Date')}: {scheduled ? formatFr08Date(scheduled) : ''}
+              </td>
+              <td colSpan={3}>
+                {t('fr08Time')}: {scheduled ? timeFormat.format(scheduled) : ''}
+              </td>
+            </tr>
+          )}
           <tr>
             <td colSpan={3} data-fr08-signature>
               {t('txDoctor')}: {order.orderer}
@@ -223,7 +236,7 @@ export function Fr08Document({ order, t }: { order: TransfusionOrder; t: Process
           </tr>
           <tr>
             <td colSpan={6}>
-              <div data-fr08-choices>
+              <div data-fr08-choices data-fr08-priorities>
                 {mark(t('fr08VeryUrgent'), order.priority === 'veryUrgent')}
                 {mark(t('txUrgent'), order.priority === 'urgent')}
                 {mark(t('txScheduled'), order.priority === 'scheduled')}
