@@ -31,6 +31,15 @@ import { comparePriority, priorityKeys, transfusionStatusKeys } from './transfus
 import { useTransfusionsTranslation } from './use-transfusions-translation';
 
 const bankOrderRead = [bloodBankPrivileges.module, bloodBankPrivileges.transfusions, 'Get Orders'];
+const statusCards = [
+  {
+    filter: 'txPendingCount',
+    label: 'txPendingCount',
+    statuses: new Set(['txPending', 'txReviewed', 'txSampleReady', 'fr08Sent', 'fr08Received', 'fr08InProgress']),
+  },
+  { filter: 'txTesting', label: 'txTesting', statuses: new Set(['txTesting']) },
+  { filter: 'txCompatible', label: 'txReadyCount', statuses: new Set(['txCompatible']) },
+];
 
 interface InboxRow {
   order: TransfusionOrder;
@@ -127,15 +136,19 @@ export function TransfusionsPage({
       };
     }),
   ];
-  const statusOptions = [
+  const statusOptions = new Set([
+    'txPendingCount',
     ...(loadWorkspace ? Object.values(transfusionStatusKeys).filter((key) => key !== 'txDelivered') : []),
+    'txTesting',
+    'txCompatible',
     ...(readableConfig ? ['fr08Sent', ...Object.values(issuedOrderStatusKeys), 'fr08Cancelled'] : []),
-  ];
-  const queue = rows
-    .filter((item) => item.request?.status !== 'delivered')
+  ]);
+  const activeCard = statusCards.find((card) => card.filter === status);
+  const inbox = rows.filter((item) => item.request?.status !== 'delivered');
+  const queue = inbox
     .filter(
       (item) =>
-        (!status || item.statusKey === status) &&
+        (!status || (activeCard ? activeCard.statuses.has(item.statusKey) : item.statusKey === status)) &&
         (!priority || item.order.priority === priority) &&
         normalizeSearch(`${item.order.number} ${item.order.patientName} ${item.order.historyNumber}`).includes(
           normalizeSearch(search),
@@ -170,34 +183,23 @@ export function TransfusionsPage({
     }
   };
   return (
-    <ProcessingPage
-      title={t('txTitle')}
-      illustration="transfusions"
-      counts={
-        configured
-          ? undefined
-          : [
-              {
-                label: t('txPendingCount'),
-                description: t('txRequests'),
-                value:
-                  loading || failed
-                    ? '—'
-                    : requests.filter((item) => ['pending', 'reviewed', 'sampleReady'].includes(item.status)).length,
-              },
-              {
-                label: t('txTesting'),
-                description: t('txRequests'),
-                value: loading || failed ? '—' : requests.filter((item) => item.status === 'testing').length,
-              },
-              {
-                label: t('txReadyCount'),
-                description: t('txRequests'),
-                value: loading || failed ? '—' : requests.filter((item) => item.status === 'compatible').length,
-              },
-            ]
-      }
-    >
+    <ProcessingPage title={t('txTitle')} illustration="transfusions">
+      <section className={shared.summary} aria-label={t('txTitle')}>
+        {statusCards.map((card) => (
+          <button
+            key={card.filter}
+            type="button"
+            className={`cds--tile ${shared.summaryTile} ${styles.inboxStatusCard}`}
+            aria-pressed={status === card.filter}
+            disabled={loading || failed}
+            onClick={() => setStatus((current) => (current === card.filter ? '' : card.filter))}
+          >
+            <span className={styles.inboxStatusLabel}>{t(card.label)}</span>
+            <small>{t('txRequests')}</small>
+            <span>{loading || failed ? '—' : inbox.filter((item) => card.statuses.has(item.statusKey)).length}</span>
+          </button>
+        ))}
+      </section>
       <div className={shared.listHeading}>
         <h2>{t('txInbox')}</h2>
       </div>
@@ -228,7 +230,7 @@ export function TransfusionsPage({
             onChange={(event) => setStatus(event.target.value)}
           >
             <SelectItem value="" text={t('allStatuses')} />
-            {statusOptions.map((key) => (
+            {Array.from(statusOptions, (key) => (
               <SelectItem key={key} value={key} text={t(key)} />
             ))}
           </Select>

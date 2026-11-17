@@ -134,6 +134,46 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(screen.getAllByRole('button', { name: t('txAttend') })).toHaveLength(1);
     expect(screen.getByRole('button', { name: t('txHistory') }).querySelector('svg')).toBeTruthy();
   });
+  it('toggles one inbox status card at a time and keeps the status and priority filters in sync', async () => {
+    const api = createMockTransfusionsApi();
+    const workspace = await api.list();
+    const statuses = ['testing', 'compatible', 'reviewed', 'pending'] as const;
+    const requests = statuses.map((status, index) => ({ ...workspace.requests[index], status }));
+    render(<TransfusionsPage api={{ ...api, list: async () => ({ ...workspace, requests }) }} />);
+
+    const inbox = within(await screen.findByRole('table', { name: t('txInbox') }));
+    const pending = screen.getByRole('button', { name: new RegExp(`${t('txPendingCount')}.*2$`) });
+    const testing = screen.getByRole('button', { name: new RegExp(`${t('txTesting')}.*1$`) });
+    const ready = screen.getByRole('button', { name: new RegExp(`${t('txReadyCount')}.*1$`) });
+    const status = screen.getByRole('combobox', { name: t('status') });
+    const priority = screen.getByRole('combobox', { name: t('txPriority') });
+
+    fireEvent.click(testing);
+    expect(testing).toHaveAttribute('aria-pressed', 'true');
+    expect(status).toHaveValue('txTesting');
+    expect(inbox.getAllByRole('row')).toHaveLength(2);
+    expect(inbox.getByText('TX-DEMO-0001')).toBeInTheDocument();
+
+    fireEvent.click(ready);
+    expect(testing).toHaveAttribute('aria-pressed', 'false');
+    expect(ready).toHaveAttribute('aria-pressed', 'true');
+    expect(inbox.queryByText('TX-DEMO-0001')).not.toBeInTheDocument();
+    expect(inbox.getByText('TX-DEMO-0002')).toBeInTheDocument();
+    fireEvent.click(ready);
+    expect(ready).toHaveAttribute('aria-pressed', 'false');
+    expect(status).toHaveValue('');
+    expect(inbox.getAllByRole('row')).toHaveLength(5);
+
+    fireEvent.click(pending);
+    expect(inbox.getByText('TX-DEMO-0003')).toBeInTheDocument();
+    expect(inbox.getByText('TX-DEMO-0004')).toBeInTheDocument();
+    fireEvent.change(priority, { target: { value: 'urgent' } });
+    expect(inbox.getAllByRole('row')).toHaveLength(2);
+    expect(inbox.getByText('TX-DEMO-0004')).toBeInTheDocument();
+    fireEvent.change(status, { target: { value: 'txPending' } });
+    expect(pending).toHaveAttribute('aria-pressed', 'false');
+    expect(inbox.getByText('TX-DEMO-0004')).toBeInTheDocument();
+  });
   it('uses the existing inbox and workflow for an issued order without duplicating its row', async () => {
     const api = createMockTransfusionsApi();
     const { order } = (await api.list()).requests[0];
@@ -171,6 +211,9 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(screen.getAllByRole('table')).toHaveLength(1);
     expect(screen.getByRole('row', { name: /TX-DEMO-0001/ })).toBeInTheDocument();
     const inbox = screen.getByRole('table', { name: t('txInbox') });
+    const pending = screen.getByRole('button', { name: new RegExp(`${t('txPendingCount')}.*5$`) });
+    fireEvent.click(pending);
+    expect(within(inbox).getByText('ORD-42')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: 'ORD-42' } });
     expect(within(inbox).getAllByRole('row')).toHaveLength(2);
 

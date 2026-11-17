@@ -3,6 +3,38 @@
 @use "@carbon/colors";
 @use "@openmrs/esm-styleguide/src/vars" as *;
 
+.inboxStatusCard:global(.cds--tile) {
+  text-align: start;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+
+  .inboxStatusLabel {
+    @include type.type-style("heading-compact-01");
+    display: block;
+    margin-block-end: layout.$spacing-04;
+    color: $text-02;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: colors.$blue-60;
+  }
+
+  &[aria-pressed="true"] {
+    border-color: colors.$blue-60;
+    box-shadow: inset 0 0 0 1px colors.$blue-60;
+  }
+
+  &:focus-visible {
+    outline: 2px solid colors.$blue-60;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

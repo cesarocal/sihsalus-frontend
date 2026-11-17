@@ -9,6 +9,10 @@ del circuito de prueba operan con datos sintéticos.
 - `/blood-bank/transfusions`: bandeja, prioridad y antigüedad, búsqueda, filtros,
   historial y entrega. Mantiene `app:home.bancoSangre.transfusiones` y el acceso
   al módulo. Historial y libro no conceden privilegios nuevos.
+  Las tres tarjetas de estado filtran la bandeja y comparten la selección con
+  el desplegable Estado. Pulsar la tarjeta activa limpia ese filtro. Los
+  recuentos incluyen las solicitudes FR08 de la bandeja y se calculan antes
+  de aplicar la búsqueda y la prioridad.
 - `/blood-bank/laboratory/compatibility`: rondas pendientes, prioridad y fecha
   de registro, etiquetas, resultados e historial. Mantiene
   `app:home.bancoSangre.laboratorio.compatibilidad` y el acceso al módulo.
