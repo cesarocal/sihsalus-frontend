@@ -13,12 +13,10 @@ export function TransfusionDetails({
   request,
   t,
   history = false,
-  componentCards = false,
 }: {
   request: TransfusionRequest;
   t: ProcessingTranslate;
   history?: boolean;
-  componentCards?: boolean;
 }) {
   const order = request.order;
   const details = {
@@ -62,14 +60,8 @@ export function TransfusionDetails({
             </div>
           ))}
         </dl>
-        {!componentCards && (
-          <p>
-            {t('txRequirement')}:{' '}
-            {order.items.map((item) => `${item.quantity} × ${t(componentDefinitions[item.component].key)}`).join('; ')}
-          </p>
-        )}
       </section>
-      {componentCards && <TransfusionComponentCards order={order} t={t} />}
+      <TransfusionComponentCards order={order} t={t} />
       {history && (
         <section className={styles.panel}>
           <h4>{t('txPatientHistory')}</h4>

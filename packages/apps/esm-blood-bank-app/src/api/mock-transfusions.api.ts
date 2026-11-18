@@ -179,6 +179,7 @@ export function createMockTransfusionsApi(
         throw new Error('INVALID_COMPATIBILITY_ROUND');
       const changes = {
         operator: input.operator,
+        labelsPrintRequestedAt: round.labelsPrintRequestedAt ?? input.labelsPrintRequestedAt,
         identityVerified: input.identityVerified,
         pretransfusionVerified: input.pretransfusionVerified,
         results: structuredClone(input.results),
@@ -188,6 +189,7 @@ export function createMockTransfusionsApi(
         JSON.stringify(changes) ===
           JSON.stringify({
             operator: round.operator,
+            labelsPrintRequestedAt: round.labelsPrintRequestedAt,
             identityVerified: round.identityVerified,
             pretransfusionVerified: round.pretransfusionVerified,
             results: round.results,

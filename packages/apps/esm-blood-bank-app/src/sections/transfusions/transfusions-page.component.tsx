@@ -1,5 +1,5 @@
 import { Button, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
-import { RecentlyViewed } from '@carbon/react/icons';
+import { Book, RecentlyViewed } from '@carbon/react/icons';
 import { userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { bloodBankPrivileges } from '../../access/blood-bank-privileges';
@@ -78,7 +78,7 @@ export function TransfusionsPage({
   const [selected, setSelected] = useState<{ order: TransfusionOrder; issued: boolean; attend: boolean }>();
   const [preparing, setPreparing] = useState(false);
   const [prepareFailed, setPrepareFailed] = useState(false);
-  const [history, setHistory] = useState(false);
+  const [archive, setArchive] = useState<'history' | 'book' | null>(null);
   const preparingRequest = useRef(false);
   const reloadOrders = orders.reload;
   useEffect(() => {
@@ -96,6 +96,7 @@ export function TransfusionsPage({
   const loading = (loadWorkspace && workspace.loading) || Boolean(readableConfig && orders.loading);
   const failed =
     (workspaceFailed || ordersFailed) && !(loadWorkspace && !workspaceFailed) && !(readableConfig && !ordersFailed);
+  const archiveUnavailable = loading || !loadWorkspace || workspaceFailed;
   const issued = readableConfig && !ordersFailed ? (orders.data ?? []) : [];
   const issuedById = new Map(issued.map((item) => [item.order.id, item]));
   const requests = loadWorkspace && !workspaceFailed ? (workspace.data?.requests ?? []) : [];
@@ -213,11 +214,14 @@ export function TransfusionsPage({
             closeButtonLabelText={t('clearSearch')}
             onChange={(event) => setSearch(event.target.value)}
           />
+          <Button kind="tertiary" renderIcon={Book} disabled={archiveUnavailable} onClick={() => setArchive('book')}>
+            {t('txBook')}
+          </Button>
           <Button
             kind="tertiary"
             renderIcon={RecentlyViewed}
-            disabled={loading || !loadWorkspace || workspaceFailed}
-            onClick={() => setHistory(true)}
+            disabled={archiveUnavailable}
+            onClick={() => setArchive('history')}
           >
             {t('txHistory')}
           </Button>
@@ -281,13 +285,15 @@ export function TransfusionsPage({
               t(item.statusKey),
               <Button key="action" kind="ghost" size="sm" disabled={preparing} onClick={() => void openRequest(item)}>
                 {t(
-                  (
-                    item.request
-                      ? item.order.priority === 'scheduled' && item.request.status !== 'testing'
-                      : item.canPrepare || item.canReceive
-                  )
-                    ? 'txAttend'
-                    : 'fr08Open',
+                  item.request?.status === 'compatible'
+                    ? 'txDeliver'
+                    : (
+                          item.request
+                            ? item.order.priority === 'scheduled' && item.request.status !== 'testing'
+                            : item.canPrepare || item.canReceive
+                        )
+                      ? 'txAttend'
+                      : 'fr08Open',
                 )}
               </Button>,
             ],
@@ -330,13 +336,13 @@ export function TransfusionsPage({
           t={t}
         />
       )}
-      {history && (
+      {archive === 'history' && <TransfusionHistory requests={shownRequests} onClose={() => setArchive(null)} t={t} />}
+      {archive === 'book' && (
         <TransfusionHistory
-          requests={shownRequests}
-          entries={(workspace.data?.bookEntries ?? []).filter((entry) =>
+          bookEntries={(workspace.data?.bookEntries ?? []).filter((entry) =>
             shownRequests.some((request) => request.id === entry.requestId),
           )}
-          onClose={() => setHistory(false)}
+          onClose={() => setArchive(null)}
           t={t}
         />
       )}

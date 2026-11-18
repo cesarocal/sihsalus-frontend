@@ -97,6 +97,11 @@ Continuar al solicitar la impresión. Continuar registra la muestra y salir con
 guardado conserva el borrador. Reimprimir conserva el instante de la toma.
 El autorrelleno depende de `user.person.display` en la sesión de OpenMRS, incluso
 para cuentas sin acceso general a fichas de personas.
+**Entregar** toma el nombre de la sesión al abrir la entrega. El responsable
+se guarda al confirmar junto con el DNI de ocho dígitos de quien recibe.
+**Libro de transfusiones** abre por separado y permite buscar por hemocomponente
+y filtrar por fecha de entrega. El historial y su impresión muestran quién
+atendió y quién entregó, con sus fechas respectivas.
 Mover filas entre los dos bloques tampoco reserva stock hasta confirmar la asignación. Guardar un
 resultado parcial no libera ni reserva unidades. La X permite Seguir editando o
 Salir, con guardado opcional marcado por defecto; los errores conservan la edición.
@@ -132,7 +137,9 @@ El procesamiento muestra la muestra del receptor una sola vez, enlazada con
 las muestras de las unidades y sus opciones de resultado. Al guardar se registra
 el nombre de la persona de la sesión que abrió el procesamiento.
 La impresión de etiquetas desde Compatibilidad incluye solo las muestras de las
-unidades de la ronda. El informe se habilita cuando se completan todas las rondas
+unidades de la ronda. Solicitar la impresión habilita los resultados. La fecha
+de la solicitud de impresión se conserva al guardar la ronda o su borrador.
+El informe se habilita cuando se completan todas las rondas
 de la solicitud. Las etiquetas y el informe de compatibilidad suprimen los
 encabezados y pies automáticos de impresión.
 

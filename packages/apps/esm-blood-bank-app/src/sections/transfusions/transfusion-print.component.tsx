@@ -5,6 +5,7 @@ import hospitalLogo from '../collection/hospital-santa-clotilde.png';
 import { inventoryDisplayDate, inventoryUnitSealCode } from '../inventory/inventory-rules';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
+import { TransfusionComponentCards } from './transfusion-component-cards.component';
 import styles from './transfusions.scss';
 import type { CompatibilityRound, RecipientSample, TransfusionRequest } from './transfusions.types';
 import { compatibilityReportReady } from './transfusions-rules';
@@ -54,6 +55,17 @@ export const compatibilityReportPrintCss = `${processingPrintCss}${compatibility
   [data-compatibility-report] summary {
     list-style: none; margin-block: 4mm 2mm; font-weight: bold; break-after: avoid;
   }
+  [data-compatibility-report] [data-transfusion-component-cards] h4 { margin-block: 4mm 2mm; break-after: avoid; }
+  [data-compatibility-report] [data-transfusion-component-cards] ul {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2mm;
+    list-style: none; padding: 0; margin: 0 0 4mm;
+  }
+  [data-compatibility-report] [data-transfusion-component-cards] li {
+    border: 1px solid #aaa; padding: 2mm; break-inside: avoid;
+  }
+  [data-compatibility-report] [data-transfusion-component-cards] li > div { display: flex; align-items: center; gap: 2mm; }
+  [data-compatibility-report] [data-transfusion-component-cards] li > div > span { display: grid; gap: 1mm; }
+  [data-compatibility-report] [data-delivery-audit] { grid-template-columns: 1fr; gap: 6pt; }
 `;
 
 const compatibilityResultKeys = {
@@ -136,10 +148,14 @@ export function CompatibilityReport({
   request,
   t,
   print = false,
+  history = false,
+  showAttendedBy = false,
 }: {
   request: TransfusionRequest;
   t: ProcessingTranslate;
   print?: boolean;
+  history?: boolean;
+  showAttendedBy?: boolean;
 }) {
   const { assignments, order } = request;
   const summary = {
@@ -148,6 +164,7 @@ export function CompatibilityReport({
     txSampleHistoryNumber: order.historyNumber,
     txReportBloodGroup: transfusionBloodGroupLabel(order.bloodGroup, t),
     ...(request.sample?.code ? { txRecipientSample: request.sample.code } : {}),
+    ...(showAttendedBy ? { txAttendedBy: request.draft.reviewer } : {}),
   };
 
   return (
@@ -156,7 +173,9 @@ export function CompatibilityReport({
         {print && <img src={hospitalLogo} width={68} height={68} alt={t('certificateHospital')} />}
         <h2>{t('txCompatibilityReport')}</h2>
       </header>
-      <dl className={`${styles.summary} ${styles.reportSummary}`}>
+      <dl
+        className={`${styles.summary} ${styles.reportSummary}${showAttendedBy ? ` ${styles.handoverReportSummary}` : ''}`}
+      >
         {Object.entries(summary).map(([key, value]) => (
           <div key={key}>
             <dt>{t(key)}</dt>
@@ -164,6 +183,7 @@ export function CompatibilityReport({
           </div>
         ))}
       </dl>
+      {history && print && <TransfusionComponentCards order={order} t={t} />}
       {!print && request.rounds.length > 0 && !compatibilityReportReady(request) && (
         <p className={styles.reportStatus} role="status">
           {t('txReportPendingPrint')}
@@ -233,11 +253,35 @@ export function CompatibilityReport({
           </div>
         </details>
       )}
-      {request.deliveredAt && (
-        <p>
-          {t('txDelivered')}: {formatDatetime(new Date(request.deliveredAt), { noToday: true })} ·{' '}
-          {request.draft.collectorName} · {request.draft.collectorDocument} · {request.draft.deliveredBy}
-        </p>
+      {history && (request.receivedAt || request.deliveredAt) && (
+        <dl className={styles.deliveryAudit} data-delivery-audit>
+          {request.receivedAt && (
+            <div>
+              <dt>{t('txAttendedBy')}</dt>
+              <dd>
+                {request.draft.reviewer || '—'} · {formatDatetime(new Date(request.receivedAt), { noToday: true })}
+              </dd>
+            </div>
+          )}
+          {request.deliveredAt && (
+            <div>
+              <dt>{t('txDeliveredBy')}</dt>
+              <dd>
+                {request.draft.deliveredBy || '—'} · {formatDatetime(new Date(request.deliveredAt), { noToday: true })}
+              </dd>
+            </div>
+          )}
+          {request.deliveredAt && request.draft.collectorName && (
+            <div>
+              <dt>{t('txCollector')}</dt>
+              <dd>
+                {request.draft.collectorName}
+                {request.draft.collectorDocument &&
+                  ` · ${t('txCollectorDocument')}: ${request.draft.collectorDocument}`}
+              </dd>
+            </div>
+          )}
+        </dl>
       )}
     </article>
   );

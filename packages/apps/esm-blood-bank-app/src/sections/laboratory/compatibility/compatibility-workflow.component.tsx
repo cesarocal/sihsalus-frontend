@@ -63,6 +63,7 @@ export function CompatibilityWorkflow({
   const [request, setRequest] = useState(initial);
   const [round, setRound] = useState(initialRound);
   const [saving, setSaving] = useState(false);
+  const [printingLabels, setPrintingLabels] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [failed, setFailed] = useState('');
   const [confirm, setConfirm] = useState(false);
@@ -71,10 +72,15 @@ export function CompatibilityWorkflow({
   const inFlight = useRef(false);
   const { order } = request;
   const assignments = request.assignments.filter((item) => item.roundId === round.id);
+  const labelsRequested = !!round.labelsPrintRequestedAt;
   const complete =
-    !!operator && round.identityVerified && round.pretransfusionVerified && Object.values(round.results).every(Boolean);
+    labelsRequested &&
+    !!operator &&
+    round.identityVerified &&
+    round.pretransfusionVerified &&
+    Object.values(round.results).every(Boolean);
   const change = (patch: Partial<CompatibilityRound>) => {
-    setRound({ ...round, ...patch });
+    setRound((current) => ({ ...current, ...patch }));
     setDirty(true);
     setFailed('');
   };
@@ -106,16 +112,26 @@ export function CompatibilityWorkflow({
     }
   };
   const print = () => {
+    if (printingLabels) return;
     setFailed('');
+    setPrintingLabels(true);
+    const onError = () => {
+      setFailed('printFailed');
+      setPrintingLabels(false);
+    };
     try {
       printDocument(
         <TransfusionLabels request={request} round={round} t={t} />,
         t('txPrintLabels'),
-        () => setFailed('printFailed'),
+        onError,
         compatibilityLabelPrintCss,
+        () => {
+          if (!labelsRequested) change({ labelsPrintRequestedAt: new Date().toISOString() });
+          setPrintingLabels(false);
+        },
       );
     } catch {
-      setFailed('printFailed');
+      onError();
     }
   };
   return (
@@ -130,13 +146,13 @@ export function CompatibilityWorkflow({
         errors={[]}
         failed={failed}
         saveErrorText={t('txSaveFailed')}
-        closeDisabled={confirm}
+        closeDisabled={confirm || printingLabels}
         onClose={onClose}
         onSaveBeforeExit={async () => (!dirty ? 'unchanged' : (await save(false)) ? 'saved' : 'failed')}
         onAdvance={() => setConfirm(true)}
         onPrevious={() => {}}
         advanceLabel={t('txRegisterResults')}
-        advanceDisabled={!complete}
+        advanceDisabled={!complete || printingLabels}
         footerClassName={styles.printFooter}
         compactHeader
         hideStepHeading
@@ -147,7 +163,7 @@ export function CompatibilityWorkflow({
             size="sm"
             className={styles.printButton}
             renderIcon={Printer}
-            disabled={saving}
+            disabled={saving || printingLabels}
             onClick={print}
           >
             {t('txPrintLabels')}
@@ -193,6 +209,7 @@ export function CompatibilityWorkflow({
               onChange={(_e, { checked }) => change({ pretransfusionVerified: checked })}
             />
           </div>
+          {!labelsRequested && <p className={styles.notice}>{t('txPrintLabelsBeforeResults')}</p>}
           <div className={styles.compatibilitySamples}>
             <div className={styles.recipientCard}>
               <SampleCard
@@ -224,9 +241,9 @@ export function CompatibilityWorkflow({
                       name={`result-${item.unit.id}`}
                       aria-label={`${t('txResult')} ${item.unit.id}`}
                       valueSelected={round.results[item.unit.id]}
-                      disabled={saving}
+                      disabled={saving || !labelsRequested}
                       onChange={(value) => {
-                        if (value === 'compatible' || value === 'incompatible')
+                        if (labelsRequested && (value === 'compatible' || value === 'incompatible'))
                           change({ results: { ...round.results, [item.unit.id]: value } });
                       }}
                     >

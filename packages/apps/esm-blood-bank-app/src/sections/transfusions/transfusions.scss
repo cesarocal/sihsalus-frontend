@@ -372,6 +372,14 @@
     font-weight: 600;
   }
 
+  input:disabled + label {
+    cursor: not-allowed;
+
+    svg {
+      color: inherit;
+    }
+  }
+
   input:focus-visible + label {
     outline: 2px solid colors.$blue-60;
     outline-offset: 1px;
@@ -441,6 +449,28 @@
   padding: layout.$spacing-05;
   margin-block-end: layout.$spacing-05;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+.handoverReportSummary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.deliveryAudit {
+  display: grid;
+  gap: layout.$spacing-03;
+  margin-block-start: layout.$spacing-05;
+  padding: layout.$spacing-04;
+  background: $ui-01;
+  border: 1px solid $ui-03;
+
+  dt {
+    @include type.type-style("heading-compact-01");
+  }
+}
+.historyDetailActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
 }
 .reportStatus {
   border-inline-start: 3px solid colors.$yellow-30;

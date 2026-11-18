@@ -1,23 +1,10 @@
-import {
-  Button,
-  ComposedModal,
-  InlineNotification,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  Search,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-  TextInput,
-} from '@carbon/react';
+import { Button, ComposedModal, InlineNotification, ModalBody, ModalHeader, Search, TextInput } from '@carbon/react';
 import { ArrowLeft, Printer } from '@carbon/react/icons';
 import { formatDatetime } from '@openmrs/esm-framework';
 import { useState } from 'react';
 import { printDocument } from '../../shared/print-document';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
+import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { TransfusionDetails } from './transfusion-details.component';
 import { CompatibilityReport, compatibilityReportPrintCss } from './transfusion-print.component';
 import styles from './transfusions.scss';
@@ -30,24 +17,23 @@ import {
 } from './transfusions-rules';
 
 export function TransfusionHistory({
-  requests,
-  entries,
+  requests = [],
+  bookEntries,
   onClose,
   t,
   compatibility = false,
-}: {
-  requests: TransfusionRequest[];
-  entries: TransfusionBookEntry[];
-  onClose: () => void;
-  t: ProcessingTranslate;
-  compatibility?: boolean;
-}) {
+}: { onClose: () => void; t: ProcessingTranslate } & (
+  | { requests: TransfusionRequest[]; compatibility?: boolean; bookEntries?: never }
+  | { bookEntries: TransfusionBookEntry[]; requests?: never; compatibility?: never }
+)) {
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [detail, setDetail] = useState<TransfusionRequest | null>(null);
   const reportReady = detail && compatibilityReportReady(detail);
   const [failed, setFailed] = useState(false);
+  const title = t(bookEntries ? 'txBook' : compatibility ? 'txCompatibilityHistory' : 'txHistory');
+  const searchLabel = t(bookEntries ? 'txBookSearch' : 'txSearch');
   const matches = (text: string) => normalizeSearch(text).includes(normalizeSearch(search));
   const range = (at: string) => {
     const day = transfusionLocalDay(at);
@@ -66,10 +52,17 @@ export function TransfusionHistory({
         matches(`${item.order.number} ${item.order.patientName} ${item.order.historyNumber}`),
     )
     .sort((a, b) => historyDate(b).localeCompare(historyDate(a)));
-  const book = entries
+  const book = bookEntries
+    ?.map((item) => {
+      const component = componentDefinitions[item.component];
+      return { ...item, componentLabel: component ? t(component.key) : '—' };
+    })
     .filter(
       (item) =>
-        range(item.at) && matches(`${item.unitCode} ${item.orderNumber} ${item.patientName} ${item.historyNumber}`),
+        range(item.at) &&
+        matches(
+          `${item.unitCode} ${item.seal} ${item.componentLabel} ${item.orderNumber} ${item.patientName} ${item.historyNumber}`,
+        ),
     )
     .sort((a, b) => b.at.localeCompare(a.at));
   const print = () => {
@@ -77,7 +70,7 @@ export function TransfusionHistory({
     setFailed(false);
     try {
       printDocument(
-        <CompatibilityReport request={detail} t={t} print />,
+        <CompatibilityReport request={detail} t={t} print history />,
         t('txCompatibilityReport'),
         () => setFailed(true),
         compatibilityReportPrintCss,
@@ -93,30 +86,38 @@ export function TransfusionHistory({
       className={styles.modal}
       preventCloseOnClickOutside
       onClose={onClose}
-      aria-label={t(compatibility ? 'txCompatibilityHistory' : 'txHistory')}
+      aria-label={title}
     >
-      <ModalHeader
-        title={t(compatibility ? 'txCompatibilityHistory' : 'txHistory')}
-        iconDescription={t('close')}
-        closeModal={onClose}
-      />
+      <ModalHeader title={title} iconDescription={t('close')} closeModal={onClose} />
       <ModalBody>
         {failed && <InlineNotification kind="error" hideCloseButton title={t('printFailed')} />}
         {detail ? (
           <>
-            <Button
-              kind="ghost"
-              size="sm"
-              renderIcon={ArrowLeft}
-              onClick={() => {
-                setDetail(null);
-                setFailed(false);
-              }}
-            >
-              {t('txBackHistory')}
-            </Button>
+            <div className={styles.historyDetailActions}>
+              <Button
+                kind="ghost"
+                size="sm"
+                renderIcon={ArrowLeft}
+                onClick={() => {
+                  setDetail(null);
+                  setFailed(false);
+                }}
+              >
+                {t('txBackHistory')}
+              </Button>
+              <Button
+                kind="tertiary"
+                className={styles.printButton}
+                size="sm"
+                renderIcon={Printer}
+                disabled={!reportReady}
+                onClick={print}
+              >
+                {t('txPrintResults')}
+              </Button>
+            </div>
             <TransfusionDetails request={detail} t={t} />
-            <CompatibilityReport request={detail} t={t} />
+            <CompatibilityReport request={detail} t={t} history />
             <section className={styles.panel}>
               <h4>{t('txStateHistory')}</h4>
               {detail.events.map((event) => (
@@ -132,8 +133,8 @@ export function TransfusionHistory({
             <div className={styles.toolbar}>
               <Search
                 id="tx-history-search"
-                labelText={t('txSearch')}
-                placeholder={t('txSearch')}
+                labelText={searchLabel}
+                placeholder={searchLabel}
                 closeButtonLabelText={t('clearSearch')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -157,108 +158,83 @@ export function TransfusionHistory({
             </div>
             {invalid ? (
               <InlineNotification kind="warning" hideCloseButton title={t('txInvalidRange')} />
+            ) : book ? (
+              <>
+                <p>{t('txBookHelp')}</p>
+                <ProcessingTable
+                  title={title}
+                  columns={[
+                    'inventoryUnitNumber',
+                    'fractionationComponent',
+                    'txSeal',
+                    'txPatient',
+                    'txService',
+                    'txHistoryNumber',
+                    'txDoctor',
+                    'txDoctorLicense',
+                    'txDeliveredBy',
+                    'txDeliveredAt',
+                  ]}
+                  rows={book.map((item) => ({
+                    id: item.id,
+                    cells: [
+                      item.unitCode,
+                      item.componentLabel,
+                      item.seal,
+                      item.patientName,
+                      item.service,
+                      item.historyNumber,
+                      item.doctor,
+                      item.doctorLicense || '—',
+                      item.attendedBy,
+                      formatDatetime(new Date(item.at), { noToday: true }),
+                    ],
+                  }))}
+                  loading={false}
+                  failed={false}
+                  reload={() => {}}
+                  emptyHelp={t('txEmptyHistory')}
+                  filterKey={`${search}:${from}:${to}`}
+                  t={t}
+                />
+              </>
             ) : (
-              <Tabs>
-                <TabList aria-label={t('txHistory')}>
-                  <Tab>{t('txRequests')}</Tab>
-                  {!compatibility && <Tab>{t('txBook')}</Tab>}
-                </TabList>
-                <TabPanels>
-                  <TabPanel>
-                    <ProcessingTable
-                      title={t('txHistory')}
-                      columns={[
-                        'txNumber',
-                        'txPatient',
-                        'txHistoryNumber',
-                        'txPriority',
-                        'status',
-                        compatibility ? 'txResultAt' : 'txDeliveredAt',
-                        'actions',
-                      ]}
-                      rows={filtered.map((item) => ({
-                        id: item.id,
-                        cells: [
-                          item.order.number,
-                          item.order.patientName,
-                          item.order.historyNumber,
-                          t(priorityKeys[item.order.priority]),
-                          t(transfusionStatusKeys[item.status]),
-                          formatDatetime(new Date(historyDate(item)), { noToday: true }),
-                          <Button key="detail" kind="ghost" size="sm" onClick={() => setDetail(item)}>
-                            {t('txViewDetail')}
-                          </Button>,
-                        ],
-                      }))}
-                      loading={false}
-                      failed={false}
-                      reload={() => {}}
-                      emptyHelp={t('txEmptyHistory')}
-                      filterKey={`${search}:${from}:${to}`}
-                      t={t}
-                    />
-                  </TabPanel>
-                  {!compatibility && (
-                    <TabPanel>
-                      <p>{t('txBookHelp')}</p>
-                      <ProcessingTable
-                        title={t('txBook')}
-                        columns={[
-                          'inventoryUnitNumber',
-                          'txSeal',
-                          'txPatient',
-                          'txService',
-                          'txHistoryNumber',
-                          'txDoctor',
-                          'txDoctorLicense',
-                          'txDeliveredBy',
-                          'txDeliveredAt',
-                        ]}
-                        rows={book.map((item) => ({
-                          id: item.id,
-                          cells: [
-                            item.unitCode,
-                            item.seal,
-                            item.patientName,
-                            item.service,
-                            item.historyNumber,
-                            item.doctor,
-                            item.doctorLicense || '—',
-                            item.attendedBy,
-                            formatDatetime(new Date(item.at), { noToday: true }),
-                          ],
-                        }))}
-                        loading={false}
-                        failed={false}
-                        reload={() => {}}
-                        emptyHelp={t('txEmptyHistory')}
-                        filterKey={`${search}:${from}:${to}`}
-                        t={t}
-                      />
-                    </TabPanel>
-                  )}
-                </TabPanels>
-              </Tabs>
+              <ProcessingTable
+                title={title}
+                columns={[
+                  'txNumber',
+                  'txPatient',
+                  'txHistoryNumber',
+                  'txPriority',
+                  'status',
+                  compatibility ? 'txResultAt' : 'txDeliveredAt',
+                  'actions',
+                ]}
+                rows={filtered.map((item) => ({
+                  id: item.id,
+                  cells: [
+                    item.order.number,
+                    item.order.patientName,
+                    item.order.historyNumber,
+                    t(priorityKeys[item.order.priority]),
+                    t(transfusionStatusKeys[item.status]),
+                    formatDatetime(new Date(historyDate(item)), { noToday: true }),
+                    <Button key="detail" kind="ghost" size="sm" onClick={() => setDetail(item)}>
+                      {t('txViewDetail')}
+                    </Button>,
+                  ],
+                }))}
+                loading={false}
+                failed={false}
+                reload={() => {}}
+                emptyHelp={t('txEmptyHistory')}
+                filterKey={`${search}:${from}:${to}`}
+                t={t}
+              />
             )}
           </>
         )}
       </ModalBody>
-      {detail && (
-        <ModalFooter className={styles.printFooter}>
-          <div>
-            <Button
-              kind="tertiary"
-              className={styles.printButton}
-              size="sm"
-              renderIcon={Printer}
-              disabled={!reportReady}
-              onClick={print}
-            >
-              {t('txPrintResults')}
-            </Button>
-          </div>
-        </ModalFooter>
-      )}
     </ComposedModal>
   );
 }

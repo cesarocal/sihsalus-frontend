@@ -126,7 +126,7 @@ export function TransfusionWorkflow({
       else if (
         !draft.collectorName.trim() ||
         !/^\d{8}$/.test(draft.collectorDocument) ||
-        !draft.deliveredBy.trim() ||
+        !operator ||
         !draft.releaseVerified
       )
         setErrors(['txPickupRequired']);
@@ -307,15 +307,18 @@ export function TransfusionWorkflow({
                     id="tx-collector-document"
                     labelText={t('txCollectorDocument')}
                     value={draft.collectorDocument}
+                    inputMode="numeric"
+                    maxLength={8}
                     disabled={saving}
-                    onChange={(e) => change({ collectorDocument: e.target.value })}
+                    onChange={(e) => change({ collectorDocument: e.target.value.replace(/[^0-9]/g, '').slice(0, 8) })}
                   />
                   <TextInput
                     id="tx-delivered-by"
                     labelText={t('txDeliveredBy')}
-                    value={draft.deliveredBy}
-                    disabled={saving}
-                    onChange={(e) => change({ deliveredBy: e.target.value })}
+                    value={operator}
+                    readOnly
+                    invalid={!operator}
+                    invalidText={t('txOperatorUnavailable')}
                   />
                 </div>
                 <p>{t('txAutomaticDate')}</p>
@@ -356,9 +359,9 @@ export function TransfusionWorkflow({
               </>
             ) : (
               <>
-                <TransfusionDetails request={request} t={t} history componentCards />
+                <TransfusionDetails request={request} t={t} history />
                 {delivery || readOnly || replacement ? (
-                  <CompatibilityReport request={request} t={t} />
+                  <CompatibilityReport request={request} t={t} showAttendedBy={delivery} />
                 ) : (
                   <div className={styles.reviewChecks}>
                     {receipt.received && (
@@ -412,7 +415,7 @@ export function TransfusionWorkflow({
                 () =>
                   confirm === 'assign'
                     ? api.assign(request.id, request.revision, draft.selectedUnitIds, draft.selectionVerified)
-                    : api.deliver(request.id, request.revision, draft),
+                    : api.deliver(request.id, request.revision, { ...draft, deliveredBy: operator }),
                 confirm === 'assign' ? 'txAssignmentSaved' : 'txDeliverySaved',
               );
               setConfirm(null);

@@ -21,7 +21,7 @@ export function TransfusionComponentCards({
   t: ProcessingTranslate;
 }) {
   return (
-    <section className={styles.panel} aria-label={t('txRequirement')}>
+    <section className={styles.panel} aria-label={t('txRequirement')} data-transfusion-component-cards>
       <h4>{t('txRequirement')}</h4>
       <ul className={styles.componentCards}>
         {order.items.map(({ component, quantity }) => {

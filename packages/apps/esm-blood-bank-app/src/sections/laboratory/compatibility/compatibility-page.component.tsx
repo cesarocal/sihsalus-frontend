@@ -145,7 +145,6 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
       {history && (
         <TransfusionHistory
           requests={data?.requests ?? []}
-          entries={[]}
           compatibility
           onClose={() => setHistory(false)}
           t={t}

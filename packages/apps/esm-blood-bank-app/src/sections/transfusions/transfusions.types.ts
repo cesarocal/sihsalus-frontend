@@ -82,6 +82,7 @@ export interface CompatibilityRound {
   id: string;
   createdAt: string;
   completedAt: string | null;
+  labelsPrintRequestedAt?: string;
   sample: RecipientSample;
   identityVerified: boolean;
   pretransfusionVerified: boolean;

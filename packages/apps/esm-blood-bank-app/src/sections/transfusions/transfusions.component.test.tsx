@@ -17,7 +17,11 @@ import { CompatibilityWorkflow } from '../laboratory/compatibility/compatibility
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { Fr08Document } from './fr08-document.component';
 import { TransfusionHistory } from './transfusion-history.component';
-import { compatibilityLabelPrintCss, compatibilityReportPrintCss, TransfusionLabels } from './transfusion-print.component';
+import {
+  compatibilityLabelPrintCss,
+  compatibilityReportPrintCss,
+  TransfusionLabels,
+} from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
@@ -389,8 +393,16 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const unitCard = within(modal.getAllByRole('region', { name: t('txUnitSample') })[0]);
     expect(unitCard.getByText(t('unitCode')).nextElementSibling).toHaveTextContent(code(1));
     expect(unitCard.getByText(t('txReportBloodGroup')).nextElementSibling).toHaveTextContent('O POSITIVO (+)');
-    fireEvent.click(modal.getByRole('button', { name: t('txPrintLabels') }));
-    const [content, , , css] = vi.mocked(printDocument).mock.calls[0];
+    const printLabels = modal.getByRole('button', { name: t('txPrintLabels') });
+    const radios = modal.getAllByRole('radio');
+    for (const radio of radios) expect(radio).toBeDisabled();
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, onError) => onError?.());
+    fireEvent.click(printLabels);
+    for (const radio of radios) expect(radio).toBeDisabled();
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, _onError, _css, onPrint) => onPrint?.());
+    fireEvent.click(printLabels);
+    for (const radio of radios) expect(radio).toBeEnabled();
+    const [content, , , css] = vi.mocked(printDocument).mock.calls[1];
     expect(css).toBe(compatibilityLabelPrintCss);
     const labels = render(content);
     expect(labels.container.querySelectorAll('[data-label]')).toHaveLength(2);
@@ -425,6 +437,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const saved = (await api.list()).requests[0];
     expect(saved.status).toBe('incompatible');
     expect(saved.rounds[0].operator).toBe('Rosa Calderón');
+    expect(saved.rounds[0].labelsPrintRequestedAt).toBeTruthy();
     expect(saved.assignments[0]).toMatchObject({ result: 'compatible', testedBy: 'Rosa Calderón' });
   });
   it('prints results before handover and commits stock and book only after pickup confirmation', async () => {
@@ -435,6 +448,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(cards.previousElementSibling).toHaveTextContent(t('txRequestDetails'));
     expect(cards.nextElementSibling).toHaveTextContent(t('txPatientHistory'));
     expect(within(cards).getByText('×2')).toBeInTheDocument();
+    expect(screen.getByText(t('txAttendedBy')).nextElementSibling).toHaveTextContent('Atención DEMO');
     fireEvent.click(screen.getByRole('button', { name: t('txPrintResults') }));
     expect(printDocument).toHaveBeenCalledOnce();
     const [content, title, , css] = vi.mocked(printDocument).mock.calls[0];
@@ -461,12 +475,20 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(cells[3].textContent).toBe(unit.unitSampleCode);
     expect(results.getByText(t('txNotRequired'))).toBeInTheDocument();
     expect(report.getByRole('table', { name: t('txReportTraceability') })).toBeInTheDocument();
+    expect(report.queryByText(t('txAttendedBy'))).not.toBeInTheDocument();
+    expect(report.queryByText(t('txDeliveredBy'))).not.toBeInTheDocument();
     printed.unmount();
     expect((await api.list()).bookEntries).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
     fireEvent.change(screen.getByLabelText(t('txCollector')), { target: { value: 'Recepción DEMO' } });
-    fireEvent.change(screen.getByLabelText(t('txCollectorDocument')), { target: { value: '90000999' } });
-    fireEvent.change(screen.getByLabelText(t('txDeliveredBy')), { target: { value: 'Entrega DEMO' } });
+    const document = screen.getByLabelText(t('txCollectorDocument'));
+    fireEvent.change(document, { target: { value: 'a9000b0999cc2' } });
+    expect(document).toHaveValue('90000999');
+    expect(document).toHaveAttribute('inputmode', 'numeric');
+    expect(document).toHaveAttribute('maxlength', '8');
+    const deliveredBy = screen.getByLabelText(t('txDeliveredBy'));
+    expect(deliveredBy).toHaveValue('Rosa Calderón');
+    expect(deliveredBy).toHaveAttribute('readonly');
     fireEvent.click(screen.getByRole('checkbox', { name: t('txReleaseCheck') }));
     fireEvent.click(screen.getByRole('button', { name: t('txDeliver') }));
     expect(screen.getByText(t('txDeliveryWarning'))).toBeInTheDocument();
@@ -476,7 +498,10 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(confirmation.querySelector('svg[data-warning-icon]')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: t('txConfirm') }));
     await waitFor(() => expect(closed).toHaveBeenCalledOnce());
-    expect((await api.list()).bookEntries).toHaveLength(3);
+    const delivered = await api.list();
+    expect(delivered.bookEntries).toHaveLength(3);
+    expect(delivered.bookEntries.every((entry) => entry.attendedBy === 'Rosa Calderón')).toBe(true);
+    expect(delivered.requests[0].draft.deliveredBy).toBe('Rosa Calderón');
   });
   it('shows cards and report results when reviewing tests and blocks printing while rounds are pending', async () => {
     const { api, request, units } = await assigned();
@@ -522,7 +547,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     vi.mocked(printDocument).mockClear();
 
     const replacement = await api.assign(rejected.id, rejected.revision, [code(3)], true);
-    render(<TransfusionHistory requests={[replacement]} entries={[]} onClose={vi.fn()} t={t} compatibility />);
+    render(<TransfusionHistory requests={[replacement]} onClose={vi.fn()} t={t} compatibility />);
     fireEvent.click(screen.getByRole('button', { name: t('txViewDetail') }));
     const historyPrintButton = screen.getByRole('button', { name: t('txPrintResults') });
     expect(historyPrintButton).toBeDisabled();
@@ -553,8 +578,13 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     render(<CompatibilityPage api={openmrsTransfusionsApi} />);
     expect(await screen.findByRole('button', { name: t('retry') })).toBeEnabled();
   });
-  it('keeps request history and issue records distinct from previous administered transfusions', async () => {
+  it('opens the book independently, filters by component and delivery date, and prints history handover details', async () => {
     const { api, request } = await compatible();
+    const queueView = render(<TransfusionsPage api={api} />);
+    const inbox = within(await screen.findByRole('table', { name: t('txInbox') }));
+    const ready = inbox.getByRole('row', { name: new RegExp(request.order.number) });
+    expect(within(ready).getByRole('button', { name: t('txDeliver') })).toBeEnabled();
+    queueView.unmount();
     const completed = await api.deliver(request.id, request.revision, {
       ...request.draft,
       collectorName: 'Recepción DEMO',
@@ -562,11 +592,31 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
       deliveredBy: 'Entrega DEMO',
       releaseVerified: true,
     });
-    const data = await api.list();
-    render(<TransfusionHistory requests={data.requests} entries={data.bookEntries} onClose={vi.fn()} t={t} />);
-    expect(screen.getAllByRole('button', { name: t('close') })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('tab', { name: t('txBook') }));
-    expect(within(screen.getByRole('table', { name: t('txBook') })).getAllByRole('row')).toHaveLength(4);
+    const historyView = render(<TransfusionsPage api={api} />);
+    await screen.findByRole('table', { name: t('txInbox') });
+    fireEvent.click(screen.getByRole('button', { name: t('txBook') }));
+    const book = within(screen.getByRole('dialog', { name: t('txBook') }));
+    const table = within(book.getByRole('table', { name: t('txBook') }));
+    expect(book.getAllByRole('button', { name: t('close') })).toHaveLength(1);
+    expect(table.getAllByRole('row')).toHaveLength(4);
+    expect(table.getByRole('columnheader', { name: t('fractionationComponent') })).toBeInTheDocument();
+    fireEvent.change(book.getByRole('searchbox'), { target: { value: 'plasma' } });
+    expect(table.getAllByRole('row')).toHaveLength(2);
+    fireEvent.change(book.getByLabelText(t('txDateFrom')), { target: { value: '2099-01-01' } });
+    expect(table.getAllByRole('row')).toHaveLength(1);
+    fireEvent.click(book.getByRole('button', { name: t('close') }));
+    fireEvent.click(screen.getByRole('button', { name: t('txHistory') }));
+    fireEvent.click(screen.getByRole('button', { name: t('txViewDetail') }));
+    expect(within(screen.getByRole('region', { name: t('txRequirement') })).getByText('×2')).toBeInTheDocument();
+    expect(screen.getByText(t('txAttendedBy')).nextElementSibling).toHaveTextContent('Atención DEMO ·');
+    expect(screen.getByText(t('txDeliveredBy')).nextElementSibling).toHaveTextContent('Entrega DEMO ·');
+    fireEvent.click(screen.getByRole('button', { name: t('txPrintResults') }));
+    const printedContent = vi.mocked(printDocument).mock.calls[0][0];
+    historyView.unmount();
+    render(printedContent);
+    expect(screen.getByRole('region', { name: t('txRequirement') })).toBeInTheDocument();
+    expect(screen.getByText(t('txAttendedBy')).nextElementSibling).toHaveTextContent('Atención DEMO ·');
+    expect(screen.getByText(t('txDeliveredBy')).nextElementSibling).toHaveTextContent('Entrega DEMO ·');
     expect(completed.order.history).toHaveLength(1);
   });
   it('escapes label text, preserves two recipient identifiers and keeps English/Spanish parity', async () => {
