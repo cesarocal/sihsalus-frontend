@@ -8,6 +8,7 @@ export type TransfusionStatus =
   | 'testing'
   | 'incompatible'
   | 'compatible'
+  | 'readyUrgent'
   | 'delivered';
 export type TransfusionPriority = 'scheduled' | 'urgent' | 'veryUrgent';
 export interface TransfusionOrder {
@@ -53,6 +54,7 @@ export interface RecipientSample {
   collectedAt: string;
   collectedBy: string;
   printRequestedAt?: string;
+  urgentPairVerified?: boolean;
   /** Previously registered samples used a separate confirmation. */
   identityVerified?: boolean;
 }
@@ -60,6 +62,7 @@ export interface TransfusionDraft {
   reviewer: string;
   reviewVerified: boolean;
   consentVerified: boolean;
+  urgentAuthorizationVerified?: boolean;
   sample: RecipientSample;
   selectedUnitIds: string[];
   selectionVerified: boolean;
@@ -67,6 +70,7 @@ export interface TransfusionDraft {
   collectorDocument: string;
   deliveredBy: string;
   releaseVerified: boolean;
+  urgentLabelsVerified?: boolean;
 }
 export interface TransfusionAssignment {
   unit: TransferUnit;
@@ -83,6 +87,7 @@ export interface CompatibilityRound {
   createdAt: string;
   completedAt: string | null;
   labelsPrintRequestedAt?: string;
+  communicated?: { at: string; by: string };
   sample: RecipientSample;
   identityVerified: boolean;
   pretransfusionVerified: boolean;
@@ -97,6 +102,7 @@ export interface TransfusionRequest {
   order: TransfusionOrder;
   draft: TransfusionDraft;
   receivedAt: string | null;
+  urgentAuthorization?: { verifiedAt: string; verifiedBy: string };
   sample: RecipientSample | null;
   assignments: TransfusionAssignment[];
   rounds: CompatibilityRound[];
@@ -122,6 +128,8 @@ export interface TransfusionBookEntry {
   collectorName: string;
   collectorDocument: string;
   at: string;
+  compatibilityPendingAtDispatch?: true;
+  compatibilityAfterDispatch?: { result: 'compatible' | 'incompatible'; at: string };
 }
 export interface TransfusionStore {
   requests: TransfusionRequest[];

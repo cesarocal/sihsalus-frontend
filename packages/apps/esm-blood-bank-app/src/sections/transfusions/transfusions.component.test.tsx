@@ -127,13 +127,17 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const other = screen.getByText(`${t('fr08OtherComponent')}: ${t('componentPlasma24')}`).closest('li');
     expect(other).toHaveTextContent(/2$/);
   });
-  it('sorts urgency then date and gives urgent rows a consultation action', async () => {
+  it('sorts urgency then date and opens every priority from the same inbox', async () => {
     render(<TransfusionsPage api={createMockTransfusionsApi()} />);
-    expect(await screen.findAllByRole('button', { name: t('txAttend') })).toHaveLength(3);
+    expect(await screen.findAllByRole('button', { name: t('txAttend') })).toHaveLength(10);
     const rows = within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('TX-DEMO-0004');
+    expect(rows[1]).toHaveTextContent('TX-DEMO-0010');
+    expect(rows[3]).toHaveTextContent('TX-DEMO-0008');
     expect(rows.find((row) => row.textContent?.includes('TX-DEMO-0003'))).toHaveTextContent('AB POSITIVO (+)');
-    expect(within(rows[1]).getByRole('button', { name: t('fr08Open') })).toBeEnabled();
+    expect(within(rows[1]).getByRole('button', { name: t('txAttend') })).toBeEnabled();
+    fireEvent.click(within(rows[3]).getByRole('button', { name: t('txAttend') }));
+    expect(screen.queryByText(t('txUrgentAuthorizationCheck'))).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: t('close') }));
     fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: 'TX-DEMO-0001' } });
     expect(screen.getAllByRole('button', { name: t('txAttend') })).toHaveLength(1);
     expect(screen.getByRole('button', { name: t('txHistory') }).querySelector('svg')).toBeTruthy();
@@ -178,6 +182,99 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(pending).toHaveAttribute('aria-pressed', 'false');
     expect(inbox.getByText('TX-DEMO-0004')).toBeInTheDocument();
   });
+  it('uses the existing screens to dispatch the very urgent demo and then process and communicate its results', async () => {
+    const api = createMockTransfusionsApi();
+    const number = 'TX-DEMO-0009';
+    const inbox = render(<TransfusionsPage api={api} />);
+    fireEvent.click(
+      within(await screen.findByRole('row', { name: new RegExp(number) })).getByRole('button', {
+        name: t('txAttend'),
+      }),
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txReviewCheck') }));
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txConsentCheck') }));
+    fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
+    expect(screen.getByText(t('txUrgentAuthorizationRequired'))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txUrgentAuthorizationCheck') }));
+    fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
+    const printSamples = await screen.findByRole('button', { name: t('txPrintUrgentSamples') });
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, _onError, _css, onPrint) => onPrint?.());
+    fireEvent.click(printSamples);
+    const specimenLabels = render(vi.mocked(printDocument).mock.lastCall?.[0]);
+    expect(specimenLabels.container.querySelectorAll('[data-label]')).toHaveLength(2);
+    expect(specimenLabels.container).toHaveTextContent(`M-REC-${number}-S`);
+    specimenLabels.unmount();
+    expect(screen.getByRole('button', { name: t('txContinue') })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txUrgentSamplesCheck') }));
+    fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
+    const candidates = within(await screen.findByRole('table', { name: t('txCandidates') }));
+    expect(candidates.queryByText(code(11))).not.toBeInTheDocument();
+    for (const unit of [1, 6, 13]) {
+      const row = within(candidates.getByRole('row', { name: new RegExp(code(unit)) }));
+      fireEvent.click(row.getByRole('button'));
+    }
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txSelectionCheck') }));
+    fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: t('txConfirmAssignment') })).getByRole('button', {
+        name: t('txConfirm'),
+      }),
+    );
+    fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: number } });
+    const ready = await screen.findByRole('row', { name: new RegExp(t('txReadyUrgent')) });
+    const beforeDispatch = render(<CompatibilityPage api={api} />);
+    expect(await within(beforeDispatch.container).findByText(t('txNoPendingTests'))).toBeInTheDocument();
+    beforeDispatch.unmount();
+
+    fireEvent.click(within(ready).getByRole('button', { name: t('txDeliver') }));
+    expect(screen.queryByRole('button', { name: t('txPrintResults') })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('txPrintUrgentReleaseLabels') }));
+    const dispatchLabels = render(vi.mocked(printDocument).mock.lastCall?.[0]);
+    expect(dispatchLabels.container.querySelectorAll('[data-label]')).toHaveLength(2);
+    expect(dispatchLabels.container).toHaveTextContent(t('txUrgentReleaseLabel'));
+    dispatchLabels.unmount();
+    fireEvent.click(screen.getByRole('button', { name: t('txContinue') }));
+    fireEvent.change(screen.getByLabelText(t('txCollector')), { target: { value: 'Recepción DEMO' } });
+    fireEvent.change(screen.getByLabelText(t('txCollectorDocument')), { target: { value: '90000999' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txUrgentReleaseCheck') }));
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txUrgentLabelsCheck') }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: t('txDeliver') }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: t('txConfirmDelivery') })).getByRole('button', {
+        name: t('txConfirm'),
+      }),
+    );
+    await waitFor(async () => expect((await api.list()).bookEntries).toHaveLength(3));
+    inbox.unmount();
+
+    render(<CompatibilityPage api={api} />);
+    fireEvent.click(await screen.findByRole('button', { name: t('txProcessTests') }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByText(`M-REC-${number}-S`)).toBeInTheDocument();
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, _onError, _css, onPrint) => onPrint?.());
+    fireEvent.click(dialog.getByRole('button', { name: t('txPrintLabels') }));
+    fireEvent.click(dialog.getByRole('checkbox', { name: t('txLabIdentity') }));
+    fireEvent.click(dialog.getByRole('checkbox', { name: t('txPretransfusionCheck') }));
+    fireEvent.click(
+      within(dialog.getByRole('group', { name: `${t('txResult')} ${code(1)}` })).getByRole('radio', {
+        name: t('txCompatible'),
+      }),
+    );
+    fireEvent.click(
+      within(dialog.getByRole('group', { name: `${t('txResult')} ${code(6)}` })).getByRole('radio', {
+        name: t('txIncompatible'),
+      }),
+    );
+    fireEvent.click(dialog.getByRole('button', { name: t('txRegisterResults') }));
+    const results = within(screen.getByRole('dialog', { name: t('txConfirmResults') }));
+    expect(results.getByText(t('txPostDispatchIncompatible'))).toBeInTheDocument();
+    fireEvent.click(results.getByRole('button', { name: t('txConfirm') }));
+    fireEvent.click(await screen.findByRole('button', { name: t('txRegisterCommunication') }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: t('txConfirm') }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: t('txRegisterCommunication') })).not.toBeInTheDocument(),
+    );
+  });
   it('uses the existing inbox and workflow for an issued order without duplicating its row', async () => {
     const api = createMockTransfusionsApi();
     const { order } = (await api.list()).requests[0];
@@ -213,9 +310,10 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
 
     const row = await screen.findByRole('row', { name: /ORD-42/ });
     expect(screen.getAllByRole('table')).toHaveLength(1);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Registros por página' }), { target: { value: '20' } });
     expect(screen.getByRole('row', { name: /TX-DEMO-0001/ })).toBeInTheDocument();
     const inbox = screen.getByRole('table', { name: t('txInbox') });
-    const pending = screen.getByRole('button', { name: new RegExp(`${t('txPendingCount')}.*5$`) });
+    const pending = screen.getByRole('button', { name: new RegExp(`${t('txPendingCount')}.*11$`) });
     fireEvent.click(pending);
     expect(within(inbox).getByText('ORD-42')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('searchbox', { name: t('txSearch') }), { target: { value: 'ORD-42' } });

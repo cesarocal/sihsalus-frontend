@@ -6,6 +6,8 @@ import { localDateTime } from '../sections/laboratory/screening/screening-rules'
 import type { TransfusionRequest } from '../sections/transfusions/transfusions.types';
 import {
   comparePriority,
+  compatibilityNeedsCommunication,
+  compatibilityPending,
   transfusionCandidate,
   transfusionLocalDay,
 } from '../sections/transfusions/transfusions-rules';
@@ -30,6 +32,7 @@ async function sampled(number = 1, api = createMockTransfusionsApi()) {
     reviewer: 'Responsable DEMO',
     reviewVerified: true,
     consentVerified: true,
+    urgentAuthorizationVerified: request.order.priority === 'veryUrgent',
   });
   const collectedAt = localDateTime();
   return api.saveSample(reviewed.id, reviewed.revision, {
@@ -37,6 +40,7 @@ async function sampled(number = 1, api = createMockTransfusionsApi()) {
     collectedAt,
     collectedBy: 'Extracción DEMO',
     printRequestedAt: collectedAt,
+    urgentPairVerified: request.order.priority === 'veryUrgent',
   });
 }
 async function assigned(api = createMockTransfusionsApi()) {
@@ -53,6 +57,7 @@ async function results(request: TransfusionRequest, incompatible = false, api = 
     {
       ...round,
       operator: 'Laboratorio DEMO',
+      labelsPrintRequestedAt: new Date().toISOString(),
       identityVerified: true,
       pretransfusionVerified: true,
       results: Object.fromEntries(
@@ -101,10 +106,36 @@ describe('regular transfusion attention and compatibility shared stock', () => {
     ).toBe(true);
     expect(new Set(stock.map((unit) => unit.sealId)).size).toBe(20);
     expect((await createMockInventoryApi().list()).operations).toEqual([]);
-    expect(data.requests).toHaveLength(4);
+    expect(data.requests).toHaveLength(10);
+    const [redCells, plasma, shortStock] = data.requests.slice(4, 7);
+    expect(data.units.filter((unit) => transfusionCandidate(unit, redCells)).map((unit) => unit.bloodGroup)).toEqual(
+      expect.arrayContaining(['A+', 'O+', 'O-']),
+    );
+    expect(data.units.filter((unit) => transfusionCandidate(unit, plasma)).map((unit) => unit.bloodGroup)).toEqual(
+      expect.arrayContaining(['A+', 'AB+']),
+    );
+    expect(data.units.filter((unit) => transfusionCandidate(unit, shortStock))).toHaveLength(1);
+    expect(data.requests.slice(7).map((request) => request.order.priority)).toEqual([
+      'urgent',
+      'veryUrgent',
+      'veryUrgent',
+    ]);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });
-  it('orders priority first then oldest request and blocks urgent pathways at the adapter', async () => {
+  it('adds the new fixtures to saved sessions and keeps their existing requests and progress', async () => {
+    const api = createMockTransfusionsApi();
+    const registered = await sampled(1, api);
+    const state = readProcessingState(() => sessionStorage);
+    if (!state.transfusions) throw new Error('MISSING_FIXTURE');
+    state.transfusions.requests = state.transfusions.requests.slice(0, 4);
+    writeProcessingState(() => sessionStorage, state);
+
+    const data = await api.list();
+    expect(data.requests).toHaveLength(10);
+    expect(data.requests[0]).toEqual(registered);
+    expect(readProcessingState(() => sessionStorage).transfusions?.requests).toHaveLength(4);
+  });
+  it('orders priority first then oldest request', () => {
     expect(
       [
         { priority: 'scheduled' as const, date: '2026-01-01' },
@@ -114,16 +145,76 @@ describe('regular transfusion attention and compatibility shared stock', () => {
     expect(
       comparePriority({ priority: 'scheduled', date: '2026-01-01' }, { priority: 'scheduled', date: '2026-01-02' }),
     ).toBeLessThan(0);
+  });
+  it.each([
+    [5, 6, true],
+    [6, 13, false],
+    [8, 6, true],
+  ])('completes regular demo %i using compatible stock from a different ABO/Rh group', async (number, unit, crossmatch) => {
     const api = createMockTransfusionsApi();
-    const request = (await api.list()).requests[3];
+    const request = await sampled(number, api);
+    const assigned = await api.assign(request.id, request.revision, [unitCode(unit)], true);
+    expect(assigned.urgentAuthorization).toBeUndefined();
+    expect(assigned.status).toBe(crossmatch ? 'testing' : 'compatible');
+    if (crossmatch)
+      await expect(api.deliver(assigned.id, assigned.revision, pickup(assigned))).rejects.toThrow(
+        'TRANSFUSION_CONFLICT',
+      );
+    const ready = crossmatch ? await results(assigned, false, api) : assigned;
+    expect((await api.deliver(ready.id, ready.revision, pickup(ready))).status).toBe('delivered');
+    expect((await api.list()).bookEntries).toHaveLength(1);
+  });
+  it.each([7, 10])('keeps demo %i open without assigning or delivering partial stock', async (number) => {
+    const api = createMockTransfusionsApi();
+    const request = await sampled(number, api);
+    const candidates = (await api.list()).units.filter((unit) => transfusionCandidate(unit, request));
+    expect(candidates.map((unit) => unit.id)).toEqual([unitCode(6)]);
+    await expect(api.assign(request.id, request.revision, [unitCode(6)], true)).rejects.toThrow(
+      'INVALID_TRANSFUSION_SELECTION',
+    );
+    const workspace = await api.list();
+    expect(workspace.requests[number - 1]).toEqual(request);
+    expect(workspace.units.find((unit) => unit.id === unitCode(6))?.status).toBe('APTO');
+    expect(workspace.bookEntries).toEqual([]);
+  });
+  it('dispatches demo TX-DEMO-0009 before compatibility and keeps a later incompatible unit out of stock', async () => {
+    const api = createMockTransfusionsApi();
+    const initial = (await api.list()).requests[8];
+    const review = { ...initial.draft, reviewer: 'DEMO', reviewVerified: true, consentVerified: true };
+    await expect(api.review(initial.id, initial.revision, review)).rejects.toThrow('INVALID_TRANSFUSION_REVIEW');
+    const reviewed = await api.review(initial.id, initial.revision, { ...review, urgentAuthorizationVerified: true });
+    const collectedAt = localDateTime();
+    const sample = { ...reviewed.draft.sample, collectedAt, collectedBy: 'DEMO', printRequestedAt: collectedAt };
+    await expect(api.saveSample(reviewed.id, reviewed.revision, sample)).rejects.toThrow('INVALID_RECIPIENT_SAMPLE');
+    const request = await api.saveSample(reviewed.id, reviewed.revision, { ...sample, urgentPairVerified: true });
+    await expect(api.assign(request.id, request.revision, [unitCode(1), unitCode(13)], true)).rejects.toThrow(
+      'INVALID_TRANSFUSION_SELECTION',
+    );
     await expect(
-      api.review(request.id, request.revision, {
-        ...request.draft,
-        reviewVerified: true,
-        consentVerified: true,
-        reviewer: 'DEMO',
-      }),
-    ).rejects.toThrow('TRANSFUSION_CONFLICT');
+      api.assign(request.id, request.revision, [unitCode(1), unitCode(6), unitCode(11)], true),
+    ).rejects.toThrow('INVALID_TRANSFUSION_SELECTION');
+    const ready = await api.assign(request.id, request.revision, [unitCode(1), unitCode(6), unitCode(13)], true);
+    expect(ready.status).toBe('readyUrgent');
+    expect(compatibilityPending(ready, ready.rounds[0])).toBe(false);
+    await expect(results(ready, false, api)).rejects.toThrow('TRANSFUSION_CONFLICT');
+    await expect(api.deliver(ready.id, ready.revision, pickup(ready))).rejects.toThrow('INVALID_TRANSFUSION_DELIVERY');
+    const delivered = await api.deliver(ready.id, ready.revision, { ...pickup(ready), urgentLabelsVerified: true });
+    expect(delivered.status).toBe('delivered');
+    expect(compatibilityPending(delivered, delivered.rounds[0])).toBe(true);
+    const tested = await results(delivered, true, api);
+    expect(tested.status).toBe('delivered');
+    expect(tested.assignments[1]).toMatchObject({ result: 'incompatible', active: true });
+    expect(compatibilityNeedsCommunication(tested, tested.rounds[0])).toBe(true);
+    const notified = await api.communicateCompatibility(tested.id, tested.revision, tested.rounds[0].id, 'Banco DEMO');
+    expect(notified.rounds[0].communicated?.by).toBe('Banco DEMO');
+    expect(compatibilityNeedsCommunication(notified, notified.rounds[0])).toBe(false);
+    const workspace = await api.list();
+    expect(workspace.units.some((unit) => [unitCode(1), unitCode(6), unitCode(13)].includes(unit.id))).toBe(false);
+    expect(workspace.bookEntries).toHaveLength(3);
+    expect(workspace.bookEntries.find((entry) => entry.unitCode === unitCode(6))).toMatchObject({
+      compatibilityPendingAtDispatch: true,
+      compatibilityAfterDispatch: { result: 'incompatible' },
+    });
   });
   it('checks donor-to-recipient ABO/Rh by component and retains the same rule at assignment and delivery', async () => {
     const api = createMockTransfusionsApi();

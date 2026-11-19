@@ -26,6 +26,7 @@ import { screeningQueueStatus } from '../laboratory/screening/screening-repeat-r
 import { screeningCategory } from '../laboratory/screening/screening-rules';
 import { defaultExpiryWarningDays, isExpiryWarningDays } from '../settings/blood-bank-settings';
 import { transferDirection } from '../transfers/transfers-rules';
+import { compatibilityPending } from '../transfusions/transfusions-rules';
 import styles from './dashboard.scss';
 import { dashboardLink, expiresSoon } from './dashboard-shortcuts';
 import { LaboratoryHomeOverview } from './laboratory-home-overview.component';
@@ -400,7 +401,11 @@ export function DashboardPage({ api, expiryWarningDays }: { api: BloodBankApi; e
                                   <Card
                                     label={t('compatibility')}
                                     description={t('compatibilityHelp')}
-                                    count={requests.flatMap((r) => r.rounds).filter((r) => !r.completedAt).length}
+                                    count={
+                                      requests.flatMap((request) =>
+                                        request.rounds.filter((round) => compatibilityPending(request, round)),
+                                      ).length
+                                    }
                                     to="/laboratory/compatibility"
                                     t={t}
                                   />

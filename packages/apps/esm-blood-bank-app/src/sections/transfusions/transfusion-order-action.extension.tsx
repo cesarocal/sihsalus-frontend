@@ -568,6 +568,7 @@ function TransfusionOrderForm({
                       <RadioButton key={value} id={`${formId}-priority-${value}`} value={value} labelText={t(label)} />
                     ))}
                   </RadioButtonGroup>
+                  {fields.priority === 'veryUrgent' && <p>{t('txUrgentAuthorizationHelp')}</p>}
                   {fields.priority === 'scheduled' && (
                     <div className={styles.fr08Schedule}>
                       <TextInput

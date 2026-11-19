@@ -44,6 +44,7 @@ export function TransfusionHistory({
       ? (item.rounds.filter((round) => !!round.completedAt).at(-1)?.completedAt ?? item.order.requestedAt)
       : (item.deliveredAt ?? item.order.requestedAt);
   const invalid = !!from && !!to && from > to;
+  const hasPostDispatchResults = bookEntries?.some((item) => item.compatibilityPendingAtDispatch);
   const filtered = requests
     .filter(
       (item) =>
@@ -174,6 +175,7 @@ export function TransfusionHistory({
                     'txDoctorLicense',
                     'txDeliveredBy',
                     'txDeliveredAt',
+                    ...(hasPostDispatchResults ? ['txCompatibilityAtDispatch', 'txPostDispatchResult'] : []),
                   ]}
                   rows={book.map((item) => ({
                     id: item.id,
@@ -188,6 +190,14 @@ export function TransfusionHistory({
                       item.doctorLicense || '—',
                       item.attendedBy,
                       formatDatetime(new Date(item.at), { noToday: true }),
+                      ...(hasPostDispatchResults
+                        ? [
+                            item.compatibilityPendingAtDispatch ? t('txResultPending') : '—',
+                            item.compatibilityAfterDispatch
+                              ? `${t(item.compatibilityAfterDispatch.result === 'compatible' ? 'txCompatible' : 'txIncompatible')} · ${formatDatetime(new Date(item.compatibilityAfterDispatch.at), { noToday: true })}`
+                              : '—',
+                          ]
+                        : []),
                     ],
                   }))}
                   loading={false}

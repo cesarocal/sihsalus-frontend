@@ -6,9 +6,12 @@ import type {
   TransfusionStore,
 } from '../sections/transfusions/transfusions.types';
 import {
+  compatibilityNeedsCommunication,
+  compatibilityPending,
   initialTransfusionRequest,
   lockedAssignments,
   needsCrossmatch,
+  priorityKeys,
   requestComplete,
   sampleValid,
   selectionComplete,
@@ -29,7 +32,7 @@ export function createMockTransfusionsApi(
 ): TransfusionsApi {
   const load = () => {
     const state = withInventoryFixtures(readProcessingState(getStorage));
-    // Autologous and special-release pathways are outside this regular mock workflow.
+    // Directed autologous units are not candidates for these requests.
     const units = transferUnits(state).filter(
       (unit) =>
         !state.fractionation?.units.find((item) => item.code === unit.id)?.label.autologous &&
@@ -45,7 +48,7 @@ export function createMockTransfusionsApi(
       !request ||
       request.revision !== revision ||
       !statuses.includes(request.status) ||
-      request.order.priority !== 'scheduled'
+      !Object.hasOwn(priorityKeys, request.order.priority)
     )
       throw new Error('TRANSFUSION_CONFLICT');
     return structuredClone(request);
@@ -80,7 +83,7 @@ export function createMockTransfusionsApi(
       const { state, store } = load();
       const existing = store.requests.find((request) => request.id === order.id);
       if (existing?.issuedOrder) return existing;
-      if (existing || !order.id || order.priority !== 'scheduled' || order.otherComponent || !requestComplete(order))
+      if (existing || !order.id || order.otherComponent || !requestComplete(order))
         throw new Error('INVALID_ISSUED_TRANSFUSION_REQUEST');
       const request: TransfusionRequest = { ...initialTransfusionRequest(order), issuedOrder: true };
       store.requests.push(request);
@@ -95,6 +98,7 @@ export function createMockTransfusionsApi(
         'sampleReady',
         'incompatible',
         'compatible',
+        'readyUrgent',
       ]);
       if (JSON.stringify(request.draft) === JSON.stringify(draft)) return request;
       request.draft = structuredClone(draft);
@@ -103,10 +107,18 @@ export function createMockTransfusionsApi(
     async review(id, revision, draft) {
       const { state, store } = load();
       const request = current(store, id, revision, ['pending']);
-      if (!requestComplete(request.order) || !draft.reviewVerified || !draft.consentVerified || !draft.reviewer.trim())
+      const urgent = request.order.priority === 'veryUrgent';
+      if (
+        !requestComplete(request.order) ||
+        !draft.reviewVerified ||
+        !draft.consentVerified ||
+        !draft.reviewer.trim() ||
+        (urgent && draft.urgentAuthorizationVerified !== true)
+      )
         throw new Error('INVALID_TRANSFUSION_REVIEW');
       request.draft = structuredClone(draft);
       request.receivedAt = new Date().toISOString();
+      if (urgent) request.urgentAuthorization = { verifiedAt: request.receivedAt, verifiedBy: draft.reviewer };
       return persist(state, store, request, draft.reviewer, 'reviewed');
     },
     async saveSample(id, revision, sample) {
@@ -165,14 +177,17 @@ export function createMockTransfusionsApi(
           results: Object.fromEntries(tested.map((item) => [item.unit.id, ''])),
         });
       request.draft.selectedUnitIds = [];
-      return persist(state, store, request, request.draft.reviewer, tested.length ? 'testing' : 'compatible');
+      const status = request.order.priority === 'veryUrgent' ? 'readyUrgent' : tested.length ? 'testing' : 'compatible';
+      return persist(state, store, request, request.draft.reviewer, status);
     },
     async saveCompatibility(id, revision, input, finalize) {
       const { state, store, units } = load();
-      const request = current(store, id, revision, ['testing']);
-      const round = request.rounds.find((item) => item.id === input.id && !item.completedAt);
+      const request = current(store, id, revision, ['testing', 'delivered']);
+      const afterDispatch = request.status === 'delivered';
+      const round = request.rounds.find((item) => item.id === input.id && compatibilityPending(request, item));
       if (
         !round ||
+        (afterDispatch && request.order.priority !== 'veryUrgent') ||
         Object.keys(input.results).sort().join('|') !== Object.keys(round.results).sort().join('|') ||
         Object.values(input.results).some((value) => !['', 'compatible', 'incompatible'].includes(value))
       )
@@ -202,26 +217,37 @@ export function createMockTransfusionsApi(
           !round.operator.trim() ||
           !round.identityVerified ||
           !round.pretransfusionVerified ||
+          (afterDispatch && !round.labelsPrintRequestedAt) ||
           !sampleValid(round.sample, request.order) ||
           Object.values(round.results).some((value) => !value)
         )
           throw new Error('INCOMPLETE_COMPATIBILITY');
         const now = new Date().toISOString();
         for (const assignment of request.assignments.filter((item) => item.roundId === round.id)) {
-          const stock = units.find((item) => item.id === assignment.unit.id);
-          if (
-            !stock ||
-            stock.status !== 'En pruebas de compatibilidad' ||
-            stock.qualityIssues.length ||
-            stock.sealId !== assignment.unit.sealId
-          )
-            throw new Error('TRANSFUSION_STOCK_CONFLICT');
+          if (!afterDispatch) {
+            const stock = units.find((item) => item.id === assignment.unit.id);
+            if (
+              !stock ||
+              stock.status !== 'En pruebas de compatibilidad' ||
+              stock.qualityIssues.length ||
+              stock.sealId !== assignment.unit.sealId
+            )
+              throw new Error('TRANSFUSION_STOCK_CONFLICT');
+          }
           const result = round.results[assignment.unit.id];
           if (!result) throw new Error('INCOMPLETE_COMPATIBILITY');
           assignment.result = result;
           assignment.resultAt = now;
           assignment.testedBy = round.operator;
-          assignment.active = result === 'compatible';
+          if (afterDispatch) {
+            const entry = store.bookEntries.find(
+              (item) => item.requestId === id && item.unitCode === assignment.unit.id,
+            );
+            if (!entry?.compatibilityPendingAtDispatch) throw new Error('TRANSFUSION_STOCK_CONFLICT');
+            entry.compatibilityAfterDispatch = { result, at: now };
+          } else {
+            assignment.active = result === 'compatible';
+          }
         }
         round.completedAt = now;
       }
@@ -230,33 +256,56 @@ export function createMockTransfusionsApi(
         store,
         request,
         round.operator,
-        finalize
-          ? Object.values(round.results).some((value) => value === 'incompatible')
-            ? 'incompatible'
-            : 'compatible'
-          : 'testing',
+        afterDispatch
+          ? 'delivered'
+          : finalize
+            ? Object.values(round.results).some((value) => value === 'incompatible')
+              ? 'incompatible'
+              : 'compatible'
+            : 'testing',
       );
+    },
+    async communicateCompatibility(id, revision, roundId, actor) {
+      const { state, store } = load();
+      const previous = store.requests.find((item) => item.id === id);
+      if (previous?.rounds.some((round) => round.id === roundId && round.communicated)) return previous;
+      const request = current(store, id, revision, ['delivered']);
+      const round = request.rounds.find(
+        (item) => item.id === roundId && compatibilityNeedsCommunication(request, item),
+      );
+      if (!round || !actor.trim()) throw new Error('INVALID_COMPATIBILITY_COMMUNICATION');
+      round.communicated = { at: new Date().toISOString(), by: actor };
+      return persist(state, store, request, actor);
     },
     async deliver(id, revision, draft) {
       const { state, store, units } = load();
       const previous = store.requests.find((item) => item.id === id);
       if (previous?.status === 'delivered') return structuredClone(previous);
-      const request = current(store, id, revision, ['compatible']);
+      const request = current(store, id, revision, ['compatible', 'readyUrgent']);
+      const urgent = request.status === 'readyUrgent';
+      const assigned = urgent ? request.assignments.filter((item) => item.active) : lockedAssignments(request);
+      const dispatchWithPendingTests = urgent && assigned.some((item) => item.result === 'pending');
       if (
         !draft.collectorName.trim() ||
         !/^\d{8}$/.test(draft.collectorDocument) ||
         !draft.deliveredBy.trim() ||
-        !draft.releaseVerified
+        !draft.releaseVerified ||
+        (urgent && (request.order.priority !== 'veryUrgent' || !request.urgentAuthorization)) ||
+        (dispatchWithPendingTests && draft.urgentLabelsVerified !== true)
       )
         throw new Error('INVALID_TRANSFUSION_DELIVERY');
-      const assigned = lockedAssignments(request);
       if (
         assigned.length !== request.order.items.reduce((sum, item) => sum + item.quantity, 0) ||
         !request.order.items.every(
           (item) => assigned.filter((unit) => unit.unit.componentType === item.component).length === item.quantity,
         ) ||
-        assigned.some((item) => needsCrossmatch(item.unit.componentType) && item.result !== 'compatible') ||
-        (assigned.some((item) => needsCrossmatch(item.unit.componentType)) &&
+        assigned.some(
+          (item) =>
+            needsCrossmatch(item.unit.componentType) &&
+            item.result !== 'compatible' &&
+            !(urgent && item.result === 'pending' && request.rounds.some((round) => round.id === item.roundId)),
+        ) ||
+        ((urgent || assigned.some((item) => needsCrossmatch(item.unit.componentType))) &&
           (!request.sample || !sampleValid(request.sample, request.order)))
       )
         throw new Error('TRANSFUSION_STOCK_CONFLICT');
@@ -270,7 +319,14 @@ export function createMockTransfusionsApi(
         )
           throw new Error('TRANSFUSION_STOCK_CONFLICT');
       }
-      request.draft = structuredClone(draft);
+      request.draft = {
+        ...request.draft,
+        collectorName: draft.collectorName,
+        collectorDocument: draft.collectorDocument,
+        deliveredBy: draft.deliveredBy,
+        releaseVerified: draft.releaseVerified,
+        urgentLabelsVerified: draft.urgentLabelsVerified,
+      };
       request.deliveredAt = new Date().toISOString();
       request.requesterStatus = 'ATENDIDA';
       for (const assignment of assigned) {
@@ -292,6 +348,7 @@ export function createMockTransfusionsApi(
           collectorName: draft.collectorName,
           collectorDocument: draft.collectorDocument,
           at: request.deliveredAt,
+          ...(assignment.result === 'pending' ? { compatibilityPendingAtDispatch: true as const } : {}),
         });
       }
       return persist(state, store, request, draft.deliveredBy, 'delivered');

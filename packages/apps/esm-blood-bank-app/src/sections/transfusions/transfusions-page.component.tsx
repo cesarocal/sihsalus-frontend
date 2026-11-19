@@ -27,7 +27,7 @@ import {
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import styles from './transfusions.scss';
 import type { TransfusionOrder, TransfusionRequest } from './transfusions.types';
-import { comparePriority, priorityKeys, transfusionStatusKeys } from './transfusions-rules';
+import { comparePriority, priorityKeys, readyForDelivery, transfusionStatusKeys } from './transfusions-rules';
 import { useTransfusionsTranslation } from './use-transfusions-translation';
 
 const bankOrderRead = [bloodBankPrivileges.module, bloodBankPrivileges.transfusions, 'Get Orders'];
@@ -38,7 +38,7 @@ const statusCards = [
     statuses: new Set(['txPending', 'txReviewed', 'txSampleReady', 'fr08Sent', 'fr08Received', 'fr08InProgress']),
   },
   { filter: 'txTesting', label: 'txTesting', statuses: new Set(['txTesting']) },
-  { filter: 'txCompatible', label: 'txReadyCount', statuses: new Set(['txCompatible']) },
+  { filter: 'txCompatible', label: 'txReadyCount', statuses: new Set(['txCompatible', 'txReadyUrgent']) },
 ];
 
 interface InboxRow {
@@ -114,7 +114,6 @@ export function TransfusionsPage({
         useMockData &&
           !workspaceFailed &&
           api.prepareIssuedRequest &&
-          item.order.priority === 'scheduled' &&
           !item.order.otherComponent &&
           !item.stopped &&
           (canReceive ||
@@ -162,7 +161,7 @@ export function TransfusionsPage({
       ),
     );
   const openRequest = async (item: InboxRow) => {
-    if (item.request && item.order.priority === 'scheduled') {
+    if (item.request) {
       setActive(item.request);
       return;
     }
@@ -285,13 +284,9 @@ export function TransfusionsPage({
               t(item.statusKey),
               <Button key="action" kind="ghost" size="sm" disabled={preparing} onClick={() => void openRequest(item)}>
                 {t(
-                  item.request?.status === 'compatible'
+                  item.request && readyForDelivery(item.request.status)
                     ? 'txDeliver'
-                    : (
-                          item.request
-                            ? item.order.priority === 'scheduled' && item.request.status !== 'testing'
-                            : item.canPrepare || item.canReceive
-                        )
+                    : (item.request ? item.request.status !== 'testing' : item.canPrepare || item.canReceive)
                       ? 'txAttend'
                       : 'fr08Open',
                 )}

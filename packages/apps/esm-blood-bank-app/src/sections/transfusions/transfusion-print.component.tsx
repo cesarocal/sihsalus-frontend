@@ -8,7 +8,7 @@ import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionComponentCards } from './transfusion-component-cards.component';
 import styles from './transfusions.scss';
 import type { CompatibilityRound, RecipientSample, TransfusionRequest } from './transfusions.types';
-import { compatibilityReportReady } from './transfusions-rules';
+import { compatibilityReportReady, urgentSerumSampleCode } from './transfusions-rules';
 
 export const transfusionLabelPrintCss = `${processingPrintCss}
   [data-label] { box-sizing: border-box; margin-block: 0 3mm; break-inside: avoid; }
@@ -89,6 +89,7 @@ export function TransfusionLabels({
         .filter((item) => item.roundId === round.id && !!item.unitSampleCode)
         .map((item) => ({
           code: item.unitSampleCode ?? '',
+          kind: '',
           name: item.unit.id,
           historyNumber: '',
           bloodGroup: item.unit.bloodGroup,
@@ -96,24 +97,28 @@ export function TransfusionLabels({
           date: item.assignedAt,
           operator: request.draft.reviewer,
         }))
-    : [
-        {
-          code: sample.code,
-          name: request.order.patientName,
-          historyNumber: sample.historyNumber,
-          bloodGroup: request.order.bloodGroup,
-          seal: '',
-          date: sample.collectedAt,
-          operator: sample.collectedBy,
-        },
-      ];
+    : (request.order.priority === 'veryUrgent'
+        ? [
+            { code: sample.code, kind: 'txAnticoagulatedSample' },
+            { code: urgentSerumSampleCode(sample), kind: 'txNonAnticoagulatedSample' },
+          ]
+        : [{ code: sample.code, kind: '' }]
+      ).map((label) => ({
+        ...label,
+        name: request.order.patientName,
+        historyNumber: sample.historyNumber,
+        bloodGroup: request.order.bloodGroup,
+        seal: '',
+        date: sample.collectedAt,
+        operator: sample.collectedBy,
+      }));
   return (
     <article className={styles.document}>
       {labels.map((label) => (
         <section key={label.code} data-label>
           <header>
             <img src={hospitalLogo} width={46} height={46} alt={t('certificateHospital')} />
-            <h2>{t('txSampleLabel')}</h2>
+            <h2>{t(label.kind || 'txSampleLabel')}</h2>
           </header>
           <p>
             {t('sampleCode')}: {label.code}
@@ -144,6 +149,43 @@ export function TransfusionLabels({
     </article>
   );
 }
+
+export function UrgentReleaseLabels({ request, t }: { request: TransfusionRequest; t: ProcessingTranslate }) {
+  const { order } = request;
+  return (
+    <article className={styles.document}>
+      {request.assignments
+        .filter((item) => item.active && item.result === 'pending')
+        .map(({ unit }) => (
+          <section key={unit.id} data-label>
+            <header>
+              <img src={hospitalLogo} width={46} height={46} alt={t('certificateHospital')} />
+              <h2>{t('txUrgentReleaseLabel')}</h2>
+            </header>
+            <p>
+              {t('txReportRequestNumber')}: {order.number}
+            </p>
+            <p>
+              {t('txRecipientName')}: {order.patientName}
+            </p>
+            <p>
+              {t('txHistoryNumber')}: {order.historyNumber}
+            </p>
+            <p>
+              {t('txReportBloodGroup')}: {transfusionBloodGroupLabel(order.bloodGroup, t)}
+            </p>
+            <p>
+              {t('inventoryUnitNumber')}: {unit.id}
+            </p>
+            <p>
+              {t('txSeal')}: {inventoryUnitSealCode(unit)}
+            </p>
+          </section>
+        ))}
+    </article>
+  );
+}
+
 export function CompatibilityReport({
   request,
   t,
@@ -163,7 +205,14 @@ export function CompatibilityReport({
     txSamplePatientName: order.patientName,
     txSampleHistoryNumber: order.historyNumber,
     txReportBloodGroup: transfusionBloodGroupLabel(order.bloodGroup, t),
-    ...(request.sample?.code ? { txRecipientSample: request.sample.code } : {}),
+    ...(request.sample?.code
+      ? order.priority === 'veryUrgent'
+        ? {
+            txAnticoagulatedSample: request.sample.code,
+            txNonAnticoagulatedSample: urgentSerumSampleCode(request.sample),
+          }
+        : { txRecipientSample: request.sample.code }
+      : {}),
     ...(showAttendedBy ? { txAttendedBy: request.draft.reviewer } : {}),
   };
 
@@ -184,6 +233,11 @@ export function CompatibilityReport({
         ))}
       </dl>
       {history && print && <TransfusionComponentCards order={order} t={t} />}
+      {order.priority === 'veryUrgent' && request.rounds.length > 0 && (
+        <p className={styles.reportStatus}>
+          {t(compatibilityReportReady(request) ? 'txPostDispatch' : 'txPostDispatchPending')}
+        </p>
+      )}
       {!print && request.rounds.length > 0 && !compatibilityReportReady(request) && (
         <p className={styles.reportStatus} role="status">
           {t('txReportPendingPrint')}
@@ -280,6 +334,16 @@ export function CompatibilityReport({
                   ` · ${t('txCollectorDocument')}: ${request.draft.collectorDocument}`}
               </dd>
             </div>
+          )}
+          {request.rounds.map((round) =>
+            round.communicated ? (
+              <div key={round.id}>
+                <dt>{t('txCommunicatedBy')}</dt>
+                <dd>
+                  {round.communicated.by} · {formatDatetime(new Date(round.communicated.at), { noToday: true })}
+                </dd>
+              </div>
+            ) : null,
           )}
         </dl>
       )}

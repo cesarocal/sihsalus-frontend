@@ -4,7 +4,14 @@ import type { ComponentType } from '../laboratory/fractionation/fractionation.ty
 import { screeningTests } from '../laboratory/screening/screening.types';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import type { TransferUnit } from '../transfers/transfers.types';
-import type { RecipientSample, TransfusionOrder, TransfusionPriority, TransfusionRequest } from './transfusions.types';
+import type {
+  CompatibilityRound,
+  RecipientSample,
+  TransfusionOrder,
+  TransfusionPriority,
+  TransfusionRequest,
+  TransfusionStatus,
+} from './transfusions.types';
 
 export const transfusionStatusKeys = {
   pending: 'txPending',
@@ -13,6 +20,7 @@ export const transfusionStatusKeys = {
   testing: 'txTesting',
   incompatible: 'txIncompatible',
   compatible: 'txCompatible',
+  readyUrgent: 'txReadyUrgent',
   delivered: 'txDelivered',
 } as const;
 export const priorityKeys = { scheduled: 'txScheduled', urgent: 'txUrgent', veryUrgent: 'txVeryUrgent' } as const;
@@ -35,6 +43,12 @@ export const needsCrossmatch = (component: ComponentType | null) =>
   component === 'pediatricFraction';
 export const lockedAssignments = (request: TransfusionRequest) =>
   request.assignments.filter((item) => item.active && item.result !== 'pending');
+export const readyForDelivery = (status: TransfusionStatus) => status === 'compatible' || status === 'readyUrgent';
+export const compatibilityPending = (request: TransfusionRequest, round: CompatibilityRound) =>
+  !round.completedAt && (request.order.priority !== 'veryUrgent' || !!request.deliveredAt);
+export const compatibilityNeedsCommunication = (request: TransfusionRequest, round: CompatibilityRound) =>
+  request.order.priority === 'veryUrgent' && !!request.deliveredAt && !!round.completedAt && !round.communicated;
+export const urgentSerumSampleCode = (sample: RecipientSample) => `${sample.code}-S`;
 export const compatibilityReportReady = (request: TransfusionRequest) =>
   request.assignments.length > 0 &&
   request.rounds.length > 0 &&
@@ -63,6 +77,7 @@ export function requestComplete(order: TransfusionOrder): boolean {
     order.historyNumber.trim() &&
     order.orderer.trim() &&
     order.diagnosis.trim() &&
+    Object.hasOwn(priorityKeys, order.priority) &&
     /^(A|B|AB|O)[+−-]$/.test(order.bloodGroup) &&
     Number.isFinite(Date.parse(order.requestedAt)) &&
     order.items.length &&
@@ -146,7 +161,6 @@ export function transfusionCandidate(unit: TransferUnit, request: TransfusionReq
   const expiry = inventoryExpiry(unit.expiresAt);
   const collected = inventoryExpiry(unit.collectedOn);
   return (
-    request.order.priority === 'scheduled' &&
     unit.status === 'APTO' &&
     !!unit.sealId &&
     !unit.qualityIssues.length &&
@@ -184,6 +198,7 @@ export function sampleValid(sample: RecipientSample, order: TransfusionOrder): b
     !!sample.code &&
     !!sample.collectedBy.trim() &&
     (sample.printRequestedAt === sample.collectedAt || sample.identityVerified === true) &&
+    (order.priority !== 'veryUrgent' || sample.urgentPairVerified === true) &&
     Number.isFinite(age) &&
     age >= 0 &&
     age <= 3

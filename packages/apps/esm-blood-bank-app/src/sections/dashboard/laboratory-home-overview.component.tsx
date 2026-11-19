@@ -18,7 +18,7 @@ import { useProcessingTranslation } from '../../shared/processing-page.component
 import { componentDefinitions, eligibleSource } from '../laboratory/fractionation/fractionation-rules';
 import { screeningCategory, screeningOriginLabel } from '../laboratory/screening/screening-rules';
 import { screeningQueueStatus } from '../laboratory/screening/screening-repeat-rules';
-import { comparePriority } from '../transfusions/transfusions-rules';
+import { comparePriority, compatibilityPending } from '../transfusions/transfusions-rules';
 import { dashboardLink } from './dashboard-shortcuts';
 import { AuthorizedHomeSource, HomeSummary, type HomeSourceState } from './home-overview.component';
 import styles from './dashboard.scss';
@@ -53,7 +53,7 @@ export function LaboratoryHomeOverview({ api, t }: { api: BloodBankApi; t: (key:
                 const followUps = samples.filter((record) => screeningCategory(record) === 'followUps');
                 const rounds = (ready(compatibility)?.requests ?? [])
                   .flatMap((request) => request.rounds.map((round) => ({ request, round })))
-                  .filter(({ round }) => !round.completedAt)
+                  .filter(({ request, round }) => compatibilityPending(request, round))
                   .sort((a, b) =>
                     comparePriority(
                       { priority: a.request.order.priority, date: a.round.createdAt },

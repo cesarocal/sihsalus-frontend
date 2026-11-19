@@ -18,6 +18,7 @@ import {
   compatibilityReportPrintCss,
   TransfusionLabels,
   transfusionLabelPrintCss,
+  UrgentReleaseLabels,
 } from './transfusion-print.component';
 import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import styles from './transfusions.scss';
@@ -25,10 +26,12 @@ import type { TransfusionDraft, TransfusionRequest } from './transfusions.types'
 import {
   compatibilityReportReady,
   needsCrossmatch,
+  readyForDelivery,
   requestComplete,
   sampleValid,
   selectionComplete,
   transfusionOperatorName,
+  urgentSerumSampleCode,
 } from './transfusions-rules';
 import { useTransfusionReceipt } from './use-transfusion-receipt';
 
@@ -52,11 +55,13 @@ export function TransfusionWorkflow({
   t: ProcessingTranslate;
 }) {
   const [request, setRequest] = useState(initial);
-  const delivery = initial.status === 'compatible';
+  const delivery = readyForDelivery(initial.status);
+  const veryUrgent = request.order.priority === 'veryUrgent';
+  const urgentRelease = initial.status === 'readyUrgent' && request.rounds.length > 0;
   const readOnly = initial.status === 'testing';
   const replacement = initial.status === 'incompatible';
   const steps = delivery
-    ? ['txReviewResults', 'txPickup']
+    ? [urgentRelease ? 'txPostDispatchPending' : 'txReviewResults', 'txPickup']
     : readOnly
       ? ['txReviewResults']
       : replacement
@@ -113,13 +118,18 @@ export function TransfusionWorkflow({
     reviewStep && request.status === 'pending' && Boolean(request.issuedOrder) && !receipt.received;
   const reportReady = compatibilityReportReady(request);
   const sample = request.sample ?? draft.sample;
-  const sampleReady =
-    !!request.sample || (sample.printRequestedAt === sample.collectedAt && sampleValid(sample, request.order));
+  const samplePrinted =
+    !!request.sample ||
+    (sample.printRequestedAt === sample.collectedAt &&
+      sampleValid({ ...sample, urgentPairVerified: true }, request.order));
+  const sampleReady = !!request.sample || (samplePrinted && sampleValid(sample, request.order));
   const selectedUnits = units.filter((unit) => draft.selectedUnitIds.includes(unit.id));
-  const assignmentEffects = [
-    selectedUnits.some((unit) => needsCrossmatch(unit.componentType)) && t('txAssignTestsEffect'),
-    selectedUnits.some((unit) => !needsCrossmatch(unit.componentType)) && t('txAssignReserveEffect'),
-  ].filter((item): item is string => typeof item === 'string');
+  const assignmentEffects = veryUrgent
+    ? [t('txUrgentAssignEffect')]
+    : [
+        selectedUnits.some((unit) => needsCrossmatch(unit.componentType)) && t('txAssignTestsEffect'),
+        selectedUnits.some((unit) => !needsCrossmatch(unit.componentType)) && t('txAssignReserveEffect'),
+      ].filter((item): item is string => typeof item === 'string');
   const advance = async () => {
     if (delivery) {
       if (step === 0) setStep(1);
@@ -127,7 +137,8 @@ export function TransfusionWorkflow({
         !draft.collectorName.trim() ||
         !/^\d{8}$/.test(draft.collectorDocument) ||
         !operator ||
-        !draft.releaseVerified
+        !draft.releaseVerified ||
+        (urgentRelease && !draft.urgentLabelsVerified)
       )
         setErrors(['txPickupRequired']);
       else setConfirm('deliver');
@@ -146,6 +157,10 @@ export function TransfusionWorkflow({
       if (awaitingReceipt || receipt.saving) return;
       if (request.status !== 'pending') {
         setStep(1);
+        return;
+      }
+      if (veryUrgent && !draft.urgentAuthorizationVerified) {
+        setErrors(['txUrgentAuthorizationRequired']);
         return;
       }
       if (
@@ -171,25 +186,29 @@ export function TransfusionWorkflow({
     }
   };
   const print = () => {
-    if (!reportReady) return;
+    if (!urgentRelease && !reportReady) return;
     setFailed('');
     try {
       printDocument(
-        <CompatibilityReport request={request} t={t} print />,
-        t('txCompatibilityReport'),
+        urgentRelease ? (
+          <UrgentReleaseLabels request={request} t={t} />
+        ) : (
+          <CompatibilityReport request={request} t={t} print />
+        ),
+        t(urgentRelease ? 'txPrintUrgentReleaseLabels' : 'txCompatibilityReport'),
         () => setFailed('printFailed'),
-        compatibilityReportPrintCss,
+        urgentRelease ? transfusionLabelPrintCss : compatibilityReportPrintCss,
       );
     } catch {
       setFailed('printFailed');
     }
   };
   const printSample = () => {
-    if (printingSample || (!sampleReady && !operator)) return;
+    if (printingSample || (!samplePrinted && !operator)) return;
     setFailed('');
     setPrintingSample(true);
     const collectedAt = new Date().toISOString();
-    const sampleToPrint = sampleReady
+    const sampleToPrint = samplePrinted
       ? sample
       : { ...sample, collectedAt, collectedBy: operator, printRequestedAt: collectedAt };
     const onError = () => {
@@ -199,11 +218,11 @@ export function TransfusionWorkflow({
     try {
       printDocument(
         <TransfusionLabels request={request} sample={sampleToPrint} t={t} />,
-        t('txPrintSample'),
+        t(veryUrgent ? 'txPrintUrgentSamples' : 'txPrintSample'),
         onError,
         transfusionLabelPrintCss,
         () => {
-          if (!sampleReady) change({ sample: sampleToPrint });
+          if (!samplePrinted) change({ sample: sampleToPrint });
           setPrintingSample(false);
         },
       );
@@ -251,7 +270,12 @@ export function TransfusionWorkflow({
                 <Button
                   kind="tertiary"
                   size="sm"
-                  disabled={!draft.reviewVerified || saving || receipt.saving}
+                  disabled={
+                    !draft.reviewVerified ||
+                    (veryUrgent && !draft.urgentAuthorizationVerified) ||
+                    saving ||
+                    receipt.saving
+                  }
                   onClick={() => void receipt.register()}
                 >
                   {t('fr08Receive')}
@@ -273,10 +297,26 @@ export function TransfusionWorkflow({
                 className={styles.printButton}
                 size="sm"
                 renderIcon={Printer}
-                disabled={saving || printingSample || (sampleStep ? !operator && !sampleReady : !reportReady)}
+                disabled={
+                  saving ||
+                  printingSample ||
+                  (sampleStep ? !operator && !samplePrinted : !urgentRelease && !reportReady)
+                }
                 onClick={sampleStep ? printSample : print}
               >
-                {t(sampleStep ? (sampleReady ? 'txReprintSample' : 'txPrintSample') : 'txPrintResults')}
+                {t(
+                  sampleStep
+                    ? veryUrgent
+                      ? samplePrinted
+                        ? 'txReprintUrgentSamples'
+                        : 'txPrintUrgentSamples'
+                      : samplePrinted
+                        ? 'txReprintSample'
+                        : 'txPrintSample'
+                    : urgentRelease
+                      ? 'txPrintUrgentReleaseLabels'
+                      : 'txPrintResults',
+                )}
               </Button>
             )
           )
@@ -324,16 +364,38 @@ export function TransfusionWorkflow({
                 <p>{t('txAutomaticDate')}</p>
                 <Checkbox
                   id="tx-release-check"
-                  labelText={t('txReleaseCheck')}
+                  labelText={t(urgentRelease ? 'txUrgentReleaseCheck' : 'txReleaseCheck')}
                   disabled={saving}
                   checked={draft.releaseVerified}
                   onChange={(_e, { checked }) => change({ releaseVerified: checked })}
                 />
+                {urgentRelease && (
+                  <Checkbox
+                    id="tx-urgent-labels-check"
+                    labelText={t('txUrgentLabelsCheck')}
+                    disabled={saving}
+                    checked={!!draft.urgentLabelsVerified}
+                    onChange={(_e, { checked }) => change({ urgentLabelsVerified: checked })}
+                  />
+                )}
               </>
             ) : sampleStep ? (
               <>
                 <div className={styles.fields}>
-                  <TextInput id="tx-sample-code" labelText={t('sampleCode')} value={draft.sample.code} readOnly />
+                  <TextInput
+                    id="tx-sample-code"
+                    labelText={t(veryUrgent ? 'txAnticoagulatedSample' : 'sampleCode')}
+                    value={sample.code}
+                    readOnly
+                  />
+                  {veryUrgent && (
+                    <TextInput
+                      id="tx-serum-sample-code"
+                      labelText={t('txNonAnticoagulatedSample')}
+                      value={urgentSerumSampleCode(sample)}
+                      readOnly
+                    />
+                  )}
                   <TextInput
                     id="tx-sample-history"
                     labelText={t('txHistoryNumber')}
@@ -349,13 +411,23 @@ export function TransfusionWorkflow({
                   <TextInput
                     id="tx-sample-operator"
                     labelText={t('txCollectedBy')}
-                    value={sampleReady ? sample.collectedBy : operator}
+                    value={samplePrinted ? sample.collectedBy : operator}
                     readOnly
-                    invalid={!sampleReady && !operator}
+                    invalid={!samplePrinted && !operator}
                     invalidText={t('txOperatorUnavailable')}
                   />
                 </div>
-                <p>{t('txSampleSaveHelp')}</p>
+                {veryUrgent ? (
+                  <Checkbox
+                    id="tx-urgent-samples-check"
+                    labelText={t('txUrgentSamplesCheck')}
+                    checked={!!sample.urgentPairVerified}
+                    disabled={saving || printingSample || !!request.sample}
+                    onChange={(_e, { checked }) => change({ sample: { ...sample, urgentPairVerified: checked } })}
+                  />
+                ) : (
+                  <p>{t('txSampleSaveHelp')}</p>
+                )}
               </>
             ) : (
               <>
@@ -389,6 +461,15 @@ export function TransfusionWorkflow({
                       disabled={saving || receipt.saving || request.status !== 'pending'}
                       onChange={(_e, { checked }) => change({ consentVerified: checked })}
                     />
+                    {veryUrgent && (
+                      <Checkbox
+                        id="tx-urgent-authorization-check"
+                        labelText={t('txUrgentAuthorizationCheck')}
+                        checked={!!draft.urgentAuthorizationVerified}
+                        disabled={saving || receipt.saving || request.status !== 'pending'}
+                        onChange={(_e, { checked }) => change({ urgentAuthorizationVerified: checked })}
+                      />
+                    )}
                   </div>
                 )}
               </>

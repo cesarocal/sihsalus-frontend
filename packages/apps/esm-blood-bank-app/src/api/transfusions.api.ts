@@ -21,6 +21,7 @@ export interface TransfusionsApi {
     round: CompatibilityRound,
     finalize: boolean,
   ): Promise<TransfusionRequest>;
+  communicateCompatibility(id: string, revision: number, roundId: string, actor: string): Promise<TransfusionRequest>;
   deliver(id: string, revision: number, draft: TransfusionDraft): Promise<TransfusionRequest>;
 }
 /** Proposed OMOD routes for inventory, compatibility and dispatch of existing orders. */
@@ -32,6 +33,7 @@ export const transfusionEndpoints = {
   sample: '/ws/rest/v1/bloodbank/transfusion-requests/:uuid/recipient-sample',
   assignments: '/ws/rest/v1/bloodbank/transfusion-requests/:uuid/assignments',
   compatibility: '/ws/rest/v1/bloodbank/transfusion-requests/:uuid/compatibility/:roundUuid',
+  communication: '/ws/rest/v1/bloodbank/transfusion-requests/:uuid/compatibility/:roundUuid/communication',
   deliver: '/ws/rest/v1/bloodbank/transfusion-requests/:uuid/deliver',
 } as const;
 const unavailable = async (): Promise<never> => {
@@ -44,5 +46,6 @@ export const openmrsTransfusionsApi: TransfusionsApi = {
   saveSample: unavailable,
   assign: unavailable,
   saveCompatibility: unavailable,
+  communicateCompatibility: unavailable,
   deliver: unavailable,
 };

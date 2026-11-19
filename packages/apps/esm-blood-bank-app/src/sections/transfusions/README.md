@@ -1,4 +1,4 @@
-# Atención regular de solicitudes transfusionales
+# Atención de solicitudes transfusionales
 
 El módulo ofrece emisión y recepción de solicitudes transfusionales con órdenes de
 OpenMRS bajo configuración explícita. Las rondas, el inventario y la entrega
@@ -21,13 +21,25 @@ del circuito de prueba operan con datos sintéticos.
   compatibles si corresponde → revisar resultados → identificar a quien recoge
   → confirmar entrega → historial y egresos del libro.
 
-Una solicitud urgente sintética permite comprobar el orden de prioridad y
-consultar su detalle. El adaptador de prueba permite atender solicitudes programadas.
+Urgente mantiene el circuito regular y se distingue por su etiqueta de prioridad.
+Muy urgente usa el circuito PC13 en las mismas pantallas. La verificación registra
+quién constató la autorización firmada y sellada del FR08 y en qué momento.
+La pantalla de muestra genera dos etiquetas para el receptor, con y sin
+anticoagulante. La selección exige las cantidades completas y aplica el filtro
+ABO/Rh por componente en las tres prioridades.
+
+En Muy urgente, la selección reserva las unidades y habilita Entregar. La revisión
+de la entrega puede imprimir los rótulos de compatibilidad pendiente para las
+unidades que requieren prueba cruzada. Al confirmar la entrega se registra un
+egreso por unidad y se habilitan las pruebas pendientes en Compatibilidad. Su
+resultado posterior queda registrado en el egreso y se registra por separado
+la comunicación al médico solicitante. Una discordancia posterior se destaca
+en Compatibilidad y conserva el egreso y la salida de inventario.
 
 El acceso de Inicio de Laboratorio `?round=<id>` en Compatibilidad revalida
-una ronda exacta no completada y abre el formulario existente, bajo su guard.
+una ronda exacta disponible y abre el formulario existente, bajo su guard.
 Abrir o cerrar sin guardar no registra resultados ni cambia estados. Una ronda
-completada o inexistente muestra un aviso seguro. La referencia se consume una
+completada que carece de acciones pendientes, o una inexistente, muestra un aviso seguro. La referencia se consume una
 vez para evitar reapertura al refrescar; recargar la URL vuelve a validarla.
 
 ## Solicitudes desde Órdenes
@@ -46,7 +58,8 @@ versión estructurada del FR08 en `instructions`; el número de acceso identific
 el intento para recuperar una respuesta de guardado perdida. Las solicitudes
 programadas guardan la fecha y hora de programación con `ON_SCHEDULED_DATE`.
 Urgente y Muy urgente usan `STAT` y conservan la prioridad específica en el
-FR08. La impresión coloca bajo **Otro (especifique)** los componentes del
+FR08. Para Muy urgente, el médico imprime, firma y sella la autorización existente
+en el FR08. La impresión coloca bajo **Otro (especifique)** los componentes del
 catálogo que quedan fuera de los siete del formato. La recepción usa
 `/order/{uuid}/fulfillerdetails/` y registra `RECEIVED`.
 
@@ -65,8 +78,8 @@ y `Add Encounters`. El Banco necesita sus permisos de módulo y Transfusiones
 junto con `Get Orders`, `Get Concepts`, `Get Patients`, `Get Encounters` y
 `Get Providers` para resolver las referencias de la orden, y `Edit Orders`
 para registrar la recepción. El REST de OpenMRS valida los permisos al ejecutar
-cada operación. Con `useMockData`, **Atender** abre el flujo existente de
-solicitudes programadas con componentes del catálogo y guarda su avance en el
+cada operación. Con `useMockData`, **Atender** abre el flujo de la prioridad
+correspondiente con componentes del catálogo y guarda su avance en el
 almacenamiento de la pestaña. La selección, las
 rondas y la entrega usan las unidades de prueba. Para una orden nueva, la
 verificación habilita el registro de recepción y la recepción confirmada
@@ -172,7 +185,7 @@ por componente) y CC17 (verificaciones y entrega).
 - Receptor: nombre y HC, fecha de toma y profesional; confirmación de concordancia
   del tubo y registro. FR08 conserva antecedentes desconocidos, no los interpreta
   como negativos. El encargado confirma la documentación/consentimiento aplicable.
-- El filtro del flujo regular usa EG05-CC14 A, B y D y las tablas de
+- El filtro común del prototipo usa EG05-CC14 A, B y D y las tablas de
   [Lifeblood](https://www.lifeblood.com.au/health-professionals/products/component-compatibility).
   Aplica las tablas ABO de glóbulos rojos y plasma en sus sentidos respectivos,
   admite ambos RhD para plasma y crioprecipitado, y exige ABO idéntico en
@@ -189,7 +202,9 @@ por componente) y CC17 (verificaciones y entrega).
   necesitan definición clínica antes de integrar el backend.
 - El profesional confirma grupo/Rh, anticuerpos y estudios pretransfusionales;
   el mock no ejecuta pruebas ni sustituye su validación de laboratorio. Aféresis,
-  componentes especiales, selección pediátrica y autorizaciones urgentes se difieren.
+  componentes especiales y selección pediátrica se difieren. El prototipo exige
+  ABO/Rh conocido para los tres niveles. La emisión clínica de emergencia con
+  grupo desconocido requiere la política institucional y la API operativa.
 - Las etiquetas de muestra llevan el logo de Santa Clotilde e identifican el
   receptor por nombre, historia clínica y ABO/Rh. Imprimir abre el diálogo del
   navegador. Los botones azules permanecen abajo a la
@@ -210,7 +225,7 @@ por componente) y CC17 (verificaciones y entrega).
 egreso. `transfusions-rules.ts` contiene reglas sin acceso al almacenamiento.
 Las pantallas usan `src/api/transfusions.api.ts`; los adaptadores están en
 `src/api/mock-transfusions.api.ts` y `mock-transfusions-store.ts`.
-`src/mocks/transfusions.mock.ts` aporta cuatro órdenes recibidas sintéticas sin
+`src/mocks/transfusions.mock.ts` aporta diez solicitudes sintéticas sin
 inventar UUIDs de OpenMRS. Textos ES/EN, Carbon, cabecera compartida, notificaciones
 cerrables existentes y errores seguros: no se cambia login ni componentes globales.
 
@@ -236,6 +251,13 @@ Seleccionar 001, 002 y 011; registrar 001 compatible y 002 incompatible; reempla
 requiere una sangre total A+ (007/008); TX-DEMO-0003 un PFC AB+ (013), sin ronda
 cruzada. Solo se admiten cantidades completas, no atención parcial.
 
+TX-DEMO-0005 y TX-DEMO-0006 prueban el filtro para receptor A+ en glóbulos rojos
+y PFC. TX-DEMO-0008 recorre el flujo regular con etiqueta Urgente.
+TX-DEMO-0009 permite seleccionar 001, 006 y 013, entregar las tres juntas
+y procesar y comunicar las pruebas de 001 y 006. TX-DEMO-0007 y TX-DEMO-0010
+solicitan dos glóbulos rojos O−. El inventario inicial tiene uno y bloquea
+el avance en Programada y Muy urgente, respectivamente.
+
 ## Integración futura y Órdenes
 
 El DDL aportado relaciona `banco_solicitud_transfusional.order_id` con `orders`,
@@ -244,7 +266,7 @@ reservas y entrega. La solicitud clínica puede basarse en Order, mientras estos
 registros de dominio conservan la atención y trazabilidad del banco.
 
 El contrato propone `GET /ws/rest/v1/bloodbank/transfusion-requests` y operaciones
-de borrador, revisión, muestra, asignación, compatibilidad y entrega, documentadas
+de borrador, revisión, muestra, asignación, compatibilidad, comunicación y entrega, documentadas
 en `transfusions.api.ts`. **No hay un endpoint servidor desplegado**. Al desactivar
 `useMockData`, las órdenes configuradas admiten emisión, consulta y recepción.
 Antes de habilitar la atención con stock operativo: acordar payload/UUIDs, permisos de servidor,

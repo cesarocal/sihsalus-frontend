@@ -14,7 +14,13 @@ import shared from '../../applicant-selection/selection.scss';
 import { TransfusionHistory } from '../../transfusions/transfusion-history.component';
 import styles from '../../transfusions/transfusions.scss';
 import type { CompatibilityRound, TransfusionRequest } from '../../transfusions/transfusions.types';
-import { comparePriority, priorityKeys } from '../../transfusions/transfusions-rules';
+import {
+  comparePriority,
+  compatibilityNeedsCommunication,
+  compatibilityPending,
+  priorityKeys,
+  urgentSerumSampleCode,
+} from '../../transfusions/transfusions-rules';
 import { useTransfusionsTranslation } from '../../transfusions/use-transfusions-translation';
 import { CompatibilityWorkflow } from './compatibility-workflow.component';
 
@@ -38,7 +44,10 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
     handledRound.current = id;
     const item = data.requests
       .flatMap((request) => request.rounds.map((round) => ({ request, round })))
-      .find(({ round }) => round.id === id && !round.completedAt);
+      .find(
+        ({ request, round }) =>
+          round.id === id && (compatibilityPending(request, round) || compatibilityNeedsCommunication(request, round)),
+      );
     setShortcutUnavailable(!item);
     if (item) setActive(item);
   }, [shortcut?.round, data, loading, failed, active, history]);
@@ -46,7 +55,7 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
   const queue = all
     .filter(
       (item) =>
-        !item.round.completedAt &&
+        (compatibilityPending(item.request, item.round) || compatibilityNeedsCommunication(item.request, item.round)) &&
         normalizeSearch(
           `${item.request.order.number} ${item.request.order.patientName} ${item.round.sample.code}`,
         ).includes(normalizeSearch(search)),
@@ -65,7 +74,8 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
         {
           label: t('txPendingTests'),
           description: t('txGroups'),
-          value: loading || failed ? '—' : all.filter((item) => !item.round.completedAt).length,
+          value:
+            loading || failed ? '—' : all.filter(({ request, round }) => compatibilityPending(request, round)).length,
         },
         {
           label: t('txCompletedTests'),
@@ -105,6 +115,7 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
             'txRecipientSample',
             'txRoundDate',
             'txSampleCount',
+            'status',
             'actions',
           ]}
           rows={queue.map(({ request, round }) => ({
@@ -113,11 +124,20 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
               request.order.number,
               t(priorityKeys[request.order.priority]),
               request.order.patientName,
-              round.sample.code,
+              request.order.priority === 'veryUrgent'
+                ? `${round.sample.code} · ${urgentSerumSampleCode(round.sample)}`
+                : round.sample.code,
               formatListDate(round.createdAt),
               Object.keys(round.results).length,
+              t(
+                round.completedAt
+                  ? 'txCommunicationPending'
+                  : request.order.priority === 'veryUrgent'
+                    ? 'txPostDispatchPending'
+                    : 'txResultPending',
+              ),
               <Button key="process" kind="ghost" size="sm" onClick={() => setActive({ request, round })}>
-                {t('txProcessTests')}
+                {t(round.completedAt ? 'txRegisterCommunication' : 'txProcessTests')}
               </Button>,
             ],
           }))}
@@ -143,12 +163,7 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
         />
       )}
       {history && (
-        <TransfusionHistory
-          requests={data?.requests ?? []}
-          compatibility
-          onClose={() => setHistory(false)}
-          t={t}
-        />
+        <TransfusionHistory requests={data?.requests ?? []} compatibility onClose={() => setHistory(false)} t={t} />
       )}
     </ProcessingPage>
   );
