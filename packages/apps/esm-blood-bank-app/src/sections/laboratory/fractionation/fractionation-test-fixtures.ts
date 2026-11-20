@@ -21,7 +21,7 @@ export function labeledBatch(input: FractionationBatch) {
   for (const node of finalNodes(batch)) {
     node.estimatedVolume = node.component === 'cryoprecipitate' ? '30' : '100';
     node.label.expiresAt = '2099-01-01T12:00';
-    node.label.storageTemperature = componentDefinitions[node.component].temperature;
+    node.label.storageTemperature = componentDefinitions[node.component].temperature || 'Temperatura verificada (DEMO)';
     node.label.antibodies = 'No detectados (DEMO)';
   }
   batch.labelsVerified = true;

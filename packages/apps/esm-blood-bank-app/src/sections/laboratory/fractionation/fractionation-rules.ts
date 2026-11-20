@@ -101,7 +101,7 @@ export const componentTypes = Object.keys(componentDefinitions) as ComponentType
 
 const separationOptions: Partial<Record<ComponentType, ComponentType[][]>> = {
   wholeBlood: [
-    ['redCells', 'liquidPlasma'],
+    ['redCells', 'plateletRichPlasma'],
     ['wholeBlood', 'pediatricFraction'],
   ],
   plateletRichPlasma: [
@@ -225,8 +225,8 @@ function validChildren(
   if (!children.length) return true;
   if (isFractionationRemainder(node)) return false;
   const options = separationOptions[node.component] ?? [];
-  // Keep previously stored PRP branches valid under their original component identity.
-  const allowed = node.component === 'wholeBlood' ? [...options, ['redCells', 'plateletRichPlasma']] : options;
+  // Keep previously stored liquid plasma branches valid under their original component identity.
+  const allowed = node.component === 'wholeBlood' ? [...options, ['redCells', 'liquidPlasma']] : options;
   if (children.some((child) => child.component === 'lowVolumeRedCells'))
     return node.parentId === null && needsLowVolumeVerification(source) && lowVolumeConfirmed && children.length === 1;
   return allowed.some(

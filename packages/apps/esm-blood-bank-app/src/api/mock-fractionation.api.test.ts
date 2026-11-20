@@ -16,6 +16,17 @@ import {
   plannedBatch,
   reviewBatch,
 } from '../sections/laboratory/fractionation/fractionation-test-fixtures';
+import type { FractionationBatch } from '../sections/laboratory/fractionation/fractionation.types';
+
+function storedLiquidPlasmaBatch(input: FractionationBatch) {
+  const batch = structuredClone(input);
+  const plasma = finalNodes(batch).find((node) => node.component === 'plateletRichPlasma');
+  if (!plasma) throw new Error('SYNTHETIC_PLASMA_MISSING');
+  plasma.id = `${plasma.parentId}:liquidPlasma`;
+  plasma.code = `${batch.sources[0].code}-PL`;
+  plasma.component = 'liquidPlasma';
+  return batch;
+}
 
 describe('atomic synthetic fractionation and inventory', () => {
   beforeEach(() => {
@@ -288,26 +299,34 @@ describe('fractionation tree and quality boundaries', () => {
   beforeEach(() => sessionStorage.clear());
   it.each(['', '0', '-1', '1e3', 'NaN', '12.345', '9999999', '1,5'])('rejects invalid mL input %s', (value) =>
     expect(positiveVolume(value)).toBe(false));
-  it('preserves old PRP trees without creating them in new separations', async () => {
+  it.each([
+    [0, 'freshFrozenPlasma'],
+    [1, 'plasma24'],
+  ] as const)('reopens the original plasma subdivision %i in new whole-blood trees', async (option, plasmaResult) => {
     const instance = createMockFractionationApi();
     const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
     const batch = plannedBatch(await instance.start([unit?.id ?? '']));
-    expect(finalNodes(batch).map((node) => node.component)).toEqual(['redCells', 'liquidPlasma']);
-    const legacy = finalNodes(batch).find((node) => node.component === 'liquidPlasma');
-    if (!legacy) throw new Error('SYNTHETIC_PLASMA_MISSING');
-    Object.assign(legacy, {
-      id: legacy.parentId + ':plateletRichPlasma',
-      code: batch.sources[0].code + '-PRP',
-      component: 'plateletRichPlasma',
-    });
-    expect(validTree(batch)).toBe(true);
-    expect(validTree(splitNode(batch, legacy.id, 1))).toBe(true);
+    const plasma = finalNodes(batch).find((node) => node.component === 'plateletRichPlasma');
+    if (!plasma) throw new Error('SYNTHETIC_PLASMA_MISSING');
+    const saved = await instance.save(splitNode(batch, plasma.id, option), 'fractionationPlan');
+    expect(finalNodes(saved).map((node) => node.component)).toEqual(['redCells', 'platelets', plasmaResult]);
+  });
+
+  it('loads stored liquid plasma plans with their existing component and code', async () => {
+    const instance = createMockFractionationApi();
+    const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
+    const batch = storedLiquidPlasmaBatch(plannedBatch(await instance.start([unit?.id ?? ''])));
+    const saved = await instance.save(batch, 'fractionationPlan');
+    expect((await createMockFractionationApi().list()).batches[0]).toEqual(saved);
+    expect(finalNodes(saved)).toContainEqual(
+      expect.objectContaining({ component: 'liquidPlasma', code: `${unit?.code}-PL` }),
+    );
   });
 
   it('suggests CPDA-1, additive and liquid plasma expirations and preserves a manual date', async () => {
     const instance = createMockFractionationApi();
     const unit = (await instance.list()).units.find((source) => source.component === 'wholeBlood');
-    const batch = labeledBatch(plannedBatch(await instance.start([unit?.id ?? ''])));
+    const batch = labeledBatch(storedLiquidPlasmaBatch(plannedBatch(await instance.start([unit?.id ?? '']))));
     batch.sources[0].collectedAt = '2026-11-12';
     const [redCells, plasma] = finalNodes(batch);
     Object.assign(redCells.label, { anticoagulant: 'CPDA-1', preservative: '', expiresAtManual: false });

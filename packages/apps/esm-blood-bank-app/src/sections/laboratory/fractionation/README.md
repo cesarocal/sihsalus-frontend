@@ -24,10 +24,12 @@ un aviso y permite quitar los filtros. El guard existente sigue siendo necesario
 - **Fraccionamiento**. El responsable se toma de la sesión al abrir el flujo
   y se conserva al continuar. El servicio modificador se obtiene de la
   localidad configurada de OpenMRS. Si no se configuró, se compone con el
-  nombre de la ubicación activa de la sesión. Sangre total produce glóbulos
-  rojos y plasma líquido o una fracción pediátrica y el remanente con el código
-  original. PFC produce factor antihemofílico crioprecipitado y plasma con
-  crioprecipitado reducido.
+  nombre de la ubicación activa de la sesión. La separación habitual produce
+  glóbulos rojos y plasma rico en plaquetas. El plasma permite continuar en el
+  mismo árbol con plaquetas y PFC o con plaquetas y plasma de 24 h. El PFC
+  permite obtener factor antihemofílico crioprecipitado y plasma con
+  crioprecipitado reducido. Como alternativa, la división pediátrica produce
+  una fracción y el remanente con el código original.
   Para sangre total de 300 a 400 mL se confirma por unidad que el
   anticoagulante se calculó para 450 ± 45 mL. La única división disponible
   produce glóbulos rojos de bajo volumen.
@@ -113,7 +115,8 @@ real. No se certifica automáticamente que una unidad sea PFC por elegirlo en el
 El balance mock compara volúmenes contra el origen sin modelar adiciones de
 soluciones; su registro y efecto sobre el balance deben acordarse con el OMOD
 antes de usar este control en un procedimiento real.
-Los árboles históricos con PRP conservan sus nombres, componentes y códigos.
+Los árboles guardados con plasma líquido conservan el componente registrado y
+el código con sufijo `-PL`.
 La fecha sugerida se calcula cuando la tabla define un plazo y se dispone de los
 datos necesarios. Los registros con fecha sin hora usan el inicio de ese día.
 El plasma líquido toma como referencia la caducidad de los glóbulos rojos de la

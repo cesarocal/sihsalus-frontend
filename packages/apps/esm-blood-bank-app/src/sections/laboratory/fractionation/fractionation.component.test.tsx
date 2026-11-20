@@ -76,7 +76,7 @@ describe('fractionation UI', () => {
     expect(data.units.find((unit) => unit.id === 'PFC-2026-002')?.state).toBe('inLaboratory');
     expect(screen.queryByRole('button', { name: t('saveDraft') })).not.toBeInTheDocument();
   });
-  it('locks both whole-blood options until undo and keeps the original code in the pediatric branch', async () => {
+  it('continues through the plasma branches and keeps the pediatric split available after undo', async () => {
     const api = createMockFractionationApi();
     const source = (await api.list()).units.find((unit) => unit.component === 'wholeBlood');
     if (!source) throw new Error('Missing synthetic whole-blood fixture');
@@ -87,9 +87,14 @@ describe('fractionation UI', () => {
     fireEvent.click(plasma);
     expect(plasma).toBeDisabled();
     expect(pediatric).toBeDisabled();
-    expect(screen.getByText(`${source.code}-PL`)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: t('fractionationClearBranch') }));
-    expect(screen.queryByText(`${source.code}-PL`)).not.toBeInTheDocument();
+    const prpCode = `${source.code}-PRP`;
+    expect(screen.getByText(prpCode)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${t('fractionationUsePlasma24')} - ${prpCode}` })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: `${t('fractionationUsePFC')} - ${prpCode}` }));
+    fireEvent.click(screen.getByRole('button', { name: `${t('fractionationSplit')} - ${prpCode}-PFC` }));
+    expect(screen.getByText(`${prpCode}-PFC-CRIO`)).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: t('fractionationClearBranch') })[0]);
+    expect(screen.queryByText(prpCode)).not.toBeInTheDocument();
     expect(plasma).toBeEnabled();
     fireEvent.click(pediatric);
     expect(screen.getByText(`${source.code}-PED`)).toBeInTheDocument();
@@ -118,7 +123,7 @@ describe('fractionation UI', () => {
     expect(screen.getByLabelText(t('fractionationOperator'))).toHaveValue('Profesional DEMO');
     expect(screen.getByText(t('componentCryo'))).toBeInTheDocument();
   });
-  it('autofills the operator and service and advances to the liquid plasma labels', async () => {
+  it('autofills the operator and service and advances to the plasma and red cell labels', async () => {
     const api = createMockFractionationApi();
     const source = (await api.list()).units.find((unit) => unit.component === 'wholeBlood');
     if (!source) throw new Error('Missing synthetic whole-blood fixture');
@@ -133,15 +138,13 @@ describe('fractionation UI', () => {
     expect(screen.queryByLabelText(t('observations'))).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: `${t('fractionationSeparatePlasma')} - ${source.code}` }));
     fireEvent.click(screen.getByRole('button', { name: t('next') }));
-    expect(await screen.findByRole('region', { name: `${source.code}-PL` })).toHaveTextContent(
-      t('componentLiquidPlasma'),
-    );
+    expect(await screen.findByRole('region', { name: `${source.code}-PRP` })).toHaveTextContent(t('componentPRP'));
     expect(screen.queryByLabelText(t('fractionationVolumeEstimated'))).not.toBeInTheDocument();
     expect(screen.queryByText(t('fractionationFinishBranches'))).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: t('previous') })).toBeEnabled();
     const saved = (await api.list()).batches[0];
     expect(saved.completedSteps).toEqual(['fractionationPlan']);
-    expect(finalNodes(saved).map((node) => node.component)).toEqual(['redCells', 'liquidPlasma']);
+    expect(finalNodes(saved).map((node) => node.component)).toEqual(['redCells', 'plateletRichPlasma']);
   });
   it('keeps the two-action X confirmation and can discard only unsaved edits', async () => {
     const api = createMockFractionationApi();

@@ -1,4 +1,29 @@
+@use "@carbon/layout";
+
+$help-menu-bottom: layout.$spacing-05 + layout.$spacing-08 + layout.$spacing-03;
+
 // Hide the decorative dot added by Billing's global submenu styles.
 .subsectionLabel::before {
   display: none;
+}
+
+:global(#omrs-left-nav-container .cds--side-nav:has([data-extension-slot-name="blood-bank-nav-slot"])) {
+  padding-block-end: $help-menu-bottom;
+}
+
+// Dock the shell's help menu when the blood bank's fixed sidebar is visible.
+:global(body:has(#omrs-left-nav-container [data-extension-slot-name="blood-bank-nav-slot"])) {
+  :global([id^="single-spa-application:@sihsalus/esm-help-menu-app-page-"] > button) {
+    left: layout.$spacing-03;
+    right: auto;
+    z-index: 8001;
+  }
+
+  :global(#help-menu-popup > [role="menu"]) {
+    bottom: $help-menu-bottom;
+    left: layout.$spacing-03;
+    right: auto;
+    margin: 0;
+    z-index: 8002;
+  }
 }
