@@ -53,7 +53,8 @@ export interface UnitCase {
   sections: Partial<Record<Stage, SavedSection>>;
 }
 export const vitalKeys = [
-  'pressure',
+  'systolicPressure',
+  'diastolicPressure',
   'pulse',
   'respirations',
   'temperature',
@@ -128,6 +129,7 @@ export const transfusionStates = ['transfusionInProgress', 'transfusionCompleted
 export const reactionStates = ['notReported', 'reported', 'reviewed', 'investigated'] as const;
 
 export const maxMonitoringColumns = 6;
+const monitoringColumnIndexes = Array.from({ length: maxMonitoringColumns }, (_, index) => index);
 export const priorTransfusionKeys = ['date', 'unitCode', 'component', 'priorReaction', 'place', 'notes'] as const;
 export const operatingRoomOptions = {
   consciousness: ['alert', 'drowsyOrDisoriented', 'coma'],
@@ -164,14 +166,16 @@ export function manualHistoryRows(fields: Fields) {
   return [...rows].sort((a, b) => a - b);
 }
 
+export function conductionVitalKeys(fields: Fields) {
+  return monitoringColumnIndexes.some((index) => fields[`pressure${index}`]) ? ['pressure', ...vitalKeys] : vitalKeys;
+}
+
 export function monitoringColumns(fields: Fields) {
   const count = Number(fields.monitoringColumns);
   const savedCount = Number.isInteger(count) && count <= maxMonitoringColumns ? count : 0;
-  const columns = Array.from({ length: maxMonitoringColumns }, (_, index) => index);
-  const lastUsed = columns.reduce(
-    (last, index) => (['time', ...vitalKeys].some((key) => fields[key + index]) ? index : last),
-    0,
-  );
+  const observedKeys = ['time', ...conductionVitalKeys(fields)];
+  const columns = monitoringColumnIndexes;
+  const lastUsed = columns.reduce((last, index) => (observedKeys.some((key) => fields[key + index]) ? index : last), 0);
   return columns.slice(0, Math.max(savedCount, lastUsed + 1));
 }
 
@@ -236,7 +240,7 @@ export function transfusionProgress(unit: UnitCase) {
 
 export function canReportReaction(conduction?: Fields) {
   const validTime = /^([01]\d|2[0-3]):[0-5]\d$/;
-  return validTime.test(conduction?.startTime ?? '') && validTime.test(conduction?.stopTime ?? '');
+  return validTime.test(conduction?.startTime ?? '') && validTime.test(conduction?.endTime ?? '');
 }
 
 export function reportNotificationTimes({ report, review }: UnitCase['sections']) {
@@ -253,12 +257,28 @@ export function reportNotificationTimes({ report, review }: UnitCase['sections']
 export function reportDefaults(conduction: Fields = {}): Fields {
   return {
     startTime: conduction.startTime ?? '',
-    stopTime: conduction.stopTime ?? '',
+    stopTime: conduction.endTime ?? '',
     bed: '',
     transfused: conduction.transfused ?? '',
     otherSymptomText: conduction.otherSymptomText ?? '',
     ...Object.fromEntries(reactionSigns.map((key) => [key, conduction[key] ?? ''])),
   };
+}
+
+const premedicationPrefix = 'premedication:';
+
+export function premedicationField(uuid: string) {
+  return premedicationPrefix + uuid;
+}
+
+export function reportPremedications(fields: Fields) {
+  const selections = Object.entries(fields)
+    .filter(([key, name]) => key.startsWith(premedicationPrefix) && name)
+    .map(([key, name]) => ({ uuid: key.slice(premedicationPrefix.length), name }));
+  if (!selections.length && fields.premedication) {
+    selections.push({ uuid: fields.premedicationConceptUuid ?? '', name: fields.premedication });
+  }
+  return selections;
 }
 
 export function validStage(stage: Stage, fields: Fields, saved: UnitCase['sections']) {
@@ -268,7 +288,7 @@ export function validStage(stage: Stage, fields: Fields, saved: UnitCase['sectio
       !saved.report &&
       canReportReaction(saved.conduction?.fields) &&
       fields.startTime === saved.conduction?.fields.startTime &&
-      fields.stopTime === saved.conduction?.fields.stopTime &&
+      fields.stopTime === saved.conduction?.fields.endTime &&
       Boolean(
         fields.transfused &&
           Number.isFinite(Number(fields.transfused)) &&

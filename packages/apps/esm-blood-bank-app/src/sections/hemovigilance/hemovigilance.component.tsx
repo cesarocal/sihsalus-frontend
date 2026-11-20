@@ -20,7 +20,7 @@ import { moduleName } from '../../constants';
 import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirmation.component';
 import { formatListDate } from '../../shared/format-list-date';
 import { notifySuccess } from '../../shared/notify-success';
-import { printDocument } from '../../shared/print-document';
+import { printDocument, type PrintPageFit } from '../../shared/print-document';
 import {
   normalizeSearch,
   ProcessingTable,
@@ -52,6 +52,7 @@ import {
 } from './hemovigilance';
 import {
   actorLicense,
+  hemovigilanceSaveError,
   isLocalHemovigilance,
   listHemovigilance,
   listPatientHemovigilance,
@@ -59,7 +60,7 @@ import {
 } from './hemovigilance.resource';
 import styles from './hemovigilance.scss';
 import { CaseFields, HemovigilanceFields } from './hemovigilance-forms.component';
-import { ConductionPrint, Fr02Print, hemovigilancePrintCss } from './hemovigilance-print.component';
+import { ConductionPrint, Fr02Print, fr02PrintPage, hemovigilancePrintCss } from './hemovigilance-print.component';
 
 const chartName = 'Transfusiones';
 const exitDialogs = ['[role="dialog"].cds--modal'];
@@ -182,7 +183,7 @@ function HemovigilanceList({
             )),
       );
   const table = (
-    <div className={styles.panel}>
+    <div className={onClose ? styles.panel : `${styles.panel} ${styles.chartPanel}`}>
       {!onClose && (
         <div className={styles.chartFilters}>
           <Search
@@ -326,7 +327,7 @@ function UnitCaseDialog({
     return { unit: initialUnit, stage, fields: fieldsForStage(initialUnit, stage), changed: false };
   });
   const [pendingExit, setPendingExit] = useState<Stage | 'close'>();
-  const [pendingFinalization, setPendingFinalization] = useState(false);
+  const [pendingConfirmation, setPendingConfirmation] = useState<'conduction' | 'review'>();
   const canEdit = (stage: Stage) =>
     session.authenticated &&
     userHasAccess(stagePrivileges[stage], session.user) &&
@@ -407,10 +408,18 @@ function UnitCaseDialog({
         const unit = { ...current.unit, sections: { ...current.unit.sections, [action]: record } };
         return { ...current, unit, fields: fieldsForStage(unit, current.stage), changed: false };
       });
-      notifySuccess(t(action === 'conduction' ? (finalizing ? 'conductionSent' : 'conductionSaved') : 'recordSaved'));
+      const success =
+        action === 'conduction'
+          ? finalizing
+            ? 'conductionSent'
+            : 'conductionSaved'
+          : action === 'review'
+            ? 'reviewSaved'
+            : 'recordSaved';
+      notifySuccess(t(success));
       return 'saved';
-    } catch {
-      setError('saveFailed');
+    } catch (error) {
+      setError(hemovigilanceSaveError(error));
       return 'failed';
     } finally {
       saving.current = false;
@@ -418,7 +427,7 @@ function UnitCaseDialog({
     }
   };
   const requestExit = (next: Stage | 'close') => {
-    if (busy || pendingExit || pendingFinalization || next === stage) return false;
+    if (busy || pendingExit || pendingConfirmation || next === stage) return false;
     if (next === 'report' && !unit.sections.report && !canReportReaction(unit.sections.conduction?.fields)) {
       setError('saveConductionTimesFirst');
       return false;
@@ -432,10 +441,10 @@ function UnitCaseDialog({
   closeRequest.current = requestExit;
   const close = () => closeRequest.current('close');
   const printError = () => setError('printFailed');
-  const printCase = (document: ReactNode, title: string) => {
+  const printCase = (document: ReactNode, title: string, fitPage?: PrintPageFit) => {
     setError('');
     try {
-      printDocument(document, title, printError, hemovigilancePrintCss);
+      printDocument(document, title, printError, hemovigilancePrintCss, undefined, fitPage);
     } catch {
       printError();
     }
@@ -480,7 +489,7 @@ function UnitCaseDialog({
       >
         <ModalHeader title={title} iconDescription={t('close')} closeModal={close} />
         <ModalBody ref={bodyRef} className={styles.conductionBody}>
-          {error && !pendingFinalization && !pendingExit && (
+          {error && !pendingConfirmation && !pendingExit && (
             <InlineNotification
               className={styles.notification}
               lowContrast
@@ -518,7 +527,7 @@ function UnitCaseDialog({
             nurse={unit.sections.report?.actor ?? (canEdit('report') ? actor : undefined)}
             reviewer={unit.sections.review?.actor ?? (physicianReport ? actor : undefined)}
             readOnly={!canEdit(stage) || busy}
-            hideBankNotification={physicianReport}
+            showBankNotification={bank}
             setFields={(value) => {
               setEditor((current) => ({ ...current, fields: value, changed: true }));
               setError('');
@@ -593,7 +602,7 @@ function UnitCaseDialog({
                     renderIcon={Printer}
                     disabled={busy || !unit.sections.review}
                     onClick={() => {
-                      if (unit.sections.review) printCase(<Fr02Print unit={unit} t={t} />, t('report'));
+                      if (unit.sections.review) printCase(<Fr02Print unit={unit} t={t} />, t('report'), fr02PrintPage);
                     }}
                   >
                     {t('printFr02')}
@@ -609,7 +618,14 @@ function UnitCaseDialog({
               </Button>
             )}
             {physicianReport && canEdit('review') && (
-              <Button size="sm" disabled={busy || loadingLicense} onClick={() => void save('review')}>
+              <Button
+                size="sm"
+                disabled={busy || loadingLicense}
+                onClick={() => {
+                  setError('');
+                  setPendingConfirmation('review');
+                }}
+              >
                 {t('confirmReview')}
               </Button>
             )}
@@ -620,7 +636,7 @@ function UnitCaseDialog({
                 onClick={async () => {
                   if (finalizing && !conductionError(fields)) {
                     setError('');
-                    setPendingFinalization(true);
+                    setPendingConfirmation('conduction');
                     return;
                   }
                   const result = await save();
@@ -650,20 +666,20 @@ function UnitCaseDialog({
           onExit={() => finishExit(pendingExit)}
         />
       )}
-      {pendingFinalization && (
+      {pendingConfirmation && (
         <WarningConfirmation
-          title={t('finalizeConduction')}
-          description={t('finalizeConductionHelp')}
+          title={t(pendingConfirmation === 'review' ? 'finalizeReview' : 'finalizeConduction')}
+          description={t(pendingConfirmation === 'review' ? 'finalizeReviewHelp' : 'finalizeConductionHelp')}
           items={[]}
-          note={t('finalizeConductionLock')}
+          note={t(pendingConfirmation === 'review' ? 'finalizeReviewStatus' : 'finalizeConductionLock')}
           error={error ? t(error) : undefined}
           cancelLabel={t('cancel')}
-          confirmLabel={t('sendConduction')}
+          confirmLabel={t(pendingConfirmation === 'review' ? 'confirmReview' : 'sendConduction')}
           closeLabel={t('close')}
           saving={busy}
-          onCancel={() => setPendingFinalization(false)}
+          onCancel={() => setPendingConfirmation(undefined)}
           onConfirm={async () => {
-            if ((await save()) === 'saved') setPendingFinalization(false);
+            if ((await save(pendingConfirmation)) === 'saved') setPendingConfirmation(undefined);
           }}
         />
       )}

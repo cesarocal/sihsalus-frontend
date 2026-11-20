@@ -16,12 +16,15 @@ export const processingPrintCss = `
   [data-blood-group] strong { font-size: 32pt; line-height: 1; }
   [data-manual-volume] { display: inline-block; width: 32mm; border-bottom: 1px solid; margin-right: 4pt; }
 `;
+export type PrintPageFit = { widthMm: number; heightMm: number };
+
 export function printDocument(
   content: ReactNode,
   title: string,
   onError?: () => void,
   css = processingPrintCss,
   onPrintRequested?: () => void,
+  fitPage?: PrintPageFit,
 ) {
   // Use the shell's shared client renderer. A dev server renderer can depend on
   // React debug internals that the production shell does not provide.
@@ -61,6 +64,14 @@ export function printDocument(
     );
     try {
       if (!frame.contentWindow) throw new Error('PRINT_WINDOW_UNAVAILABLE');
+      const article = fitPage && frame.contentDocument?.querySelector('article');
+      if (article && fitPage) {
+        // The print iframe is hidden. Measure at the physical page width before scaling.
+        article.style.inlineSize = `${fitPage.widthMm}mm`;
+        const height = article.getBoundingClientRect().height;
+        const available = (fitPage.heightMm * 96) / 25.4;
+        if (height > available) article.style.zoom = String(available / height);
+      }
       frame.contentWindow.focus();
       frame.contentWindow.print();
       onPrintRequested?.();

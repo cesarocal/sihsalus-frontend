@@ -31,6 +31,7 @@ vi.mock('./hemovigilance.resource', () => ({
   isLocalHemovigilance: () => true,
   listPatientHemovigilance: vi.fn(),
   saveHemovigilance: vi.fn(),
+  hemovigilanceSaveError: () => 'saveFailed',
   actorLicense: async () => (session.physician ? 'CMP-1234' : 'CEP-5678'),
   searchPremedications: vi.fn(),
 }));
@@ -270,7 +271,7 @@ describe('nursing transfusion monitoring', () => {
     expect(showSnackbar).not.toHaveBeenCalled();
   });
 
-  it('requires ordered controls and saved start and stop times before reporting a reaction', async () => {
+  it('requires ordered controls and saved start and end times before reporting a reaction', async () => {
     const sheet = await openSheet();
     const dialog = within(sheet);
     fireEvent.change(dialog.getByLabelText('Hora de inicio'), { target: { value: '09:30' } });
@@ -298,9 +299,18 @@ describe('nursing transfusion monitoring', () => {
       target: { value: cardiovascular.getByRole<HTMLOptionElement>('option', { name: 'Normal' }).value },
     });
     fireEvent.click(dialog.getByRole('button', { name: 'Reportar reacción adversa' }));
-    expect(dialog.getByText(/^Guarde la hora de inicio y la hora de suspensión/)).toBeVisible();
-    fireEvent.change(dialog.getByLabelText('Hora de suspensión'), { target: { value: '10:10' } });
+    expect(dialog.getByText(/^Guarde la hora de inicio y la hora de término/)).toBeVisible();
+    expect(dialog.queryByLabelText('Hora de suspensión')).not.toBeInTheDocument();
+    fireEvent.change(dialog.getByRole('spinbutton', { name: 'Presión sistólica (mmHg) 1' }), {
+      target: { value: '120' },
+    });
+    fireEvent.change(dialog.getByRole('spinbutton', { name: 'Presión diastólica (mmHg) 1' }), {
+      target: { value: '80' },
+    });
+    fireEvent.change(dialog.getByLabelText('Hora de término'), { target: { value: '10:10' } });
     fireEvent.click(dialog.getByRole('button', { name: 'Guardar registro' }));
+    const send = within(screen.getByRole('dialog', { name: 'Enviar Hoja de conducción a revisión' }));
+    fireEvent.click(send.getByRole('button', { name: 'Guardar y enviar' }));
     await waitFor(() => expect(showSnackbar).toHaveBeenCalled());
     fireEvent.click(dialog.getByRole('button', { name: 'Reportar reacción adversa' }));
     const report = within(await screen.findByRole('dialog', { name: 'Reporte de reacción FR02: UNIT-20' }));
@@ -308,6 +318,7 @@ describe('nursing transfusion monitoring', () => {
     expect(report.getByLabelText('Hora de inicio')).toHaveAttribute('readonly');
     expect(report.getByLabelText('Hora de suspensión')).toHaveValue('10:10');
     expect(report.getByLabelText('Hora de suspensión')).toHaveAttribute('readonly');
+    expect(report.queryByLabelText('Hora de notificación al Banco de Sangre')).toBeNull();
     expect(report.getByLabelText('Cantidad transfundida (mL)')).toBeVisible();
     expect(report.queryByRole('button', { name: 'Imprimir FR08' })).toBeNull();
     expect(saveHemovigilance).toHaveBeenCalledWith(
@@ -316,7 +327,9 @@ describe('nursing transfusion monitoring', () => {
       expect.objectContaining({
         cardiovascular: 'normal',
         time5: '10:06',
-        stopTime: '10:10',
+        endTime: '10:10',
+        systolicPressure0: '120',
+        diastolicPressure0: '80',
         weight: '60',
         responsiblePhysician: 'Doctora Ejemplo',
         physicianRegistration: 'CMP-1234',
@@ -330,6 +343,11 @@ describe('nursing transfusion monitoring', () => {
       target: { value: 'para' },
     });
     fireEvent.click(await report.findByRole('button', { name: 'Paracetamol' }));
+    vi.mocked(searchPremedications).mockResolvedValue([{ uuid: 'drug2', display: 'Loratadina', retired: false }]);
+    fireEvent.change(report.getByRole('searchbox', { name: 'Premedicación previa a transfusión' }), {
+      target: { value: 'lora' },
+    });
+    fireEvent.click(await report.findByRole('button', { name: 'Loratadina' }));
     fireEvent.change(report.getByLabelText('Cantidad transfundida (mL)'), { target: { value: '100' } });
     fireEvent.change(report.getByLabelText('Número de cama'), { target: { value: 'Cama 5' } });
     expect(report.getByRole('group', { name: 'Presión arterial (mmHg)' })).toBeVisible();
@@ -349,8 +367,8 @@ describe('nursing transfusion monitoring', () => {
         expect.anything(),
         'report',
         expect.objectContaining({
-          premedicationConceptUuid: 'drug',
-          premedication: 'Paracetamol',
+          'premedication:drug': 'Paracetamol',
+          'premedication:drug2': 'Loratadina',
           bed: 'Cama 5',
           transfused: '100',
           systolicBefore: '120',
@@ -370,6 +388,7 @@ describe('nursing transfusion monitoring', () => {
     vi.mocked(listPatientHemovigilance).mockResolvedValue([
       {
         ...unit,
+        dispatch: { ...unit.dispatch, component: 'lowVolumeRedCells' },
         sections: {
           report: {
             ...past.sections.conduction,
@@ -385,6 +404,7 @@ describe('nursing transfusion monitoring', () => {
               diastolicAfter: '85',
               chills: 'yes',
               sepsis: 'yes',
+              premedication: 'Premedicación anterior',
             },
           },
         },
@@ -415,11 +435,16 @@ describe('nursing transfusion monitoring', () => {
     expect(report.queryByRole('button', { name: 'Reporte de reacción FR02' })).toBeNull();
     expect(report.queryByLabelText('Observaciones de la revisión médica')).toBeNull();
     expect(report.getByText('CMP-1234')).toBeVisible();
+    expect(report.getByText('Premedicación anterior')).toBeVisible();
     const print = report.getByRole('button', { name: 'Imprimir FR02' });
     expect(print).toBeDisabled();
     const review = report.getByRole('button', { name: 'Registrar revisión' });
     await waitFor(() => expect(review).toBeEnabled());
     fireEvent.click(review);
+    const confirmation = within(screen.getByRole('dialog', { name: 'Confirmar revisión del FR02' }));
+    expect(confirmation.getByText('El reporte pasará al estado Revisada.')).toBeVisible();
+    expect(saveHemovigilance).not.toHaveBeenCalled();
+    fireEvent.click(confirmation.getByRole('button', { name: 'Registrar revisión' }));
     await waitFor(() => expect(print).toBeEnabled());
     expect(report.queryByLabelText('Hora de notificación al Banco de Sangre')).not.toBeInTheDocument();
     expect(saveHemovigilance).toHaveBeenCalledWith(
@@ -444,9 +469,9 @@ describe('nursing transfusion monitoring', () => {
     );
     expect(printed.getByText('Frecuencia respiratoria (rpm)')).toBeVisible();
     expect(printed.getByText('Frecuencia del pulso (ppm)')).toBeVisible();
-    expect(printed.getByText('Enfermera Ejemplo').parentElement).toHaveClass('fr02Signer');
-    expect(printed.getByText('CEP 5678').parentElement).toHaveClass('fr02Signer');
-    expect(printed.getByText('Médico Ejemplo').parentElement).toHaveClass('fr02Signer');
+    expect(printed.getByText('Enfermera Ejemplo - CEP 5678').parentElement).toHaveClass('fr02Signer');
+    expect(printed.getByText(/^Médico Ejemplo - CMP /).parentElement).toHaveClass('fr02Signer');
+    expect(printed.getByText(/Otros: Glóbulos Rojos de Bajo Volumen/i)).toBeVisible();
     expect(printed.queryByText('FR08 ORD-20')).not.toBeInTheDocument();
     expect(printed.getByText('AM/PM').previousElementSibling).toHaveTextContent(/^:$/);
   });

@@ -11,6 +11,7 @@ import {
   conditions,
   conductionCode,
   conductionSignKeys,
+  conductionVitalKeys,
   type Fields,
   findings,
   manualHistoryRows,
@@ -19,15 +20,16 @@ import {
   operatingRoomOptions,
   priorConductionValues,
   priorTransfusionKeys,
+  premedicationField,
   reactionPressureKeys,
   reactionSigns,
   reactionVitalKeys,
   reactionVitalLabel,
   reportTimes,
+  reportPremedications,
   type Stage,
   studies,
   type UnitCase,
-  vitalKeys,
 } from './hemovigilance';
 import styles from './hemovigilance.scss';
 import { PremedicationPicker } from './premedication-picker.component';
@@ -91,7 +93,7 @@ export function HemovigilanceFields({
   fields,
   setFields,
   readOnly,
-  hideBankNotification = false,
+  showBankNotification = false,
   nurse,
   reviewer,
   unit,
@@ -102,7 +104,7 @@ export function HemovigilanceFields({
   fields: Fields;
   setFields: (fields: Fields) => void;
   readOnly: boolean;
-  hideBankNotification?: boolean;
+  showBankNotification?: boolean;
   nurse?: Actor;
   reviewer?: Actor;
   unit: UnitCase;
@@ -195,8 +197,9 @@ export function HemovigilanceFields({
     const { order, dispatch } = unit;
     const manualRows = manualHistoryRows(fields);
     const columns = monitoringColumns(fields);
+    const parameters = conductionVitalKeys(fields);
     const lastColumn = columns.length - 1;
-    const canRemoveColumn = lastColumn > 0 && !['time', ...vitalKeys].some((key) => fields[key + lastColumn]);
+    const canRemoveColumn = lastColumn > 0 && !['time', ...parameters].some((key) => fields[key + lastColumn]);
     const dateLabel = (value: string) => value.split('-').reverse().join('/');
     const cellInput = (key: string, label: string, type = 'text', min?: string, placeholder = '—') => (
       <input
@@ -349,7 +352,6 @@ export function HemovigilanceFields({
               {readout('conductionDate', dateLabel(fields.conductionDate ?? ''))}
             </dl>
             {input('startTime', 'time')}
-            {input('stopTime', 'time')}
             {input('endTime', 'time')}
           </div>
           {!readOnly && (
@@ -392,11 +394,17 @@ export function HemovigilanceFields({
                 </tr>
               </thead>
               <tbody>
-                {vitalKeys.map((key) => (
+                {parameters.map((key) => (
                   <tr key={key}>
                     <th scope="row">{t(key)}</th>
                     {columns.map((column) => (
-                      <td key={column}>{cellInput(key + column, `${t(key)} ${column + 1}`)}</td>
+                      <td key={column}>
+                        {cellInput(
+                          key + column,
+                          `${t(key)} ${column + 1}`,
+                          key === 'systolicPressure' || key === 'diastolicPressure' ? 'number' : 'text',
+                        )}
+                      </td>
                     ))}
                   </tr>
                 ))}
@@ -451,6 +459,14 @@ export function HemovigilanceFields({
   if (stage === 'report') {
     const { order, dispatch } = unit;
     const hasLegacyPressure = Boolean(fields.pressureBefore || fields.pressureAfter);
+    const premedications = reportPremedications(fields);
+    const changePremedication = (uuid: string, name?: string) => {
+      const next = { ...fields };
+      const key = premedicationField(uuid);
+      if (name) next[key] = name;
+      else delete next[key];
+      setFields(next);
+    };
     return (
       <div className={styles.conductionLayout}>
         <SheetSection title={t('reactionPatientAndUnit')}>
@@ -462,7 +478,7 @@ export function HemovigilanceFields({
                 {readout('historyNumber', order.historyNumber)}
                 {readout('service', order.service)}
               </dl>
-              <div className={styles.bodyMeasurements}>{input('bed')}</div>
+              <div className={`${styles.bodyMeasurements} ${styles.reportEntry}`}>{input('bed')}</div>
             </div>
             <div className={styles.unitSummary}>
               <h4>{t('unitTitle')}</h4>
@@ -470,26 +486,18 @@ export function HemovigilanceFields({
                 {readout('unitCode', dispatch.unitCode)}
                 {readout('bloodComponent', t(componentDefinitions[dispatch.component].key))}
               </dl>
-              <div className={styles.bodyMeasurements}>{input('transfused', 'number')}</div>
+              <div className={`${styles.bodyMeasurements} ${styles.reportEntry}`}>{input('transfused', 'number')}</div>
             </div>
           </div>
         </SheetSection>
         <SheetSection title={t('reactionTransfusionDetails')}>
           <div className={styles.reactionTimes}>
             {reportTimes
-              .filter((key) => !hideBankNotification || key !== 'bankNotified')
+              .filter((key) => showBankNotification || key !== 'bankNotified')
               .map((key) => input(key, 'time'))}
           </div>
           <div className={styles.reactionMedication}>
-            {readOnly ? (
-              input('premedication')
-            ) : (
-              <PremedicationPicker
-                value={fields.premedication ?? ''}
-                onChange={(uuid, name) => setFields({ ...fields, premedication: name, premedicationConceptUuid: uuid })}
-                t={t}
-              />
-            )}
+            <PremedicationPicker selected={premedications} onChange={changePremedication} readOnly={readOnly} t={t} />
           </div>
         </SheetSection>
         <SheetSection title={t('vitalChanges')}>

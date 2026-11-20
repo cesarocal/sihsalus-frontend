@@ -309,10 +309,12 @@ y el UUID de la orden identifican cada hoja y reporte.
   confirma el envío al médico. El guardado deja la hoja abierta en solo lectura.
 - La ficha muestra el estado de transfusión por unidad. El inicio guardado
   indica una transfusión en curso y la hora de término indica que se completó.
-  La hora de suspensión guardada en la hoja o en un FR02 anterior indica una
-  interrupción y tiene prioridad sobre la hora de término. Si todavía no hay datos de administración,
+  Un FR02 con hora de suspensión indica una interrupción y tiene prioridad
+  sobre la hora de término. Las hojas anteriores que guardaron una hora de
+  suspensión independiente conservan su estado. Si todavía no hay datos de administración,
   la celda queda con un guion.
-- El FR02 nuevo toma las horas de inicio y suspensión guardadas en la hoja.
+- El FR02 nuevo toma las horas de inicio y término guardadas en la hoja. La
+  hora de término se usa como hora de suspensión del episodio reportado.
   El encuentro de reporte registra la notificación al médico y el encuentro
   de revisión registra la notificación a Banco de Sangre. La revisión habilita
   la impresión del informe. El CEP y el CMP se toman del atributo activo

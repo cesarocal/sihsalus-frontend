@@ -112,8 +112,8 @@ describe('hemovigilance records', () => {
     expect(openmrsFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('requires the FR02 start and suspension times to match the saved monitoring sheet', async () => {
-    const fields = { startTime: '10:00', stopTime: '10:30' };
+  it('requires the FR02 start and suspension times to match the saved start and end times', async () => {
+    const fields = { startTime: '10:00', endTime: '10:30' };
     deliverEvents([
       event('delivery', 'dispatch', dispatch.unitCode),
       event('conduction', 'conduction', dispatch.unitCode, '', fields),
@@ -134,6 +134,7 @@ describe('hemovigilance records', () => {
     const unit: UnitCase = { order, dispatch, sections: {} };
     vi.mocked(openmrsFetch).mockResolvedValueOnce({
       data: { patient: { uuid: order.patientId }, visit: { uuid: 'visit' }, location: { uuid: 'location' } },
+      headers: new Headers({ Date: 'Thu, 19 Nov 2026 13:40:20 GMT' }),
     } as Awaited<ReturnType<typeof openmrsFetch>>);
     vi.mocked(openmrsFetch).mockResolvedValueOnce({
       data: { uuid: 'conduction-record' },
@@ -160,7 +161,23 @@ describe('hemovigilance records', () => {
       visit: 'visit',
       location: 'location',
       encounterType: demoMetadata.encounters.conduction,
+      encounterDatetime: '2026-11-19T13:40:19.000+00:00',
     });
     expect(JSON.parse(body.obs[0].value)).toMatchObject({ orderId: order.id, fields });
+  });
+
+  it('recovers a matching saved encounter when its response is lost', async () => {
+    const delivered = event('delivery', 'dispatch', dispatch.unitCode);
+    deliverEvents([delivered]);
+    vi.mocked(openmrsFetch).mockResolvedValueOnce({
+      data: { patient: { uuid: order.patientId }, visit: { uuid: 'visit' }, location: { uuid: 'location' } },
+    } as Awaited<ReturnType<typeof openmrsFetch>>);
+    vi.mocked(openmrsFetch).mockRejectedValueOnce(new TypeError('Connection lost'));
+    const fields = { conductionDate: '2026-11-19', startTime: '10:00', time0: '10:10' };
+    deliverEvents([delivered, event('saved', 'conduction', dispatch.unitCode, '', fields)]);
+
+    const saved = await saveHemovigilance({ order, dispatch, sections: {} }, 'conduction', fields, actor);
+    expect(saved).toMatchObject({ uuid: 'saved', fields, actor });
+    expect(vi.mocked(openmrsFetch).mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
   });
 });

@@ -10,6 +10,7 @@ import {
   conductionCode,
   conductionFields,
   conductionSignKeys,
+  conductionVitalKeys,
   type Fields,
   findings,
   manualHistoryRows,
@@ -21,10 +22,12 @@ import {
   reactionVitalKeys,
   reactionVitalLabel,
   reportNotificationTimes,
+  reportPremedications,
   studies,
   type UnitCase,
-  vitalKeys,
 } from './hemovigilance';
+
+export const fr02PrintPage = { widthMm: 193, heightMm: 280 };
 
 export const hemovigilancePrintCss = `
 @page { size:A4 portrait; margin:8mm 8mm; }
@@ -52,7 +55,8 @@ tr, section, header { break-inside:avoid; }
 .value { flex:1 1 auto; min-width:7mm; min-height:3mm; border-bottom:.55pt solid; overflow-wrap:anywhere; }
 .checks { display:grid; gap:.7mm 2mm; margin:1mm 0; align-items:start; }
 .square { display:inline-block; width:2.85mm; height:2.85mm; line-height:2.6mm; text-align:center; vertical-align:-.4mm; border:.7pt solid; margin-right:1.05mm; }
-.recommendations { min-height:34mm; white-space:pre-wrap; overflow-wrap:anywhere; }
+.fr02 { font-size:8.5pt; line-height:1.16; }
+.fr02 .recommendations { min-height:20mm; white-space:pre-wrap; overflow-wrap:anywhere; }
 .signatures { margin-top:6mm; }
 .conduction th, .conduction td { font-size:8.5pt; height:4.15mm; padding:.55mm 1mm; }
 .conduction .signatures { width:min(100%, 157mm); margin:4mm auto 0; break-inside:avoid; }
@@ -253,11 +257,6 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
           <Field label={t('startTime')}>
             <TimeText value={fields.startTime} showBlank={false} />
           </Field>
-          {fields.stopTime && (
-            <Field label={t('stopTime')}>
-              <TimeText value={fields.stopTime} showBlank={false} />
-            </Field>
-          )}
           <Field label={t('endTime')}>
             <TimeText value={fields.endTime} showBlank={false} />
           </Field>
@@ -276,7 +275,7 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
                 </td>
               ))}
             </tr>
-            {vitalKeys.map((key) => (
+            {conductionVitalKeys(fields).map((key) => (
               <tr key={key}>
                 <th scope="row">{t(key)}</th>
                 {columns.map((col) => (
@@ -342,7 +341,7 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
 }
 
 const fr02Components: [string, string[]][] = [
-  ['Glóbulos Rojos', ['redCells', 'lowVolumeRedCells']],
+  ['Glóbulos Rojos', ['redCells']],
   ['Glóbulos Rojos Lavados', ['washedRedCells']],
   ['Plasma Fresco Congelado', ['freshFrozenPlasma']],
   ['Plasma Residual', ['cryoReducedPlasma']],
@@ -359,11 +358,11 @@ function formatFr02Pressure(report: Fields, phase: 'Before' | 'After') {
 }
 
 function Fr02Signer({ label, registration, actor }: { label: string; registration: string; actor?: Actor }) {
+  const identity = [actor?.name, actor?.license && `${registration} ${actor.license}`].filter(Boolean).join(' - ');
   return (
     <div className="fr02Signer">
       <span>{label}</span>
-      {actor?.name && <span>{actor.name}</span>}
-      <span>{[registration, actor?.license].filter(Boolean).join(' ')}</span>
+      {identity && <span>{identity}</span>}
     </div>
   );
 }
@@ -388,7 +387,7 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
   const review = sections.review?.actor;
   const investigator = sections.investigation?.actor;
   return (
-    <article>
+    <article className="fr02">
       <div className="titleRow">
         <h1>EG07 - FR02: REPORTE DE REACCIÓN ADVERSA TRANSFUSIONAL</h1>
         <small>(Hoja 1 de 1)</small>
@@ -441,7 +440,11 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
           <Field label="Cantidad transfundida">{report.transfused && `${report.transfused} mL`}</Field>
         </Line>
         <Line>
-          <Field label="Premedicación previa a transfusión">{report.premedication}</Field>
+          <Field label="Premedicación previa a transfusión">
+            {reportPremedications(report)
+              .map(({ name }) => name)
+              .join(', ')}
+          </Field>
         </Line>
         <Line>
           <Field label="Hora de inicio de transfusión">

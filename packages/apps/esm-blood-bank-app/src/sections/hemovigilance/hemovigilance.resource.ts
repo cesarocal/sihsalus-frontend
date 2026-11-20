@@ -147,28 +147,49 @@ function combineCases(orders: TransfusionOrder[], events: Awaited<ReturnType<typ
   return [...map.values()];
 }
 
+function responseStatus(error: unknown) {
+  return error && typeof error === 'object' && 'response' in error && error.response instanceof Response
+    ? error.response.status
+    : 0;
+}
+
+export function hemovigilanceSaveError(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message === 'HEMOVIGILANCE_CONFLICT') return 'saveConflict';
+    if (error.message === 'INVALID_HEMOVIGILANCE_ENCOUNTER') return 'saveVisitMissing';
+  }
+  const status = responseStatus(error);
+  if (status === 401 || status === 403) return 'saveAccessDenied';
+  if (status === 400) return 'saveRejected';
+  return 'saveFailed';
+}
+
 async function persist(order: TransfusionOrder, event: Event) {
-  const { data: parent } = await openmrsFetch<Encounter>(
+  const { data: parent, headers } = await openmrsFetch<Encounter>(
     endpoint(`encounter/${encodeURIComponent(order.encounterId)}`, {
       v: 'custom:(uuid,patient:(uuid),visit:(uuid),location:(uuid))',
     }),
+    { cache: 'no-store', rejectOnAuthFailure: true },
   );
   if (parent.patient.uuid !== order.patientId || !parent.visit || !parent.location)
     throw new Error('INVALID_HEMOVIGILANCE_ENCOUNTER');
-  const at = new Date().toISOString();
-  const { data } = await openmrsFetch<Ref>(`${restBaseUrl}/encounter`, {
+  const serverTime = Date.parse(headers?.get('Date') ?? '');
+  // OpenMRS rejects encounters set at or after its current time.
+  const at = new Date((Number.isFinite(serverTime) ? serverTime : Date.now()) - 1000).toISOString();
+  const { data } = await openmrsFetch<Ref & { encounterDatetime?: string }>(`${restBaseUrl}/encounter`, {
     method: 'POST',
+    rejectOnAuthFailure: true,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       patient: order.patientId,
       visit: parent.visit.uuid,
       location: parent.location.uuid,
       encounterType: demoMetadata.encounters[event.kind],
-      encounterDatetime: at,
+      encounterDatetime: at.replace('Z', '+00:00'),
       obs: [{ concept: demoMetadata.text, value: JSON.stringify(event) }],
     }),
   });
-  return { uuid: data.uuid, at };
+  return { uuid: data.uuid, at: data.encounterDatetime || at };
 }
 
 export async function recordDemoDispatch(request: TransfusionRequest) {
@@ -202,9 +223,9 @@ export async function recordDemoDispatch(request: TransfusionRequest) {
 }
 
 export async function saveHemovigilance(unit: UnitCase, kind: Stage, fields: Fields, actor: Actor) {
-  const current = (await listHemovigilance([unit.order])).find(
-    (entry) => entry.dispatch.unitCode === unit.dispatch.unitCode,
-  );
+  const loadCurrent = async () =>
+    (await listHemovigilance([unit.order])).find((entry) => entry.dispatch.unitCode === unit.dispatch.unitCode);
+  const current = await loadCurrent();
   const previous = unit.sections[kind]?.uuid ?? '';
   if (
     !current ||
@@ -216,16 +237,32 @@ export async function saveHemovigilance(unit: UnitCase, kind: Stage, fields: Fie
   )
     throw new Error('HEMOVIGILANCE_CONFLICT');
   const recordFields = kind === 'report' ? { ...fields, doctorNotified: '', bankNotified: '' } : fields;
-  const record = await persist(unit.order, {
-    version: 1,
-    kind,
-    orderId: unit.order.id,
-    dispatch: unit.dispatch,
-    previous,
-    fields: recordFields,
-    actor,
-  });
-  return { ...record, fields: recordFields, actor };
+  try {
+    const record = await persist(unit.order, {
+      version: 1,
+      kind,
+      orderId: unit.order.id,
+      dispatch: unit.dispatch,
+      previous,
+      fields: recordFields,
+      actor,
+    });
+    return { ...record, fields: recordFields, actor };
+  } catch (error) {
+    const status = responseStatus(error);
+    if (!status || status >= 500) {
+      const refreshed = await loadCurrent().catch(() => undefined);
+      const saved = refreshed?.sections[kind];
+      if (
+        saved &&
+        saved.uuid !== previous &&
+        saved.actor.personUuid === actor.personUuid &&
+        JSON.stringify(saved.fields) === JSON.stringify(recordFields)
+      )
+        return saved;
+    }
+    throw error;
+  }
 }
 
 export async function searchPremedications(query: string, signal: AbortSignal) {

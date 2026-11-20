@@ -1,4 +1,5 @@
-import { Button, Search, TextInput } from '@carbon/react';
+import { Button, Search } from '@carbon/react';
+import { Close } from '@carbon/react/icons';
 import { useDebounce } from '@openmrs/esm-framework';
 import { useEffect, useId, useState } from 'react';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
@@ -6,12 +7,14 @@ import { searchPremedications } from './hemovigilance.resource';
 import styles from './hemovigilance.scss';
 
 export function PremedicationPicker({
-  value,
+  selected,
   onChange,
+  readOnly,
   t,
 }: {
-  value: string;
-  onChange: (uuid: string, name: string) => void;
+  selected: { uuid: string; name: string }[];
+  onChange: (uuid: string, name?: string) => void;
+  readOnly: boolean;
   t: ProcessingTranslate;
 }) {
   const id = useId();
@@ -20,26 +23,45 @@ export function PremedicationPicker({
   const debounced = useDebounce(term);
   const [search, setSearch] = useState<{ term: string; options?: Awaited<ReturnType<typeof searchPremedications>> }>();
   useEffect(() => {
-    if (value || term.length < 3 || term !== debounced) return;
+    if (readOnly || term.length < 3 || term !== debounced) return;
     const controller = new AbortController();
     const finish = (options?: Awaited<ReturnType<typeof searchPremedications>>) => {
       if (!controller.signal.aborted) setSearch({ term, options });
     };
     void searchPremedications(term, controller.signal).then(finish, () => finish());
     return () => controller.abort();
-  }, [debounced, term, value]);
+  }, [debounced, term, readOnly]);
 
-  if (value)
+  const selections = selected.length ? (
+    <ul className={styles.premedicationSelected} aria-label={t('premedication')}>
+      {selected.map(({ uuid, name }) => (
+        <li key={uuid}>
+          <span>{name}</span>
+          {!readOnly && (
+            <Button
+              type="button"
+              kind="ghost"
+              size="sm"
+              hasIconOnly
+              renderIcon={Close}
+              iconDescription={t('removePremedication', { name })}
+              onClick={() => onChange(uuid)}
+            />
+          )}
+        </li>
+      ))}
+    </ul>
+  ) : null;
+  if (readOnly)
     return (
-      <div className={styles.premedicationSelected}>
-        <TextInput id={id} value={value} labelText={t('premedication')} readOnly />
-        <Button type="button" kind="ghost" size="sm" onClick={() => onChange('', '')}>
-          {t('clearPremedication')}
-        </Button>
+      <div>
+        <span className="cds--label">{t('premedication')}</span>
+        {selections ?? <div>—</div>}
       </div>
     );
 
   const active = search?.term === term ? search : undefined;
+  const available = active?.options?.filter(({ uuid }) => !selected.some((item) => item.uuid === uuid));
   return (
     <div className={styles.premedicationPicker}>
       <label className="cds--label" htmlFor={id} id={`${id}-label`}>
@@ -58,7 +80,8 @@ export function PremedicationPicker({
           if (term !== event.target.value.trim()) setSearch(undefined);
         }}
       />
-      {term.length >= 3 && !active?.options?.length && (
+      {selections}
+      {term.length >= 3 && !available?.length && (
         <p role="status">
           {t(
             !active
@@ -69,9 +92,9 @@ export function PremedicationPicker({
           )}
         </p>
       )}
-      {!!active?.options?.length && (
-        <ul aria-label={t('premedicationResults')}>
-          {active.options.map(({ uuid, display }) => (
+      {!!available?.length && (
+        <ul className={styles.premedicationResults} aria-label={t('premedicationResults')}>
+          {available.map(({ uuid, display }) => (
             <li key={uuid}>
               <Button
                 type="button"

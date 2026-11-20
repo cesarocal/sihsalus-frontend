@@ -2,12 +2,15 @@
   padding: 1rem;
 }
 
+.chartPanel { padding-block-start: 0; }
+:global([data-extension-slot-name='blood-bank-patient-transfusions-slot']) { margin-block-start: .25rem; }
+
 .chartFilters {
   display: grid;
   grid-template-columns: minmax(15rem, 1.6fr) repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: .75rem 1rem;
-  margin-block-end: 1rem;
+  margin-block-end: .625rem;
 
   select { width: 100%; }
 }
@@ -169,16 +172,38 @@
 }
 
 .unitSummary .bodyMeasurements { grid-template-columns: minmax(0, 12rem); }
+.reportEntry :global(.cds--text-input):not([readonly]) { background: var(--cds-background, #fff); }
 .reactionTimes, .reactionPersonnel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: .75rem 1rem;
 }
 .reactionMedication { margin-block-start: 1rem; max-inline-size: 36rem; }
-.premedicationSelected { display: flex; align-items: end; gap: .5rem; }
+.premedicationSelected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .375rem;
+  margin-block-start: .5rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    padding-inline-start: .625rem;
+    background: var(--cds-layer-01, #f4f4f4);
+    border-radius: .125rem;
+    font-size: .875rem;
+    overflow-wrap: anywhere;
+  }
+}
 .premedicationPicker {
   p { margin-block-start: .5rem; color: var(--cds-text-secondary, #525252); font-size: .875rem; }
-  ul { max-block-size: 12rem; overflow: auto; border: 1px solid var(--cds-border-subtle, #c6c6c6); }
+}
+.premedicationResults {
+  max-block-size: 12rem;
+  overflow: auto;
+  border: 1px solid var(--cds-border-subtle, #c6c6c6);
+
   button { inline-size: 100%; max-inline-size: none; }
 }
 .reactionVitals {
