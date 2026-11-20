@@ -8,7 +8,7 @@ import {
   ModalHeader,
   Tag,
 } from '@carbon/react';
-import { Printer } from '@carbon/react/icons';
+import { Printer, RainDrop } from '@carbon/react/icons';
 import { ConfigurableLink, useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -74,7 +74,10 @@ export function HemovigilanceLink({ basePath }: { basePath: string }) {
       className={`cds--side-nav__link${active ? ' active-left-nav-link' : ''}`}
       aria-current={active ? 'page' : undefined}
     >
-      {t('chapter')}
+      <span className="sihsalus-side-nav__item">
+        <RainDrop size={20} className="sihsalus-side-nav__icon" aria-hidden="true" />
+        <span className="sihsalus-side-nav__text">{t('chapter')}</span>
+      </span>
     </ConfigurableLink>
   );
 }
@@ -139,19 +142,19 @@ function HemovigilanceList({
       <ProcessingTable
         title={t(onClose ? 'queue' : 'deliveredUnits')}
         columns={[
-          t('fr08'),
-          t('patientName'),
+          t(onClose ? 'fr08' : 'chartFr08'),
+          ...(onClose ? [t('patientName')] : []),
           t('unitCode'),
           t('component'),
           t('dispatchDate'),
-          t('reactionState'),
-          t('actions'),
+          t(onClose ? 'reactionState' : 'chartFr02'),
+          t(onClose ? 'actions' : 'chartRecord'),
         ]}
         rows={units.map((unit) => ({
           id: id(unit),
           cells: [
             unit.order.number,
-            unit.order.patientName,
+            ...(onClose ? [unit.order.patientName] : []),
             unit.dispatch.unitCode,
             t(componentDefinitions[unit.dispatch.component].key),
             formatListDate(unit.dispatch.deliveredAt),

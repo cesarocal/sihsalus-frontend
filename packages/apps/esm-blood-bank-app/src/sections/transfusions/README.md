@@ -48,8 +48,9 @@ La canasta de Órdenes permite emitir el FR08. La ficha muestra la orden en
 su lista habitual. En Banco de Sangre las solicitudes del tipo
 configurado aparecen en la misma bandeja que usa el flujo de atención.
 **Atender** abre el paso correspondiente al estado de la solicitud. En
-**Verificación de la solicitud** están **Imprimir FR08** y **Registrar
-recepción**. **Ver solicitud** abre las solicitudes disponibles para consulta.
+**Verificación de la solicitud** está **Registrar recepción**. **Ver solicitud**
+abre las solicitudes disponibles para consulta. El médico puede imprimir el
+FR08 desde Órdenes.
 
 La acción de la canasta requiere una visita activa, un proveedor asociado a la
 sesión y el número de historia clínica configurado. Un POST a `/encounter`
@@ -85,6 +86,12 @@ rondas y la entrega usan las unidades de prueba. Para una orden nueva, la
 verificación habilita el registro de recepción y la recepción confirmada
 habilita el avance hacia la muestra. Al avanzar se guarda una fecha y hora
 en el registro local de atención.
+
+Para pacientes sintéticos de hemovigilancia, la bandeja consulta los encuentros
+de entrega de OpenMRS. Si existe una entrega, muestra la orden como **Atendida**
+en el historial incluso al abrir otra sesión. Vuelve a comprobar el registro
+antes de abrir la atención y antes de entregar. **Recibida** es el estado que
+OpenMRS guarda al registrar la recepción de la orden.
 
 EG05-PC10 ubica la revisión de la integridad y legibilidad de la solicitud y
 el registro de fecha y hora de recepción antes de la toma de muestra. La API

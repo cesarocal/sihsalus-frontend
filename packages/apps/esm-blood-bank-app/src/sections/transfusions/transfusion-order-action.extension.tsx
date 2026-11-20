@@ -18,13 +18,14 @@ import {
   AddIcon,
   ChevronDownIcon,
   getConfig,
+  showSnackbar,
   useConfig,
   usePatient,
   userHasAccess,
   useSession,
   useVisit,
 } from '@openmrs/esm-framework';
-import { type FormEvent, useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BloodBankConfig } from '../../config-schema';
 import { useProcessingData } from '../../shared/processing-page.component';
@@ -33,7 +34,7 @@ import { componentDefinitions } from '../laboratory/fractionation/fractionation-
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import { listFr08Services } from './fr08-catalogs.resource';
 import { Fr08DiagnosisPicker } from './fr08-diagnosis-picker.component';
-import { formatFr08Date, Fr08Document, PrintFr08 } from './fr08-document.component';
+import { Fr08Document, formatFr08Date, PrintFr08 } from './fr08-document.component';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import {
   configuredTransfusionOrders,
@@ -181,7 +182,6 @@ function TransfusionOrderForm({
   const [scheduledTime, setScheduledTime] = useState('');
   const [requirements, setRequirements] = useState<RequirementRow[]>([{ id: 0, ...emptyRequirement }]);
   const nextRow = useRef(1);
-  const [invalidSubmissions, setInvalidSubmissions] = useState(0);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [issued, setIssued] = useState<IssuedTransfusionOrder>();
@@ -215,11 +215,6 @@ function TransfusionOrderForm({
     requirements.every((row) => row.component) &&
     validFr08(enteredFields) &&
     validFr08ClinicalValues(enteredFields);
-  const complete = completeDetails && validFr08Schedule(enteredFields);
-
-  useLayoutEffect(() => {
-    if (invalidSubmissions > 0) modalBody.current?.scrollTo({ top: 0 });
-  }, [invalidSubmissions]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -235,7 +230,11 @@ function TransfusionOrderForm({
     )
       return;
     if (!completeDetails || !validFr08Schedule(enteredFields)) {
-      setInvalidSubmissions((previous) => previous + 1);
+      showSnackbar({
+        title: t(completeDetails ? 'fr08FutureScheduleRequired' : 'fr08Required'),
+        kind: 'warning',
+        autoClose: true,
+      });
       return;
     }
     setFailed(false);
@@ -301,6 +300,10 @@ function TransfusionOrderForm({
       className={styles.fr08Modal}
       containerClassName={styles.fr08ModalContainer}
       preventCloseOnClickOutside
+      onBlurCapture={(event) => {
+        if (event.relatedTarget instanceof Node && modalBody.current?.contains(event.relatedTarget))
+          event.stopPropagation();
+      }}
       onClose={() => {
         if (inFlight.current) return false;
         onClose();
@@ -316,14 +319,6 @@ function TransfusionOrderForm({
             {!visit && !loading && <InlineNotification kind="warning" hideCloseButton title={t('fr08ActiveVisit')} />}
             {!provider?.uuid && <InlineNotification kind="warning" hideCloseButton title={t('fr08ProviderRequired')} />}
             {failed && <InlineNotification kind="error" hideCloseButton title={t('fr08SaveFailed')} />}
-            {invalidSubmissions > 0 && !complete && (
-              <InlineNotification
-                className={styles.fr08Warning}
-                kind="warning"
-                hideCloseButton
-                title={t(completeDetails ? 'fr08FutureScheduleRequired' : 'fr08Required')}
-              />
-            )}
             <form id={formId} onSubmit={submit} noValidate>
               <fieldset disabled={saving || !ready} className={styles.fr08Form}>
                 <TextInput
@@ -568,7 +563,9 @@ function TransfusionOrderForm({
                       <RadioButton key={value} id={`${formId}-priority-${value}`} value={value} labelText={t(label)} />
                     ))}
                   </RadioButtonGroup>
-                  {fields.priority === 'veryUrgent' && <p>{t('txUrgentAuthorizationHelp')}</p>}
+                  {fields.priority === 'veryUrgent' && (
+                    <p className={styles.fr08UrgentWarning}>{t('txUrgentAuthorizationHelp')}</p>
+                  )}
                   {fields.priority === 'scheduled' && (
                     <div className={styles.fr08Schedule}>
                       <TextInput

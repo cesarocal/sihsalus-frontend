@@ -5,10 +5,11 @@ import { useState } from 'react';
 import { printDocument } from '../../shared/print-document';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { Fr08Document } from './fr08-document.component';
 import { TransfusionDetails } from './transfusion-details.component';
 import { CompatibilityReport, compatibilityReportPrintCss } from './transfusion-print.component';
 import styles from './transfusions.scss';
-import type { TransfusionBookEntry, TransfusionRequest } from './transfusions.types';
+import type { TransfusionBookEntry, TransfusionOrder, TransfusionRequest } from './transfusions.types';
 import {
   compatibilityReportReady,
   priorityKeys,
@@ -19,17 +20,24 @@ import {
 export function TransfusionHistory({
   requests = [],
   bookEntries,
+  recordedDeliveries = [],
   onClose,
   t,
   compatibility = false,
 }: { onClose: () => void; t: ProcessingTranslate } & (
-  | { requests: TransfusionRequest[]; compatibility?: boolean; bookEntries?: never }
-  | { bookEntries: TransfusionBookEntry[]; requests?: never; compatibility?: never }
+  | {
+      requests: TransfusionRequest[];
+      compatibility?: boolean;
+      bookEntries?: never;
+      recordedDeliveries?: { order: TransfusionOrder; deliveredAt: string }[];
+    }
+  | { bookEntries: TransfusionBookEntry[]; requests?: never; compatibility?: never; recordedDeliveries?: never }
 )) {
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [detail, setDetail] = useState<TransfusionRequest | null>(null);
+  const [recordedDetail, setRecordedDetail] = useState<TransfusionOrder>();
   const reportReady = detail && compatibilityReportReady(detail);
   const [failed, setFailed] = useState(false);
   const title = t(bookEntries ? 'txBook' : compatibility ? 'txCompatibilityHistory' : 'txHistory');
@@ -45,14 +53,30 @@ export function TransfusionHistory({
       : (item.deliveredAt ?? item.order.requestedAt);
   const invalid = !!from && !!to && from > to;
   const hasPostDispatchResults = bookEntries?.some((item) => item.compatibilityPendingAtDispatch);
-  const filtered = requests
-    .filter(
-      (item) =>
-        (compatibility ? item.rounds.some((round) => !!round.completedAt) : item.status === 'delivered') &&
-        range(historyDate(item)) &&
-        matches(`${item.order.number} ${item.order.patientName} ${item.order.historyNumber}`),
-    )
-    .sort((a, b) => historyDate(b).localeCompare(historyDate(a)));
+  const localHistory = requests.filter((item) =>
+    compatibility ? item.rounds.some((round) => !!round.completedAt) : item.status === 'delivered',
+  );
+  const localIds = new Set(localHistory.map((request) => request.order.id));
+  const filtered = [
+    ...localHistory.map((request) => ({
+      id: request.id,
+      order: request.order,
+      at: historyDate(request),
+      status: request.status,
+      request,
+    })),
+    ...recordedDeliveries
+      .filter(({ order }) => !localIds.has(order.id))
+      .map(({ order, deliveredAt }) => ({
+        id: order.id,
+        order,
+        at: deliveredAt,
+        status: 'delivered' as const,
+        request: undefined,
+      })),
+  ]
+    .filter(({ order, at }) => range(at) && matches(`${order.number} ${order.patientName} ${order.historyNumber}`))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const book = bookEntries
     ?.map((item) => {
       const component = componentDefinitions[item.component];
@@ -128,6 +152,13 @@ export function TransfusionHistory({
                 </p>
               ))}
             </section>
+          </>
+        ) : recordedDetail ? (
+          <>
+            <Button kind="ghost" size="sm" renderIcon={ArrowLeft} onClick={() => setRecordedDetail(undefined)}>
+              {t('txBackHistory')}
+            </Button>
+            <Fr08Document order={recordedDetail} t={t} />
           </>
         ) : (
           <>
@@ -226,10 +257,18 @@ export function TransfusionHistory({
                     item.order.number,
                     item.order.patientName,
                     item.order.historyNumber,
-                    t(priorityKeys[item.order.priority]),
+                    t(item.order.priority === 'veryUrgent' ? 'txVeryUrgentShort' : priorityKeys[item.order.priority]),
                     t(transfusionStatusKeys[item.status]),
-                    formatDatetime(new Date(historyDate(item)), { noToday: true }),
-                    <Button key="detail" kind="ghost" size="sm" onClick={() => setDetail(item)}>
+                    formatDatetime(new Date(item.at), { noToday: true }),
+                    <Button
+                      key="detail"
+                      kind="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (item.request) setDetail(item.request);
+                        else setRecordedDetail(item.order);
+                      }}
+                    >
                       {t('txViewDetail')}
                     </Button>,
                   ],

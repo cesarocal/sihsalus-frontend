@@ -1,4 +1,4 @@
-import { Button, Checkbox, InlineNotification, TextInput } from '@carbon/react';
+import { Button, Checkbox, TextInput } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { useSession } from '@openmrs/esm-framework';
 import { useRef, useState } from 'react';
@@ -10,7 +10,6 @@ import type { ProcessingTranslate } from '../../shared/processing-page.component
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import type { TransferUnit } from '../transfers/transfers.types';
-import { PrintFr08 } from './fr08-document.component';
 import { TransfusionDetails } from './transfusion-details.component';
 import type { IssuedTransfusionOrder, TransfusionOrderConfig } from './transfusion-order.resource';
 import {
@@ -43,6 +42,7 @@ export function TransfusionWorkflow({
   api,
   onSaved,
   onDelivered,
+  beforeDelivery,
   onClose,
   t,
 }: {
@@ -53,6 +53,7 @@ export function TransfusionWorkflow({
   api: TransfusionsApi;
   onSaved: () => void;
   onDelivered?: (request: TransfusionRequest) => Promise<void>;
+  beforeDelivery?: (order: TransfusionRequest['order']) => Promise<void>;
   onClose: () => void;
   t: ProcessingTranslate;
 }) {
@@ -99,8 +100,13 @@ export function TransfusionWorkflow({
       onSaved();
       if (result.revision !== request.revision) notifySuccess(t(message));
       return result;
-    } catch {
-      setFailed('txSaveFailed');
+    } catch (error) {
+      if (error instanceof Error && error.message === 'TRANSFUSION_ALREADY_DELIVERED') {
+        setFailed('txAlreadyDelivered');
+        onSaved();
+      } else {
+        setFailed('txSaveFailed');
+      }
       return null;
     } finally {
       inFlight.current = false;
@@ -264,10 +270,10 @@ export function TransfusionWorkflow({
         footerClassName={styles.printFooter}
         compactHeader
         hideStepHeading={selectionStep}
+        preserveContentScroll
         extraActions={
           reviewStep ? (
             <div className={styles.receiptActions}>
-              <PrintFr08 order={request.order} t={t} label={t('fr08PrintForm')} disabled={saving || receipt.saving} />
               {receipt.canReceive && (
                 <Button
                   kind="tertiary"
@@ -291,6 +297,14 @@ export function TransfusionWorkflow({
               checked={draft.selectionVerified}
               disabled={saving}
               onChange={(_e, { checked }) => change({ selectionVerified: checked })}
+            />
+          ) : delivery && step === 1 ? (
+            <Checkbox
+              id="tx-release-check"
+              labelText={t(urgentRelease ? 'txUrgentReleaseCheck' : 'txReleaseCheck')}
+              disabled={saving}
+              checked={draft.releaseVerified}
+              onChange={(_e, { checked }) => change({ releaseVerified: checked })}
             />
           ) : (
             (sampleStep || ((delivery || readOnly || replacement) && step === 0)) && (
@@ -364,13 +378,6 @@ export function TransfusionWorkflow({
                   />
                 </div>
                 <p>{t('txAutomaticDate')}</p>
-                <Checkbox
-                  id="tx-release-check"
-                  labelText={t(urgentRelease ? 'txUrgentReleaseCheck' : 'txReleaseCheck')}
-                  disabled={saving}
-                  checked={draft.releaseVerified}
-                  onChange={(_e, { checked }) => change({ releaseVerified: checked })}
-                />
                 {urgentRelease && (
                   <Checkbox
                     id="tx-urgent-labels-check"
@@ -438,9 +445,6 @@ export function TransfusionWorkflow({
                   <CompatibilityReport request={request} t={t} showAttendedBy={delivery} />
                 ) : (
                   <div className={styles.reviewChecks}>
-                    {receipt.received && (
-                      <InlineNotification kind="success" hideCloseButton title={t('fr08ReceiptRegistered')} />
-                    )}
                     <TextInput
                       id="tx-reviewer"
                       labelText={t('txReviewer')}
@@ -498,6 +502,7 @@ export function TransfusionWorkflow({
                 async () => {
                   if (confirm === 'assign')
                     return api.assign(request.id, request.revision, draft.selectedUnitIds, draft.selectionVerified);
+                  if (request.issuedOrder) await beforeDelivery?.(request.order);
                   const delivered = await api.deliver(request.id, request.revision, {
                     ...draft,
                     deliveredBy: operator,

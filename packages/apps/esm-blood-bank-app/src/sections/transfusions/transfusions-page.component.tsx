@@ -1,5 +1,5 @@
 import { Button, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
-import { Book, RecentlyViewed } from '@carbon/react/icons';
+import { Book, RecentlyViewed, Report } from '@carbon/react/icons';
 import { userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { bloodBankPrivileges } from '../../access/blood-bank-privileges';
@@ -14,7 +14,11 @@ import {
 import shared from '../applicant-selection/selection.scss';
 import { hemoPrivileges } from '../hemovigilance/hemovigilance';
 import { BankHemovigilance } from '../hemovigilance/hemovigilance.component';
-import { isLocalHemovigilance, recordDemoDispatch } from '../hemovigilance/hemovigilance.resource';
+import {
+  isLocalHemovigilance,
+  listRecordedDeliveries,
+  recordDemoDispatch,
+} from '../hemovigilance/hemovigilance.resource';
 import { IssuedTransfusionOrderDialog } from './issued-transfusion-order-dialog.component';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionHistory } from './transfusion-history.component';
@@ -67,12 +71,16 @@ export function TransfusionsPage({
   const configured = configuredTransfusionOrders(orderConfig) ? orderConfig : undefined;
   const readableConfig = authenticated && configured && userHasAccess(bankOrderRead, user) ? configured : undefined;
   const loadWorkspace = useMockData || !configured;
+  const verifyDelivery = Boolean(readableConfig && isLocalHemovigilance(useMockData));
   const load = useCallback(() => api.list(), [api]);
   const workspace = useProcessingData(load, loadWorkspace);
-  const loadIssued = useCallback(
-    () => (readableConfig ? listIssuedTransfusionOrders(readableConfig) : Promise.resolve([])),
-    [readableConfig],
-  );
+  const loadIssued = useCallback(async () => {
+    const issued = readableConfig ? await listIssuedTransfusionOrders(readableConfig) : [];
+    const delivered = verifyDelivery
+      ? await listRecordedDeliveries(issued.map(({ order }) => order))
+      : new Map<string, string>();
+    return { issued, delivered };
+  }, [readableConfig, verifyDelivery]);
   const orders = useProcessingData(loadIssued, Boolean(readableConfig));
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -80,7 +88,7 @@ export function TransfusionsPage({
   const [active, setActive] = useState<TransfusionRequest | null>(null);
   const [selected, setSelected] = useState<{ order: TransfusionOrder; issued: boolean; attend: boolean }>();
   const [preparing, setPreparing] = useState(false);
-  const [prepareFailed, setPrepareFailed] = useState(false);
+  const [prepareFailed, setPrepareFailed] = useState('');
   const [archive, setArchive] = useState<'history' | 'book' | null>(null);
   const [reactionQueue, setReactionQueue] = useState(false);
   const preparingRequest = useRef(false);
@@ -101,7 +109,7 @@ export function TransfusionsPage({
   const failed =
     (workspaceFailed || ordersFailed) && !(loadWorkspace && !workspaceFailed) && !(readableConfig && !ordersFailed);
   const archiveUnavailable = loading || !loadWorkspace || workspaceFailed;
-  const issued = readableConfig && !ordersFailed ? (orders.data ?? []) : [];
+  const issued = readableConfig && !ordersFailed ? (orders.data?.issued ?? []) : [];
   const canInvestigate = Boolean(
     readableConfig && isLocalHemovigilance(useMockData) && userHasAccess(hemoPrivileges.bank, user),
   );
@@ -109,39 +117,45 @@ export function TransfusionsPage({
   const requests = loadWorkspace && !workspaceFailed ? (workspace.data?.requests ?? []) : [];
   const requestById = new Map(requests.filter((item) => item.issuedOrder).map((item) => [item.order.id, item]));
   const shownRequests = requests.filter((item) => !item.issuedOrder || issuedById.has(item.order.id));
+  const recordedDeliveries = issued.flatMap(({ order }) => {
+    const deliveredAt = orders.data?.delivered.get(order.id);
+    return deliveredAt ? [{ order, deliveredAt }] : [];
+  });
   const canEditOrders = Boolean(readableConfig && userHasAccess('Edit Orders', user));
   const rows: InboxRow[] = [
     ...requests
       .filter((request) => !request.issuedOrder)
       .map((request) => ({ order: request.order, statusKey: transfusionStatusKeys[request.status], request })),
-    ...issued.map((item) => {
-      const existing = requestById.get(item.order.id);
-      const canReceive = canEditOrders && !item.stopped && !item.fulfillerStatus;
-      const canPrepare = Boolean(
-        useMockData &&
-          !workspaceFailed &&
-          api.prepareIssuedRequest &&
-          !item.order.otherComponent &&
-          !item.stopped &&
-          (canReceive ||
-            item.fulfillerStatus === 'RECEIVED' ||
-            (!item.fulfillerStatus && existing && existing.status !== 'pending')),
-      );
-      const request = canPrepare ? existing : undefined;
-      return {
-        order: item.order,
-        request,
-        issued: item,
-        canPrepare,
-        canReceive,
-        statusKey:
-          request && request.status !== 'pending'
-            ? transfusionStatusKeys[request.status]
-            : canPrepare && !item.fulfillerStatus
-              ? transfusionStatusKeys.pending
-              : issuedOrderStatus(item),
-      };
-    }),
+    ...issued
+      .filter((item) => !orders.data?.delivered.has(item.order.id))
+      .map((item) => {
+        const existing = requestById.get(item.order.id);
+        const canReceive = canEditOrders && !item.stopped && !item.fulfillerStatus;
+        const canPrepare = Boolean(
+          useMockData &&
+            !workspaceFailed &&
+            api.prepareIssuedRequest &&
+            !item.order.otherComponent &&
+            !item.stopped &&
+            (canReceive ||
+              item.fulfillerStatus === 'RECEIVED' ||
+              (!item.fulfillerStatus && existing && existing.status !== 'pending')),
+        );
+        const request = canPrepare ? existing : undefined;
+        return {
+          order: item.order,
+          request,
+          issued: item,
+          canPrepare,
+          canReceive,
+          statusKey:
+            request && request.status !== 'pending'
+              ? transfusionStatusKeys[request.status]
+              : canPrepare && !item.fulfillerStatus
+                ? transfusionStatusKeys.pending
+                : issuedOrderStatus(item),
+        };
+      }),
   ];
   const statusOptions = new Set([
     'txPendingCount',
@@ -168,22 +182,24 @@ export function TransfusionsPage({
       ),
     );
   const openRequest = async (item: InboxRow) => {
-    if (item.request) {
-      setActive(item.request);
-      return;
-    }
-    if (!item.canPrepare || !api.prepareIssuedRequest) {
+    if (!item.request && (!item.canPrepare || !api.prepareIssuedRequest)) {
       setSelected({ order: item.order, issued: Boolean(item.issued), attend: Boolean(item.canReceive) });
       return;
     }
     if (preparingRequest.current) return;
     preparingRequest.current = true;
     setPreparing(true);
-    setPrepareFailed(false);
+    setPrepareFailed('');
     try {
-      setActive(await api.prepareIssuedRequest(item.order));
+      if (item.issued && verifyDelivery && (await listRecordedDeliveries([item.order])).has(item.order.id)) {
+        setPrepareFailed('txAlreadyDelivered');
+        reloadOrders();
+        return;
+      }
+      if (item.request) setActive(item.request);
+      else if (api.prepareIssuedRequest) setActive(await api.prepareIssuedRequest(item.order));
     } catch {
-      setPrepareFailed(true);
+      setPrepareFailed('txSaveFailed');
     } finally {
       preparingRequest.current = false;
       setPreparing(false);
@@ -221,7 +237,12 @@ export function TransfusionsPage({
             onChange={(event) => setSearch(event.target.value)}
           />
           {canInvestigate && (
-            <Button kind="tertiary" disabled={loading || ordersFailed} onClick={() => setReactionQueue(true)}>
+            <Button
+              kind="tertiary"
+              renderIcon={Report}
+              disabled={loading || ordersFailed}
+              onClick={() => setReactionQueue(true)}
+            >
               {t('txReactionQueue')}
             </Button>
           )}
@@ -269,7 +290,7 @@ export function TransfusionsPage({
             </Button>
           </div>
         )}
-        {prepareFailed && <InlineNotification hideCloseButton kind="error" title={t('txSaveFailed')} />}
+        {prepareFailed && <InlineNotification hideCloseButton kind="error" title={t(prepareFailed)} />}
         <ProcessingTable
           title={t('txInbox')}
           columns={[
@@ -287,7 +308,7 @@ export function TransfusionsPage({
             cells: [
               item.order.number,
               <Tag key="priority" type={item.order.priority === 'scheduled' ? 'blue' : 'red'}>
-                {t(priorityKeys[item.order.priority])}
+                {t(item.order.priority === 'veryUrgent' ? 'txVeryUrgentShort' : priorityKeys[item.order.priority])}
               </Tag>,
               formatListDate(item.order.requestedAt),
               item.order.patientName,
@@ -324,8 +345,19 @@ export function TransfusionsPage({
           orderConfig={readableConfig}
           units={workspace.data?.units ?? []}
           api={api}
-          onDelivered={isLocalHemovigilance(useMockData) && readableConfig ? recordDemoDispatch : undefined}
-          onSaved={workspace.reload}
+          beforeDelivery={
+            verifyDelivery
+              ? async (order) => {
+                  if ((await listRecordedDeliveries([order])).has(order.id))
+                    throw new Error('TRANSFUSION_ALREADY_DELIVERED');
+                }
+              : undefined
+          }
+          onDelivered={verifyDelivery ? recordDemoDispatch : undefined}
+          onSaved={() => {
+            workspace.reload();
+            if (verifyDelivery) reloadOrders();
+          }}
           onClose={() => {
             setActive(null);
             workspace.reload();
@@ -344,7 +376,14 @@ export function TransfusionsPage({
           t={t}
         />
       )}
-      {archive === 'history' && <TransfusionHistory requests={shownRequests} onClose={() => setArchive(null)} t={t} />}
+      {archive === 'history' && (
+        <TransfusionHistory
+          requests={shownRequests}
+          recordedDeliveries={recordedDeliveries}
+          onClose={() => setArchive(null)}
+          t={t}
+        />
+      )}
       {reactionQueue && canInvestigate && (
         <BankHemovigilance orders={issued.map(({ order }) => order)} onClose={() => setReactionQueue(false)} />
       )}

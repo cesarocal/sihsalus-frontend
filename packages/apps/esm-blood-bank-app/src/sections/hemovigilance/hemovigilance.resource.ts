@@ -50,12 +50,13 @@ async function eligible(patientId: string) {
   );
 }
 
-async function encounters(patientId: string) {
+async function encounters(patientId: string, encounterType?: string) {
   const rows: { row: Encounter; event: Event }[] = [];
   for (let startIndex = 0; ; ) {
     const { data } = await openmrsFetch<{ results: Encounter[]; links?: { rel: string }[] }>(
       endpoint('encounter', {
         patient: patientId,
+        ...(encounterType ? { encounterType } : {}),
         limit: '100',
         startIndex: String(startIndex),
         v: 'custom:(uuid,encounterDatetime,patient:(uuid),encounterType:(uuid),obs:(concept:(uuid),value))',
@@ -80,6 +81,25 @@ async function encounters(patientId: string) {
     startIndex += data.results.length;
   }
   return rows.sort((a, b) => Date.parse(a.row.encounterDatetime) - Date.parse(b.row.encounterDatetime));
+}
+
+/** Delivery is established by the dispatch encounter, independently of later FR02 revisions. */
+export async function listRecordedDeliveries(orders: TransfusionOrder[]) {
+  const patients = new Set(orders.map((order) => order.patientId));
+  const orderPatients = new Map(orders.map((order) => [order.id, order.patientId]));
+  const streams = await Promise.all(
+    [...patients].map(async (patient) =>
+      (await eligible(patient)) ? encounters(patient, demoMetadata.encounters.dispatch) : [],
+    ),
+  );
+  const delivered = new Map<string, string>();
+  for (const { row, event } of streams.flat()) {
+    if (event.kind !== 'dispatch' || orderPatients.get(event.orderId) !== row.patient.uuid) continue;
+    const date = event.deliveredUnits?.[0]?.deliveredAt ?? event.dispatch?.deliveredAt;
+    if (!date || !Number.isFinite(Date.parse(date))) throw new Error('INVALID_HEMOVIGILANCE_DISPATCH_DATE');
+    if (!delivered.has(event.orderId)) delivered.set(event.orderId, date);
+  }
+  return delivered;
 }
 
 export async function listHemovigilance(orders: TransfusionOrder[]): Promise<UnitCase[]> {

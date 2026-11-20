@@ -3,8 +3,8 @@ import { Printer } from '@carbon/react/icons';
 import { useState } from 'react';
 import { printDocument } from '../../shared/print-document';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
+import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { transfusionRhLabel } from './transfusion-blood-group';
 import styles from './transfusions.scss';
 import type { TransfusionOrder } from './transfusions.types';
@@ -188,9 +188,7 @@ export function Fr08Document({ order, t }: { order: TransfusionOrder; t: Process
             </td>
           </tr>
           <tr>
-            <td colSpan={6}>
-              {t('fr08Requirement')} · {t('fr08Quantity')}
-            </td>
+            <td colSpan={6}>{t('fr08Requirement')}</td>
           </tr>
           <tr>
             <td colSpan={3}>

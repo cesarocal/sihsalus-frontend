@@ -52,9 +52,6 @@ export function IssuedTransfusionOrderDialog({
       <ModalBody>
         {attend && <h3>{t('txReview')}</h3>}
         {receipt.failed && <InlineNotification kind="error" hideCloseButton title={t('fr08ReceiveFailed')} />}
-        {attend && receipt.received && (
-          <InlineNotification kind="success" hideCloseButton title={t('fr08ReceiptRegistered')} />
-        )}
         <Fr08Document order={order} t={t} />
         {receipt.canReceive && (
           <Checkbox
@@ -67,7 +64,7 @@ export function IssuedTransfusionOrderDialog({
         )}
       </ModalBody>
       <ModalFooter className={styles.fr08Footer}>
-        <PrintFr08 order={order} t={t} label={t('fr08PrintForm')} disabled={receipt.saving} />
+        {!attend && <PrintFr08 order={order} t={t} label={t('fr08PrintForm')} />}
         <Button kind="secondary" disabled={receipt.saving} onClick={onClose}>
           {t('close')}
         </Button>

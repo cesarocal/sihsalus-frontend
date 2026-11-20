@@ -541,6 +541,10 @@
   block-size: 100dvh;
 }
 
+:global(body):has(.fr08Modal) :global(.omrs-snackbars-container) {
+  z-index: 9003;
+}
+
 .fr08Modal .fr08ModalContainer:global(.cds--modal-container) {
   position: relative;
   inline-size: min(calc(100% - 2rem), 64rem);
@@ -550,6 +554,7 @@
 
 .fr08ModalBody {
   overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 
 .fr08Form {
@@ -573,9 +578,8 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: layout.$spacing-04;
 }
-.fr08Warning:global(.cds--inline-notification) {
-  inline-size: 100%;
-  max-inline-size: none;
+.fr08UrgentWarning {
+  margin-block-start: layout.$spacing-06;
 }
 
 .fr08ClinicalFields,

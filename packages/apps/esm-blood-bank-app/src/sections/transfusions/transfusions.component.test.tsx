@@ -1,5 +1,5 @@
 import { IbmDevopsTest } from '@carbon/react/icons';
-import { type FetchResponse, openmrsFetch } from '@openmrs/esm-framework';
+import { type FetchResponse, openmrsFetch, showSnackbar } from '@openmrs/esm-framework';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustra
 import { formatListDate } from '../../shared/format-list-date';
 import { printDocument } from '../../shared/print-document';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
+import { demoMetadata } from '../hemovigilance/hemovigilance';
 import { CompatibilityPage } from '../laboratory/compatibility/compatibility-page.component';
 import { CompatibilityWorkflow } from '../laboratory/compatibility/compatibility-workflow.component';
 import { localDateTime } from '../laboratory/screening/screening-rules';
@@ -52,6 +53,14 @@ const t = (key: string, values?: Record<string, string>) =>
     key
   ).replace(/\{\{(\w+)\}\}/g, (match, name: string) => values?.[name] ?? match);
 const code = (number: number) => `BB-TX-DEMO-${String(number).padStart(3, '0')}`;
+const fr08Config = {
+  orderTypeUuid: 'fr08-type',
+  conceptUuid: 'fr08-concept',
+  encounterTypeUuid: 'fr08-encounter-type',
+  careSettingUuid: 'care-setting',
+  historyIdentifierTypeUuid: 'history-type',
+  documentIdentifierTypeUuids: [],
+};
 async function prepared() {
   const api = createMockTransfusionsApi();
   const initial = (await api.list()).requests[0];
@@ -278,21 +287,13 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
   it('uses the existing inbox and workflow for an issued order without duplicating its row', async () => {
     const api = createMockTransfusionsApi();
     const { order } = (await api.list()).requests[0];
-    const config = {
-      orderTypeUuid: 'fr08-type',
-      conceptUuid: 'fr08-concept',
-      encounterTypeUuid: 'fr08-encounter-type',
-      careSettingUuid: 'care-setting',
-      historyIdentifierTypeUuid: 'history-type',
-      documentIdentifierTypeUuids: [],
-    };
     const issued = {
       uuid: 'fr08-order',
       orderNumber: 'ORD-42',
       dateActivated: order.requestedAt,
       fulfillerStatus: null,
-      concept: { uuid: config.conceptUuid },
-      orderType: { uuid: config.orderTypeUuid },
+      concept: { uuid: fr08Config.conceptUuid },
+      orderType: { uuid: fr08Config.orderTypeUuid },
       patient: { uuid: order.patientId },
       encounter: { uuid: order.encounterId },
       orderer: { display: order.orderer },
@@ -300,13 +301,14 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     };
     let registered = false;
     vi.mocked(openmrsFetch).mockImplementation(async (url, options) => {
+      if (String(url).includes('/patient/')) return { data: { person: { attributes: [] } } } as FetchResponse<unknown>;
       if (options?.method === 'POST') registered = true;
       const backendOrder = { ...issued, fulfillerStatus: registered ? 'RECEIVED' : null };
       return {
         data: String(url).includes('/order?') ? { results: [backendOrder] } : backendOrder,
       } as FetchResponse<unknown>;
     });
-    render(<TransfusionsPage api={api} orderConfig={config} />);
+    render(<TransfusionsPage api={api} orderConfig={fr08Config} />);
 
     const row = await screen.findByRole('row', { name: /ORD-42/ });
     expect(screen.getAllByRole('table')).toHaveLength(1);
@@ -323,14 +325,17 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     fireEvent.click(within(row).getByRole('button', { name: t('txAttend') }));
     expect(await screen.findByRole('dialog', { name: /ORD-42/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: t('fr08Receive') })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: t('fr08PrintForm') }));
-    expect(printDocument).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: t('fr08PrintForm') })).not.toBeInTheDocument();
     expect(registered).toBe(false);
     fireEvent.click(screen.getByRole('checkbox', { name: t('txReviewCheck') }));
     fireEvent.click(screen.getByRole('checkbox', { name: t('txConsentCheck') }));
     expect(screen.getByRole('button', { name: t('txContinue') })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: t('fr08Receive') }));
-    expect(await screen.findByText(t('fr08ReceiptRegistered'))).toBeInTheDocument();
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(
+        expect.objectContaining({ title: t('fr08ReceiptRegistered'), kind: 'success' }),
+      ),
+    );
     expect(openmrsFetch).toHaveBeenCalledWith(
       '/ws/rest/v1/order/fr08-order/fulfillerdetails/',
       expect.objectContaining({ method: 'POST', body: { fulfillerStatus: 'RECEIVED' } }),
@@ -340,6 +345,59 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect((await api.list()).requests.find((request) => request.id === issued.uuid)?.receivedAt).toBeTruthy();
     await waitFor(() => expect(screen.getByRole('row', { name: /ORD-42/ })).toHaveTextContent(t('txReviewed')));
     expect(within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row')).toHaveLength(2);
+  });
+  it('puts an issued request with a persisted dispatch in history when the tab has no local delivery record', async () => {
+    const api = createMockTransfusionsApi();
+    const { order } = (await api.list()).requests[0];
+    const issued = {
+      uuid: 'fr08-delivered-order',
+      orderNumber: 'ORD-17',
+      dateActivated: order.requestedAt,
+      fulfillerStatus: 'RECEIVED',
+      concept: { uuid: fr08Config.conceptUuid },
+      orderType: { uuid: fr08Config.orderTypeUuid },
+      patient: { uuid: order.patientId },
+      encounter: { uuid: order.encounterId },
+      orderer: { display: order.orderer },
+      instructions: JSON.stringify({ format: 'EG05-FR08/v1', request: order }),
+    };
+    const deliveredAt = new Date().toISOString();
+    const dispatch = {
+      patient: { uuid: order.patientId },
+      encounterType: { uuid: demoMetadata.encounters.dispatch },
+      encounterDatetime: deliveredAt,
+      obs: [
+        {
+          concept: { uuid: demoMetadata.text },
+          value: JSON.stringify({
+            version: 1,
+            orderId: issued.uuid,
+            kind: 'dispatch',
+            deliveredUnits: [{ unitCode: code(1), deliveredAt }],
+          }),
+        },
+      ],
+    };
+    const prepareIssuedRequest = vi.fn(api.prepareIssuedRequest);
+    vi.mocked(openmrsFetch).mockImplementation(async (url) => {
+      const data = String(url).includes('/patient/')
+        ? { person: { attributes: [{ attributeType: { uuid: demoMetadata.testPatient }, value: 'true' }] } }
+        : String(url).includes('/encounter?')
+          ? { results: [dispatch] }
+          : { results: [issued] };
+      return { data } as FetchResponse<unknown>;
+    });
+    render(<TransfusionsPage api={{ ...api, prepareIssuedRequest }} orderConfig={fr08Config} />);
+
+    const inbox = within(await screen.findByRole('table', { name: t('txInbox') }));
+    expect(inbox.queryByRole('row', { name: /ORD-17/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: t('txHistory') }));
+    const delivered = await screen.findByRole('row', { name: /ORD-17/ });
+    expect(delivered).toHaveTextContent(t('txDelivered'));
+    expect(within(delivered).queryByRole('button', { name: t('txAttend') })).not.toBeInTheDocument();
+    fireEvent.click(within(delivered).getByRole('button', { name: t('txViewDetail') }));
+    expect(screen.getByText(t('fr08Title'))).toBeInTheDocument();
+    expect(prepareIssuedRequest).not.toHaveBeenCalled();
   });
   it('reviews the received order and history, prints without registering, then registers the sample on Continue', async () => {
     const api = createMockTransfusionsApi();
