@@ -95,6 +95,32 @@ describe('nursing transfusion monitoring', () => {
     }));
   });
 
+  it('shows transfusion progress per unit independently of the FR02 status', async () => {
+    const conduction = past.sections.conduction;
+    const finished = { ...conduction, fields: { ...conduction.fields, endTime: '13:15' } };
+    const interruption = { ...conduction, fields: { startTime: '12:30', stopTime: '13:15' } };
+    vi.mocked(listPatientHemovigilance).mockResolvedValue([
+      unit,
+      past,
+      { ...unit, dispatch: { ...unit.dispatch, unitCode: 'UNIT-COMPLETED' }, sections: { conduction: finished } },
+      {
+        ...unit,
+        dispatch: { ...unit.dispatch, unitCode: 'UNIT-STOPPED' },
+        sections: { conduction: finished, report: interruption },
+      },
+    ]);
+
+    render(<HemovigilanceChart patientUuid={unit.order.patientId} />);
+    await screen.findByRole('columnheader', { name: 'Estado de transfusión' });
+    const row = (code: string) => within(screen.getByRole('row', { name: new RegExp(code) }));
+    expect(row('UNIT-20').getByRole('cell', { name: '—' })).toBeVisible();
+    expect(row('UNIT-19').getByText('Transfusión en curso')).toBeVisible();
+    expect(row('UNIT-COMPLETED').getByText('Completada')).toBeVisible();
+    expect(row('UNIT-STOPPED').getByText('Interrumpida')).toBeVisible();
+    expect(row('UNIT-STOPPED').getByText('Reportada')).toBeVisible();
+    expect(row('UNIT-COMPLETED').getByText('Sin reporte')).toBeVisible();
+  });
+
   it('shows FR08 and prior conduction data and lets nursing add a manual transfusion', async () => {
     const dialog = within(await openSheet());
     expect(dialog.getByRole('heading', { name: 'Hoja de conducción: HC-ORD-20-UNIT-20' })).toBeVisible();

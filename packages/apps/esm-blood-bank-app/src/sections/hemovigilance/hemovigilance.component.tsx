@@ -33,6 +33,7 @@ import {
   previousConductions,
   reportDefaults,
   type Stage,
+  transfusionProgress,
   type UnitCase,
   validStage,
 } from './hemovigilance';
@@ -49,6 +50,11 @@ import { ConductionPrint, Fr02Print, hemovigilancePrintCss } from './hemovigilan
 
 const chartName = 'Transfusiones';
 const exitDialogs = ['[role="dialog"].cds--modal'];
+const transfusionProgressColors = {
+  transfusionInProgress: 'blue',
+  transfusionCompleted: 'green',
+  transfusionInterrupted: 'red',
+} as const;
 const stagePrivileges = {
   conduction: hemoPrivileges.conduction,
   report: hemoPrivileges.report,
@@ -154,25 +160,37 @@ function HemovigilanceList({
           t('unitCode'),
           t('component'),
           t('dispatchDate'),
+          ...(onClose ? [] : [t('transfusionStatus')]),
           t(onClose ? 'reactionState' : 'chartFr02'),
           t(onClose ? 'actions' : 'chartRecord'),
         ]}
-        rows={units.map((unit) => ({
-          id: id(unit),
-          cells: [
-            unit.order.number,
-            ...(onClose ? [unit.order.patientName] : []),
-            unit.dispatch.unitCode,
-            t(componentDefinitions[unit.dispatch.component].key),
-            formatListDate(unit.dispatch.deliveredAt),
-            <Tag key="status" type={unit.sections.report ? 'blue' : 'gray'}>
-              {t(currentStage(unit))}
-            </Tag>,
-            <Button key="open" kind="ghost" size="sm" onClick={() => setSelected(id(unit))}>
-              {t(onClose ? 'openFr02' : 'openConduction')}
-            </Button>,
-          ],
-        }))}
+        rows={units.map((unit) => {
+          const progress = transfusionProgress(unit);
+          const progressCell = progress ? (
+            <Tag key="progress" type={transfusionProgressColors[progress]}>
+              {t(progress)}
+            </Tag>
+          ) : (
+            '—'
+          );
+          return {
+            id: id(unit),
+            cells: [
+              unit.order.number,
+              ...(onClose ? [unit.order.patientName] : []),
+              unit.dispatch.unitCode,
+              t(componentDefinitions[unit.dispatch.component].key),
+              formatListDate(unit.dispatch.deliveredAt),
+              ...(onClose ? [] : [progressCell]),
+              <Tag key="status" type={unit.sections.report ? 'blue' : 'gray'}>
+                {t(currentStage(unit))}
+              </Tag>,
+              <Button key="open" kind="ghost" size="sm" onClick={() => setSelected(id(unit))}>
+                {t(onClose ? 'openFr02' : 'openConduction')}
+              </Button>,
+            ],
+          };
+        })}
         loading={data.loading}
         failed={data.failed}
         reload={data.reload}

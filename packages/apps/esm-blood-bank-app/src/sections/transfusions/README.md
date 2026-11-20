@@ -305,6 +305,11 @@ y el UUID de la orden identifican cada hoja y reporte.
 - El control empieza con una columna y admite hasta seis. Cada columna
   requiere una hora y la siguiente debe ser igual o posterior a la anterior.
   La impresión de la hoja siempre reserva las seis columnas.
+- La ficha muestra el estado de transfusión por unidad. El inicio guardado
+  indica una transfusión en curso y la hora de término indica que se completó.
+  La hora de suspensión guardada en el FR02 indica una interrupción y tiene
+  prioridad sobre la hora de término. Si todavía no hay datos de administración,
+  la celda queda con un guion.
 - Los documentos A4 usan el formato institucional de conducción y el FR02,
   con espacio para firmas físicas. Este circuito trabaja con el inventario y
   los pacientes de prueba. La entrega clínica requiere el OMOD de Banco de Sangre.
