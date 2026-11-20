@@ -6,6 +6,9 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  Search,
+  Select,
+  SelectItem,
   Tag,
 } from '@carbon/react';
 import { ArrowLeft, Printer, RainDrop, Report } from '@carbon/react/icons';
@@ -18,12 +21,19 @@ import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirm
 import { formatListDate } from '../../shared/format-list-date';
 import { notifySuccess } from '../../shared/notify-success';
 import { printDocument } from '../../shared/print-document';
-import { ProcessingTable, type ProcessingTranslate, useProcessingData } from '../../shared/processing-page.component';
-import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import {
+  normalizeSearch,
+  ProcessingTable,
+  type ProcessingTranslate,
+  useProcessingData,
+} from '../../shared/processing-page.component';
+import { WarningConfirmation } from '../../shared/warning-confirmation.component';
+import { componentDefinitions, componentTypes } from '../laboratory/fractionation/fractionation-rules';
 import type { TransfusionOrder } from '../transfusions/transfusions.types';
 import { transfusionOperatorName } from '../transfusions/transfusions-rules';
 import { useTransfusionsTranslation } from '../transfusions/use-transfusions-translation';
 import {
+  canReportReaction,
   conductionCode,
   conductionError,
   conductionFields,
@@ -31,9 +41,12 @@ import {
   type Fields,
   hemoPrivileges,
   previousConductions,
+  reactionStates,
   reportDefaults,
+  reportNotificationTimes,
   type Stage,
   transfusionProgress,
+  transfusionStates,
   type UnitCase,
   validStage,
 } from './hemovigilance';
@@ -131,6 +144,10 @@ function HemovigilanceList({
 }) {
   const data = useProcessingData(load);
   const [selected, setSelected] = useState<string>();
+  const [query, setQuery] = useState('');
+  const [component, setComponent] = useState('');
+  const [progressFilter, setProgressFilter] = useState('');
+  const [reactionFilter, setReactionFilter] = useState('');
   const id = (unit: UnitCase) => `${unit.order.id}/${unit.dispatch.unitCode}`;
   const units = [...(data.data ?? [])].sort(
     (a, b) => Date.parse(b.dispatch.deliveredAt) - Date.parse(a.dispatch.deliveredAt),
@@ -150,8 +167,72 @@ function HemovigilanceList({
         t={t}
       />
     );
+  const term = normalizeSearch(query);
+  const isFiltered = Boolean(term || component || progressFilter || reactionFilter);
+  const visibleUnits = onClose
+    ? units
+    : units.filter(
+        (unit) =>
+          (!component || unit.dispatch.component === component) &&
+          (!progressFilter || (transfusionProgress(unit) ?? 'unstarted') === progressFilter) &&
+          (!reactionFilter || currentStage(unit) === reactionFilter) &&
+          (!term ||
+            [unit.order.number, unit.dispatch.unitCode, t(componentDefinitions[unit.dispatch.component].key)].some(
+              (value) => normalizeSearch(value).includes(term),
+            )),
+      );
   const table = (
     <div className={styles.panel}>
+      {!onClose && (
+        <div className={styles.chartFilters}>
+          <Search
+            id="hemo-chart-search"
+            labelText={t('chartSearch')}
+            placeholder={t('chartSearch')}
+            closeButtonLabelText={t('clearSearch')}
+            size="md"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <Select
+            id="hemo-chart-component"
+            size="md"
+            labelText={t('component')}
+            value={component}
+            onChange={(event) => setComponent(event.target.value)}
+          >
+            <SelectItem value="" text={t('chartAllComponents')} />
+            {componentTypes.map((type) => (
+              <SelectItem key={type} value={type} text={t(componentDefinitions[type].key)} />
+            ))}
+          </Select>
+          <Select
+            id="hemo-chart-progress"
+            size="md"
+            labelText={t('transfusionStatus')}
+            value={progressFilter}
+            onChange={(event) => setProgressFilter(event.target.value)}
+          >
+            <SelectItem value="" text={t('chartAllStates')} />
+            <SelectItem value="unstarted" text={t('chartUnstarted')} />
+            {transfusionStates.map((state) => (
+              <SelectItem key={state} value={state} text={t(state)} />
+            ))}
+          </Select>
+          <Select
+            id="hemo-chart-reaction"
+            size="md"
+            labelText={t('chartFr02')}
+            value={reactionFilter}
+            onChange={(event) => setReactionFilter(event.target.value)}
+          >
+            <SelectItem value="" text={t('chartAllStates')} />
+            {reactionStates.map((state) => (
+              <SelectItem key={state} value={state} text={t(state)} />
+            ))}
+          </Select>
+        </div>
+      )}
       <ProcessingTable
         title={t(onClose ? 'queue' : 'deliveredUnits')}
         columns={[
@@ -164,7 +245,7 @@ function HemovigilanceList({
           t(onClose ? 'reactionState' : 'chartFr02'),
           t(onClose ? 'actions' : 'chartRecord'),
         ]}
-        rows={units.map((unit) => {
+        rows={visibleUnits.map((unit) => {
           const progress = transfusionProgress(unit);
           const progressCell = progress ? (
             <Tag key="progress" type={transfusionProgressColors[progress]}>
@@ -194,7 +275,8 @@ function HemovigilanceList({
         loading={data.loading}
         failed={data.failed}
         reload={data.reload}
-        emptyHelp={t(onClose ? 'queueEmpty' : 'noDeliveries')}
+        emptyHelp={t(onClose ? 'queueEmpty' : isFiltered ? 'chartNoMatches' : 'noDeliveries')}
+        filterKey={JSON.stringify([term, component, progressFilter, reactionFilter])}
         t={t}
       />
     </div>
@@ -213,7 +295,11 @@ function HemovigilanceList({
 
 function fieldsForStage(unit: UnitCase, stage: Stage) {
   if (stage === 'conduction') return conductionFields(unit);
-  return unit.sections[stage]?.fields ?? (stage === 'report' ? reportDefaults(unit.sections.conduction?.fields) : {});
+  if (stage === 'report') {
+    const fields = unit.sections.report?.fields ?? reportDefaults(unit.sections.conduction?.fields);
+    return { ...fields, ...reportNotificationTimes(unit.sections) };
+  }
+  return unit.sections[stage]?.fields ?? {};
 }
 
 function UnitCaseDialog({
@@ -240,30 +326,47 @@ function UnitCaseDialog({
     return { unit: initialUnit, stage, fields: fieldsForStage(initialUnit, stage), changed: false };
   });
   const [pendingExit, setPendingExit] = useState<Stage | 'close'>();
+  const [pendingFinalization, setPendingFinalization] = useState(false);
   const canEdit = (stage: Stage) =>
     session.authenticated &&
     userHasAccess(stagePrivileges[stage], session.user) &&
-    (!unit.sections[stage] || stage === 'conduction') &&
-    (stage === 'conduction' || stage === 'report' || Boolean(unit.sections.report));
+    (stage === 'conduction'
+      ? !unit.sections.conduction?.fields.endTime
+      : !unit.sections[stage] &&
+        (stage === 'report' ? canReportReaction(unit.sections.conduction?.fields) : Boolean(unit.sections.report)));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [license, setLicense] = useState('');
+  const [loadingLicense, setLoadingLicense] = useState(true);
   const saving = useRef(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const personUuid = session.user?.person?.uuid ?? '';
   const providerUuid = session.currentProvider?.uuid ?? '';
   const actor = { name: transfusionOperatorName(session), personUuid, license };
   const saved = unit.sections[stage];
   const conduction = stage === 'conduction';
+  const physician = session.authenticated && userHasAccess(hemoPrivileges.review, session.user);
+  const canPrintConduction = Boolean(unit.sections.conduction?.fields.endTime) && !busy && !changed;
+  const finalizing = conduction && Boolean(fields.endTime);
+  const physicianReport = !bank && physician && stage === 'report' && Boolean(unit.sections.report);
+  const canOpenReport = Boolean(
+    unit.sections.report || (session.authenticated && userHasAccess(hemoPrivileges.report, session.user)),
+  );
   const history = conduction ? previousConductions(unit, fields, cases) : [];
   useEffect(() => {
     let active = true;
     setLicense('');
-    void actorLicense(personUuid, providerUuid).then(
-      (value) => {
-        if (active) setLicense(value);
-      },
-      () => {},
-    );
+    setLoadingLicense(true);
+    void actorLicense(personUuid, providerUuid)
+      .then(
+        (value) => {
+          if (active) setLicense(value);
+        },
+        () => {},
+      )
+      .finally(() => {
+        if (active) setLoadingLicense(false);
+      });
     return () => {
       active = false;
     };
@@ -275,6 +378,7 @@ function UnitCaseDialog({
       return;
     }
     setError('');
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
     setEditor((current) => ({
       ...current,
       stage: next,
@@ -282,10 +386,12 @@ function UnitCaseDialog({
       changed: false,
     }));
   };
-  const save = async (): Promise<ExitSaveResult> => {
-    if (saving.current || !canEdit(stage)) return 'failed';
-    if (!validStage(stage, fields, unit.sections)) {
-      setError(conduction ? conductionError(fields) : 'invalid' + stage);
+  const save = async (action = stage): Promise<ExitSaveResult> => {
+    const values = action === 'review' ? {} : fields;
+    if (saving.current || !canEdit(action) || (loadingLicense && (action === 'report' || action === 'review')))
+      return 'failed';
+    if (!validStage(action, values, unit.sections)) {
+      setError(action === 'conduction' ? conductionError(values) : 'invalid' + action);
       return 'failed';
     }
     if (!actor.name || !actor.personUuid) {
@@ -296,13 +402,12 @@ function UnitCaseDialog({
     setBusy(true);
     setError('');
     try {
-      const record = await saveHemovigilance(unit, stage, fields, actor);
-      setEditor((current) => ({
-        ...current,
-        unit: { ...current.unit, sections: { ...current.unit.sections, [stage]: record } },
-        changed: false,
-      }));
-      notifySuccess(t('recordSaved'));
+      const record = await saveHemovigilance(unit, action, values, actor);
+      setEditor((current) => {
+        const unit = { ...current.unit, sections: { ...current.unit.sections, [action]: record } };
+        return { ...current, unit, fields: fieldsForStage(unit, current.stage), changed: false };
+      });
+      notifySuccess(t(action === 'conduction' ? (finalizing ? 'conductionSent' : 'conductionSaved') : 'recordSaved'));
       return 'saved';
     } catch {
       setError('saveFailed');
@@ -313,7 +418,11 @@ function UnitCaseDialog({
     }
   };
   const requestExit = (next: Stage | 'close') => {
-    if (busy || pendingExit || next === stage) return false;
+    if (busy || pendingExit || pendingFinalization || next === stage) return false;
+    if (next === 'report' && !unit.sections.report && !canReportReaction(unit.sections.conduction?.fields)) {
+      setError('saveConductionTimesFirst');
+      return false;
+    }
     if (changed) setPendingExit(next);
     else finishExit(next);
     return false;
@@ -322,7 +431,6 @@ function UnitCaseDialog({
   const closeRequest = useRef(requestExit);
   closeRequest.current = requestExit;
   const close = () => closeRequest.current('close');
-  const bodyRef = useRef<HTMLDivElement>(null);
   const printError = () => setError('printFailed');
   const printCase = (document: ReactNode, title: string) => {
     setError('');
@@ -332,26 +440,18 @@ function UnitCaseDialog({
       printError();
     }
   };
-  const stages: Stage[] = bank
-    ? ['report', ...(unit.sections.review ? ['review' as const] : []), 'investigation']
-    : [
-        'report',
-        ...(unit.sections.report && (unit.sections.review || userHasAccess(hemoPrivileges.review, session.user))
-          ? ['review' as const]
-          : []),
-        ...(unit.sections.investigation ? ['investigation' as const] : []),
-      ];
+  const stages = ['report', 'investigation'] as const;
   const title = conduction
     ? t('unitConductionTitle', { code: unit.dispatch.unitCode })
     : `${t(bank ? 'openFr02' : 'report')}: ${unit.dispatch.unitCode}`;
   const audit = (saved || canEdit(stage)) && (
     <dl className={conduction ? `${styles.sheetCard} ${styles.conductionAudit}` : styles.caseFields}>
       <div>
-        <dt>{t(stage === 'report' ? 'nurse' : 'recordedBy')}</dt>
+        <dt>{t('recordedBy')}</dt>
         <dd>{(canEdit(stage) ? actor : saved?.actor)?.name || '—'}</dd>
       </div>
       <div>
-        <dt>{t(stage === 'report' ? 'cep' : 'registration')}</dt>
+        <dt>{t('registration')}</dt>
         <dd>{(canEdit(stage) ? actor : saved?.actor)?.license || '—'}</dd>
       </div>
       {saved && (
@@ -379,8 +479,8 @@ function UnitCaseDialog({
         }}
       >
         <ModalHeader title={title} iconDescription={t('close')} closeModal={close} />
-        <ModalBody ref={bodyRef} className={conduction ? styles.conductionBody : undefined}>
-          {error && (
+        <ModalBody ref={bodyRef} className={styles.conductionBody}>
+          {error && !pendingFinalization && !pendingExit && (
             <InlineNotification
               className={styles.notification}
               lowContrast
@@ -389,8 +489,8 @@ function UnitCaseDialog({
               hideCloseButton
             />
           )}
-          {!conduction && <CaseFields unit={unit} t={t} />}
-          {!conduction && stages.length > 1 && (
+          {stage === 'investigation' && <CaseFields unit={unit} t={t} />}
+          {!conduction && bank && (
             <div className={styles.actions}>
               {stages.map((key) => (
                 <Button
@@ -406,8 +506,8 @@ function UnitCaseDialog({
               ))}
             </div>
           )}
-          {!conduction && <h3 className={styles.sectionTitle}>{t(stage)}</h3>}
-          {!conduction && audit}
+          {stage === 'investigation' && <h3 className={styles.sectionTitle}>{t(stage)}</h3>}
+          {stage === 'investigation' && audit}
           <HemovigilanceFields
             key={stage}
             stage={stage}
@@ -415,7 +515,8 @@ function UnitCaseDialog({
             history={history}
             fields={fields}
             t={t}
-            copied={unit.sections.conduction?.fields}
+            nurse={unit.sections.report?.actor ?? (canEdit('report') ? actor : undefined)}
+            reviewer={unit.sections.review?.actor ?? (physicianReport ? actor : undefined)}
             readOnly={!canEdit(stage) || busy}
             setFields={(value) => {
               setEditor((current) => ({ ...current, fields: value, changed: true }));
@@ -429,25 +530,27 @@ function UnitCaseDialog({
           <div className={styles.actions}>
             {conduction ? (
               <>
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  renderIcon={Printer}
-                  disabled={busy}
-                  onClick={() =>
-                    printCase(
-                      <ConductionPrint
-                        unit={unit}
-                        history={previousConductions(unit, conductionFields(unit), cases)}
-                        t={t}
-                      />,
-                      t('conductionTitle', { code: conductionCode(unit) }),
-                    )
-                  }
-                >
-                  {t('printConduction')}
-                </Button>
-                {(unit.sections.report || canEdit('report')) && (
+                {physician && (
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    renderIcon={Printer}
+                    disabled={!canPrintConduction}
+                    onClick={() =>
+                      printCase(
+                        <ConductionPrint
+                          unit={unit}
+                          history={previousConductions(unit, conductionFields(unit), cases)}
+                          t={t}
+                        />,
+                        t('conductionTitle', { code: conductionCode(unit) }),
+                      )
+                    }
+                  >
+                    {t('printConduction')}
+                  </Button>
+                )}
+                {canOpenReport && (
                   <Button
                     kind="tertiary"
                     size="sm"
@@ -472,31 +575,58 @@ function UnitCaseDialog({
                     {t('backToConduction')}
                   </Button>
                 )}
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  renderIcon={Printer}
-                  disabled={busy}
-                  onClick={() => printCase(<Fr02Print unit={unit} t={t} />, t('report'))}
-                >
-                  {t('printFr02')}
-                </Button>
+                {!bank && stage === 'report' && unit.sections.investigation && (
+                  <Button kind="ghost" size="sm" disabled={busy} onClick={() => requestExit('investigation')}>
+                    {t('investigation')}
+                  </Button>
+                )}
+                {!bank && stage === 'investigation' && (
+                  <Button kind="ghost" size="sm" disabled={busy} onClick={() => requestExit('report')}>
+                    {t('viewReaction')}
+                  </Button>
+                )}
+                {(physicianReport || bank) && (
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    renderIcon={Printer}
+                    disabled={busy || !unit.sections.review}
+                    onClick={() => {
+                      if (unit.sections.review) printCase(<Fr02Print unit={unit} t={t} />, t('report'));
+                    }}
+                  >
+                    {t('printFr02')}
+                  </Button>
+                )}
               </>
             )}
           </div>
           <div className={styles.actions}>
-            <Button kind="secondary" size="sm" disabled={busy} onClick={close}>
-              {t('close')}
-            </Button>
+            {!physicianReport && (
+              <Button kind="secondary" size="sm" disabled={busy} onClick={close}>
+                {t('close')}
+              </Button>
+            )}
+            {physicianReport && canEdit('review') && (
+              <Button size="sm" disabled={busy || loadingLicense} onClick={() => void save('review')}>
+                {t('confirmReview')}
+              </Button>
+            )}
             {canEdit(stage) && (
               <Button
                 size="sm"
-                disabled={busy || (!changed && stage !== 'review')}
+                disabled={busy || !changed || (stage === 'report' && loadingLicense)}
                 onClick={async () => {
-                  if ((await save()) === 'saved') finishExit('close');
+                  if (finalizing && !conductionError(fields)) {
+                    setError('');
+                    setPendingFinalization(true);
+                    return;
+                  }
+                  const result = await save();
+                  if (result === 'saved' && !conduction) finishExit('close');
                 }}
               >
-                {t(stage === 'review' ? 'confirmReview' : 'saveSection')}
+                {t('saveSection')}
               </Button>
             )}
           </div>
@@ -505,14 +635,35 @@ function UnitCaseDialog({
       {pendingExit && (
         <ExitConfirmation
           title={t(pendingExit === 'close' ? 'exitTitle' : 'switchTitle')}
-          description={t('exitHelp')}
+          description={
+            finalizing
+              ? `${t('exitHelp')} ${t('finalizeConductionHelp')} ${t('finalizeConductionLock')}`
+              : t('exitHelp')
+          }
           closeLabel={t('close')}
           saving={busy}
           saveErrorText={t('saveFailed')}
           t={t}
           onCancel={() => setPendingExit(undefined)}
-          onSave={save}
+          onSave={() => save()}
           onExit={() => finishExit(pendingExit)}
+        />
+      )}
+      {pendingFinalization && (
+        <WarningConfirmation
+          title={t('finalizeConduction')}
+          description={t('finalizeConductionHelp')}
+          items={[]}
+          note={t('finalizeConductionLock')}
+          error={error ? t(error) : undefined}
+          cancelLabel={t('cancel')}
+          confirmLabel={t('sendConduction')}
+          closeLabel={t('close')}
+          saving={busy}
+          onCancel={() => setPendingFinalization(false)}
+          onConfirm={async () => {
+            if ((await save()) === 'saved') setPendingFinalization(false);
+          }}
         />
       )}
     </>

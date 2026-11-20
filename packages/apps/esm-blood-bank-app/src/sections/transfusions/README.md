@@ -304,12 +304,19 @@ y el UUID de la orden identifican cada hoja y reporte.
   transfusiones previas que se añaden a mano se guardan en la hoja actual.
 - El control empieza con una columna y admite hasta seis. Cada columna
   requiere una hora y la siguiente debe ser igual o posterior a la anterior.
-  La impresión de la hoja siempre reserva las seis columnas.
+  La impresión de la hoja siempre reserva las seis columnas y se habilita
+  solo para el médico después de guardar la hora de término. Enfermería
+  confirma el envío al médico. El guardado deja la hoja abierta en solo lectura.
 - La ficha muestra el estado de transfusión por unidad. El inicio guardado
   indica una transfusión en curso y la hora de término indica que se completó.
-  La hora de suspensión guardada en el FR02 indica una interrupción y tiene
-  prioridad sobre la hora de término. Si todavía no hay datos de administración,
+  La hora de suspensión guardada en la hoja o en un FR02 anterior indica una
+  interrupción y tiene prioridad sobre la hora de término. Si todavía no hay datos de administración,
   la celda queda con un guion.
+- El FR02 nuevo toma las horas de inicio y suspensión guardadas en la hoja.
+  El encuentro de reporte registra la notificación al médico y el encuentro
+  de revisión registra la notificación a Banco de Sangre. La revisión habilita
+  la impresión del informe. El CEP y el CMP se toman del atributo activo
+  `Número de Colegiatura` del proveedor vinculado a cada cuenta.
 - Los documentos A4 usan el formato institucional de conducción y el FR02,
   con espacio para firmas físicas. Este circuito trabaja con el inventario y
   los pacientes de prueba. La entrega clínica requiere el OMOD de Banco de Sangre.

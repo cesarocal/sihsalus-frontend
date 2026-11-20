@@ -117,12 +117,14 @@ export const findings = [
   'otherFinding',
 ];
 export const reportTimes = ['startTime', 'stopTime', 'doctorNotified', 'bankNotified', 'urineTime'];
+export const transfusionStates = ['transfusionInProgress', 'transfusionCompleted', 'transfusionInterrupted'] as const;
+export const reactionStates = ['notReported', 'reported', 'reviewed', 'investigated'] as const;
 
 export const maxMonitoringColumns = 6;
 export const priorTransfusionKeys = ['date', 'unitCode', 'component', 'priorReaction', 'place', 'notes'] as const;
 export const operatingRoomOptions = {
   consciousness: ['alert', 'drowsyOrDisoriented', 'coma'],
-  cardiovascular: ['myocardialInfarction', 'hypertension', 'valvulopathy', 'angina', 'normal'],
+  cardiovascular: ['normal', 'cardiovascularCondition'],
   pulmonary: ['normal', 'pulmonaryDisease'],
 } as const;
 
@@ -220,14 +222,32 @@ export function currentStage(unit: UnitCase) {
 
 export function transfusionProgress(unit: UnitCase) {
   const { conduction, report } = unit.sections;
-  if (report?.fields.stopTime) return 'transfusionInterrupted';
+  if (conduction?.fields.stopTime || report?.fields.stopTime) return 'transfusionInterrupted';
   if (!conduction?.fields.startTime) return undefined;
   return conduction.fields.endTime ? 'transfusionCompleted' : 'transfusionInProgress';
+}
+
+export function canReportReaction(conduction?: Fields) {
+  const validTime = /^([01]\d|2[0-3]):[0-5]\d$/;
+  return validTime.test(conduction?.startTime ?? '') && validTime.test(conduction?.stopTime ?? '');
+}
+
+export function reportNotificationTimes({ report, review }: UnitCase['sections']) {
+  const time = (record?: SavedSection) => {
+    const date = record && new Date(record.at);
+    return date && Number.isFinite(date.getTime()) ? localDateTime(date).slice(11, 16) : '';
+  };
+  return {
+    doctorNotified: report?.fields.doctorNotified || time(report),
+    bankNotified: time(review),
+  };
 }
 
 export function reportDefaults(conduction: Fields = {}): Fields {
   return {
     startTime: conduction.startTime ?? '',
+    stopTime: conduction.stopTime ?? '',
+    bed: '',
     transfused: conduction.transfused ?? '',
     otherSymptomText: conduction.otherSymptomText ?? '',
     ...Object.fromEntries(reactionSigns.map((key) => [key, conduction[key] ?? ''])),
@@ -235,14 +255,15 @@ export function reportDefaults(conduction: Fields = {}): Fields {
 }
 
 export function validStage(stage: Stage, fields: Fields, saved: UnitCase['sections']) {
-  if (stage === 'conduction') return !conductionError(fields);
+  if (stage === 'conduction') return !saved.conduction?.fields.endTime && !conductionError(fields);
   if (stage === 'report')
     return (
       !saved.report &&
+      canReportReaction(saved.conduction?.fields) &&
+      fields.startTime === saved.conduction?.fields.startTime &&
+      fields.stopTime === saved.conduction?.fields.stopTime &&
       Boolean(
-        fields.startTime &&
-          fields.stopTime &&
-          fields.transfused &&
+        fields.transfused &&
           Number.isFinite(Number(fields.transfused)) &&
           Number(fields.transfused) >= 0 &&
           (reactionSigns.some((key) => fields[key] === 'yes') ||

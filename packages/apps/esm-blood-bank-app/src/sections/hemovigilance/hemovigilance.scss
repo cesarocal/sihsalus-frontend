@@ -2,6 +2,16 @@
   padding: 1rem;
 }
 
+.chartFilters {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1.6fr) repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: .75rem 1rem;
+  margin-block-end: 1rem;
+
+  select { width: 100%; }
+}
+
 .caseFields, .grid, .checks {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
@@ -105,7 +115,8 @@
 .identityRow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .requestFields { grid-template-columns: repeat(2, minmax(0, 17rem)); }
 .conductionTimes {
-  grid-template-columns: repeat(3, minmax(0, 12rem));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  max-inline-size: 52rem;
   align-items: end;
   margin-block-end: .875rem;
 }
@@ -130,6 +141,35 @@
 }
 .conductionLayout .checks { margin-block-end: 0; }
 .conductionLayout .checks + :global(.cds--form-item) { margin-block-start: .75rem; }
+
+.unitSummary .bodyMeasurements { grid-template-columns: minmax(0, 12rem); }
+.reactionTimes, .reactionPersonnel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: .75rem 1rem;
+}
+.reactionMedication { margin-block-start: 1rem; max-inline-size: 36rem; }
+.premedicationSelected { display: flex; align-items: end; gap: .5rem; }
+.premedicationPicker {
+  p { margin-block-start: .5rem; color: var(--cds-text-secondary, #525252); font-size: .875rem; }
+  ul { max-block-size: 12rem; overflow: auto; border: 1px solid var(--cds-border-subtle, #c6c6c6); }
+  button { inline-size: 100%; max-inline-size: none; }
+}
+.reactionVitals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem 1rem;
+}
+.vitalPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .625rem;
+  border: 1px solid var(--cds-border-subtle, #c6c6c6);
+  padding: .75rem;
+  min-inline-size: 0;
+
+  legend { padding-inline: .375rem; font-size: .875rem; font-weight: 600; }
+}
 
 .readout {
   display: grid;
@@ -234,11 +274,12 @@
 
 @media (max-width: 760px) {
   .summaryGrid { grid-template-columns: minmax(0, 1fr); }
-  .recipientFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recipientFacts, .chartFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reactionVitals { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 450px) {
-  .identityRow, .conductionTimes, .requestFields { grid-template-columns: minmax(0, 1fr); }
+  .identityRow, .conductionTimes, .requestFields, .chartFilters { grid-template-columns: minmax(0, 1fr); }
 }
 
 .sectionTitle { margin-block: 1rem .5rem; }

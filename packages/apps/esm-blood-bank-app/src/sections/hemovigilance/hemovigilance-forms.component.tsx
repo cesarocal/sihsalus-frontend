@@ -7,6 +7,7 @@ import { componentDefinitions, componentTypes } from '../laboratory/fractionatio
 import { transfusionBloodGroupLabel } from '../transfusions/transfusion-blood-group';
 import {
   antecedentKeys,
+  type Actor,
   conditions,
   conductionCode,
   conductionSignKeys,
@@ -27,6 +28,16 @@ import {
   vitalKeys,
 } from './hemovigilance';
 import styles from './hemovigilance.scss';
+import { PremedicationPicker } from './premedication-picker.component';
+
+function Readout({ label, value, className = '' }: { label: string; value?: string; className?: string }) {
+  return (
+    <div className={`${styles.readout} ${className}`.trim()}>
+      <dt>{label}</dt>
+      <dd>{value || '—'}</dd>
+    </div>
+  );
+}
 
 function SheetSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   const headingId = useId();
@@ -78,7 +89,8 @@ export function HemovigilanceFields({
   fields,
   setFields,
   readOnly,
-  copied = {},
+  nurse,
+  reviewer,
   unit,
   history = [],
   t,
@@ -87,7 +99,8 @@ export function HemovigilanceFields({
   fields: Fields;
   setFields: (fields: Fields) => void;
   readOnly: boolean;
-  copied?: Fields;
+  nurse?: Actor;
+  reviewer?: Actor;
   unit: UnitCase;
   history?: UnitCase[];
   t: ProcessingTranslate;
@@ -104,11 +117,12 @@ export function HemovigilanceFields({
       step={type === 'number' ? 'any' : undefined}
       maxLength={500}
       value={fields[key] ?? ''}
-      readOnly={
-        readOnly || (stage === 'report' && (key === 'startTime' || key === 'transfused') && Boolean(copied[key]))
-      }
+      readOnly={readOnly || (stage === 'report' && reportTimes.includes(key) && key !== 'urineTime')}
       onChange={(event) => change(key, event.target.value)}
     />
+  );
+  const readout = (key: string, value?: string, className?: string) => (
+    <Readout label={t(key)} value={value} className={className} />
   );
   const notes = (key: string) => (
     <TextArea
@@ -144,7 +158,7 @@ export function HemovigilanceFields({
         {detailsKey && fields[detailsTrigger] === 'yes' && input(detailsKey)}
       </>
     );
-    return stage === 'conduction' ? (
+    return stage === 'conduction' || stage === 'report' ? (
       <SheetSection title={t(title)}>{content}</SheetSection>
     ) : (
       <fieldset className={styles.block}>
@@ -160,12 +174,6 @@ export function HemovigilanceFields({
     const columns = monitoringColumns(fields);
     const lastColumn = columns.length - 1;
     const canRemoveColumn = lastColumn > 0 && !['time', ...vitalKeys].some((key) => fields[key + lastColumn]);
-    const readout = (key: string, value: string, className = '') => (
-      <div className={`${styles.readout} ${className}`.trim()}>
-        <dt>{t(key)}</dt>
-        <dd>{value || '—'}</dd>
-      </div>
-    );
     const dateLabel = (value: string) => value.split('-').reverse().join('/');
     const cellInput = (key: string, label: string, type = 'text', min?: string, placeholder = '—') => (
       <input
@@ -265,11 +273,16 @@ export function HemovigilanceFields({
                       const component = fields[field] ?? '';
                       return (
                         <td key={key}>
-                          {key === 'component' ? (
+                          {key === 'component' && readOnly ? (
+                            <span>
+                              {Object.hasOwn(componentDefinitions, component)
+                                ? t(componentDefinitions[component as keyof typeof componentDefinitions].key)
+                                : component || '—'}
+                            </span>
+                          ) : key === 'component' ? (
                             <select
                               className={styles.cellInput}
                               aria-label={label}
-                              disabled={readOnly}
                               value={component}
                               onChange={(event) => change(field, event.target.value)}
                             >
@@ -313,6 +326,7 @@ export function HemovigilanceFields({
               {readout('conductionDate', dateLabel(fields.conductionDate ?? ''))}
             </dl>
             {input('startTime', 'time')}
+            {input('stopTime', 'time')}
             {input('endTime', 'time')}
           </div>
           {!readOnly && (
@@ -384,10 +398,15 @@ export function HemovigilanceFields({
                     id={`hemo-conduction-${key}`}
                     labelText={t(key)}
                     value={selected}
-                    disabled={readOnly}
+                    readOnly={readOnly}
                     onChange={(event) => change(key, event.target.value)}
                   >
-                    <SelectItem value="" text={t('chooseClinicalState')} />
+                    <SelectItem
+                      value=""
+                      text={t('chooseClinicalState')}
+                      disabled={key === 'cardiovascular'}
+                      hidden={key === 'cardiovascular'}
+                    />
                     {options.map((option) => (
                       <SelectItem key={option} value={option} text={t(option)} />
                     ))}
@@ -406,28 +425,69 @@ export function HemovigilanceFields({
       </div>
     );
   }
-  if (stage === 'report')
+  if (stage === 'report') {
+    const { order, dispatch } = unit;
     return (
-      <>
-        <div className={styles.grid}>
-          {input('transfused', 'number')}
-          {input('premedication')}
-        </div>
-        <div className={styles.grid}>{reportTimes.map((key) => input(key, 'time'))}</div>
-        <fieldset className={styles.block}>
-          <legend>{t('vitalChanges')}</legend>
-          <div className={styles.grid}>
-            {reactionVitalKeys.flatMap((key) => [
-              input(key + 'Before', 'text', `${t(key)} · ${t('before')}`),
-              input(key + 'After', 'text', `${t(key)} · ${t('after')}`),
-            ])}
+      <div className={styles.conductionLayout}>
+        <SheetSection title={t('reactionPatientAndUnit')}>
+          <div className={styles.summaryGrid}>
+            <div>
+              <span className={styles.summaryLabel}>{t('patientName')}</span>
+              <h4 className={styles.recipientName}>{order.patientName}</h4>
+              <dl className={styles.requestFields}>
+                {readout('historyNumber', order.historyNumber)}
+                {readout('service', order.service)}
+              </dl>
+              <div className={styles.bodyMeasurements}>{input('bed')}</div>
+            </div>
+            <div className={styles.unitSummary}>
+              <h4>{t('unitTitle')}</h4>
+              <dl className={styles.unitFacts}>
+                {readout('unitCode', dispatch.unitCode)}
+                {readout('bloodComponent', t(componentDefinitions[dispatch.component].key))}
+              </dl>
+              <div className={styles.bodyMeasurements}>{input('transfused', 'number')}</div>
+            </div>
           </div>
-        </fieldset>
+        </SheetSection>
+        <SheetSection title={t('reactionTransfusionDetails')}>
+          <div className={styles.reactionTimes}>{reportTimes.map((key) => input(key, 'time'))}</div>
+          <div className={styles.reactionMedication}>
+            {readOnly ? (
+              input('premedication')
+            ) : (
+              <PremedicationPicker
+                value={fields.premedication ?? ''}
+                onChange={(uuid, name) => setFields({ ...fields, premedication: name, premedicationConceptUuid: uuid })}
+                t={t}
+              />
+            )}
+          </div>
+        </SheetSection>
+        <SheetSection title={t('vitalChanges')}>
+          <div className={styles.reactionVitals}>
+            {reactionVitalKeys.map((key) => (
+              <fieldset key={key} className={styles.vitalPair}>
+                <legend>{t(key)}</legend>
+                {input(key + 'Before', 'text', `${t(key)} · ${t('before')}`, t('before'))}
+                {input(key + 'After', 'text', `${t(key)} · ${t('after')}`, t('after'))}
+              </fieldset>
+            ))}
+          </div>
+        </SheetSection>
         {checklist('symptoms', reactionSigns, 'otherSymptomText')}
         {checklist('underlyingConditions', conditions)}
-      </>
+        <SheetSection title={t('reactionPersonnel')}>
+          <dl className={styles.reactionPersonnel}>
+            {readout('nurse', nurse?.name)}
+            {readout('cep', nurse?.license)}
+            {readout('reactionPhysician', reviewer?.name)}
+            {readout('cmp', reviewer?.license)}
+          </dl>
+        </SheetSection>
+      </div>
     );
-  if (stage === 'review') return notes('reviewNotes');
+  }
   return (
     <>
       <div className={styles.grid}>

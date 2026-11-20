@@ -17,7 +17,13 @@ const dispatch: Dispatch = {
   deliveredAt: '2026-11-19T15:00:00Z',
 };
 
-function event(uuid: string, kind: 'dispatch' | 'report' | 'conduction', unitCode: string, previous = '') {
+function event(
+  uuid: string,
+  kind: 'dispatch' | 'report' | 'conduction',
+  unitCode: string,
+  previous = '',
+  fields = { startTime: '10:00' } as Record<string, string>,
+) {
   return {
     uuid,
     encounterDatetime: '2026-11-19T15:00:00Z',
@@ -33,7 +39,7 @@ function event(uuid: string, kind: 'dispatch' | 'report' | 'conduction', unitCod
           kind,
           dispatch: { ...dispatch, unitCode },
           actor,
-          fields: { startTime: '10:00' },
+          fields,
           previous,
         }),
       },
@@ -86,6 +92,40 @@ describe('hemovigilance records', () => {
     const unit: UnitCase = { order, dispatch, sections: {} };
     const fields = { conductionDate: '2026-11-19', startTime: '10:00', time0: '10:15', time1: '10:14' };
     await expect(saveHemovigilance(unit, 'conduction', fields, actor)).rejects.toThrow('HEMOVIGILANCE_CONFLICT');
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects edits to a finalized monitoring sheet even with the current revision', async () => {
+    const fields = { conductionDate: '2026-11-19', startTime: '10:00', endTime: '11:00', time0: '10:15' };
+    const unit = {
+      order,
+      dispatch,
+      sections: { conduction: { uuid: 'conduction', fields, at: '2026-11-19T15:00:00Z', actor } },
+    };
+    deliverEvents([
+      event('delivery', 'dispatch', dispatch.unitCode),
+      event('conduction', 'conduction', dispatch.unitCode, '', fields),
+    ]);
+    await expect(saveHemovigilance(unit, 'conduction', { ...fields, endTime: '10:30' }, actor)).rejects.toThrow(
+      'HEMOVIGILANCE_CONFLICT',
+    );
+    expect(openmrsFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('requires the FR02 start and suspension times to match the saved monitoring sheet', async () => {
+    const fields = { startTime: '10:00', stopTime: '10:30' };
+    deliverEvents([
+      event('delivery', 'dispatch', dispatch.unitCode),
+      event('conduction', 'conduction', dispatch.unitCode, '', fields),
+    ]);
+    await expect(
+      saveHemovigilance(
+        { order, dispatch, sections: {} },
+        'report',
+        { ...fields, stopTime: '10:05', transfused: '20', chills: 'yes' },
+        actor,
+      ),
+    ).rejects.toThrow('HEMOVIGILANCE_CONFLICT');
     expect(openmrsFetch).toHaveBeenCalledTimes(2);
   });
 

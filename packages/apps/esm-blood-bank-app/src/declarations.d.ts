@@ -9,6 +9,11 @@ declare module '*.png' {
   export default url;
 }
 
+declare module '*.png?inline' {
+  const dataUrl: string;
+  export default dataUrl;
+}
+
 declare namespace NodeJS {
   interface Require {
     context(directory: string, useSubdirectories?: boolean, regExp?: RegExp, mode?: string): unknown;

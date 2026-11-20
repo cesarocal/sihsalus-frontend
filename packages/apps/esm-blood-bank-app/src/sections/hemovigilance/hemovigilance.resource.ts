@@ -6,7 +6,6 @@ import {
   type Dispatch,
   demoMetadata,
   type Fields,
-  reportDefaults,
   type Stage,
   type UnitCase,
   validStage,
@@ -207,27 +206,34 @@ export async function saveHemovigilance(unit: UnitCase, kind: Stage, fields: Fie
     (entry) => entry.dispatch.unitCode === unit.dispatch.unitCode,
   );
   const previous = unit.sections[kind]?.uuid ?? '';
-  const copied = reportDefaults(current?.sections.conduction?.fields);
   if (
     !current ||
     (current.sections[kind]?.uuid ?? '') !== previous ||
     !validStage(kind, fields, current.sections) ||
-    (kind === 'report' && ['startTime', 'transfused'].some((key) => copied[key] && copied[key] !== fields[key])) ||
     !actor.name.trim() ||
     !actor.personUuid ||
     Object.values(fields).some((value) => typeof value !== 'string' || value.length > 500)
   )
     throw new Error('HEMOVIGILANCE_CONFLICT');
+  const recordFields = kind === 'report' ? { ...fields, doctorNotified: '', bankNotified: '' } : fields;
   const record = await persist(unit.order, {
     version: 1,
     kind,
     orderId: unit.order.id,
     dispatch: unit.dispatch,
     previous,
-    fields,
+    fields: recordFields,
     actor,
   });
-  return { ...record, fields, actor };
+  return { ...record, fields: recordFields, actor };
+}
+
+export async function searchPremedications(query: string, signal: AbortSignal) {
+  const { data } = await openmrsFetch<{ results: { uuid: string; display: string; retired: boolean }[] }>(
+    endpoint('concept', { q: query, class: 'Drug', limit: '15', v: 'custom:(uuid,display,retired)' }),
+    { signal },
+  );
+  return data.results.filter(({ retired }) => !retired);
 }
 
 export async function actorLicense(personUuid: string, providerUuid: string) {
@@ -235,15 +241,15 @@ export async function actorLicense(personUuid: string, providerUuid: string) {
   const { data } = await openmrsFetch<{
     person: Ref | null;
     retired: boolean;
-    attributes: { attributeType: { display: string }; value: unknown }[];
+    attributes: { attributeType: { display: string }; value: unknown; voided?: boolean }[];
   }>(
     endpoint(`provider/${encodeURIComponent(providerUuid)}`, {
-      v: 'custom:(person:(uuid),retired,attributes:(attributeType:(display),value))',
+      v: 'custom:(person:(uuid),retired,attributes:(attributeType:(display),value,voided))',
     }),
   );
   if (data.retired || data.person?.uuid !== personUuid) return '';
   const registration = data.attributes.find(
-    ({ attributeType }) => attributeType.display === 'Número de Colegiatura',
+    ({ attributeType, voided }) => !voided && attributeType.display === 'Número de Colegiatura',
   )?.value;
   return typeof registration === 'string' ? registration : '';
 }

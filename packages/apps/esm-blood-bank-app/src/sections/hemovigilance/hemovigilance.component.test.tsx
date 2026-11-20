@@ -1,5 +1,5 @@
 import { showSnackbar } from '@openmrs/esm-framework';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import spanish from '../../../translations/es.json';
 import { transfusionRequestsMock } from '../../mocks/transfusions.mock';
@@ -7,15 +7,23 @@ import { printDocument } from '../../shared/print-document';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import type { UnitCase } from './hemovigilance';
 import { HemovigilanceChart } from './hemovigilance.component';
-import { listPatientHemovigilance, saveHemovigilance } from './hemovigilance.resource';
+import { listPatientHemovigilance, saveHemovigilance, searchPremedications } from './hemovigilance.resource';
 
+const session = vi.hoisted(() => ({ physician: false }));
 vi.mock('@openmrs/esm-framework', () => ({
   useConfig: () => ({ useMockData: true }),
   useSession: () => ({
     authenticated: true,
-    user: { person: { uuid: 'nurse', preferredName: { givenName: 'Enfermera', familyName: 'Ejemplo' } } },
+    user: {
+      person: {
+        uuid: session.physician ? 'doctor' : 'nurse',
+        preferredName: { givenName: session.physician ? 'Médico' : 'Enfermera', familyName: 'Ejemplo' },
+      },
+    },
   }),
-  userHasAccess: () => true,
+  useDebounce: (value: string) => value,
+  userHasAccess: (access: string | string[]) =>
+    Array.isArray(access) || (session.physician ? access.endsWith('.revisar') : !access.endsWith('.revisar')),
   showSnackbar: vi.fn(),
 }));
 
@@ -23,7 +31,8 @@ vi.mock('./hemovigilance.resource', () => ({
   isLocalHemovigilance: () => true,
   listPatientHemovigilance: vi.fn(),
   saveHemovigilance: vi.fn(),
-  actorLicense: async () => '',
+  actorLicense: async () => (session.physician ? 'CMP-1234' : 'CEP-5678'),
+  searchPremedications: vi.fn(),
 }));
 
 vi.mock('../../shared/print-document', () => ({ printDocument: vi.fn() }));
@@ -75,13 +84,14 @@ const past = {
 async function openSheet() {
   render(<HemovigilanceChart patientUuid={unit.order.patientId} />);
   const row = await screen.findByRole('row', { name: /UNIT-20/ });
-  fireEvent.click(within(row).getByRole('button', { name: 'Hoja de conducción' }));
+  await act(async () => fireEvent.click(within(row).getByRole('button', { name: 'Hoja de conducción' })));
   return screen.getByRole('dialog', { name: 'Hoja de conducción de la unidad UNIT-20' });
 }
 
 describe('nursing transfusion monitoring', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    session.physician = false;
     vi.mocked(listPatientHemovigilance).mockResolvedValue([
       unit,
       past,
@@ -114,11 +124,20 @@ describe('nursing transfusion monitoring', () => {
     await screen.findByRole('columnheader', { name: 'Estado de transfusión' });
     const row = (code: string) => within(screen.getByRole('row', { name: new RegExp(code) }));
     expect(row('UNIT-20').getByRole('cell', { name: '—' })).toBeVisible();
-    expect(row('UNIT-19').getByText('Transfusión en curso')).toBeVisible();
+    expect(row('UNIT-19').getByText('En curso')).toBeVisible();
     expect(row('UNIT-COMPLETED').getByText('Completada')).toBeVisible();
     expect(row('UNIT-STOPPED').getByText('Interrumpida')).toBeVisible();
     expect(row('UNIT-STOPPED').getByText('Reportada')).toBeVisible();
     expect(row('UNIT-COMPLETED').getByText('Sin reporte')).toBeVisible();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Estado de transfusión' }), {
+      target: { value: 'transfusionInterrupted' },
+    });
+    expect(row('UNIT-STOPPED').getByText('Interrumpida')).toBeVisible();
+    expect(screen.queryByRole('row', { name: /UNIT-COMPLETED/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: /Buscar por solicitud/ }), {
+      target: { value: 'UNIT-20' },
+    });
+    expect(screen.getByText('No hay unidades que coincidan con la búsqueda y los filtros.')).toBeVisible();
   });
 
   it('shows FR08 and prior conduction data and lets nursing add a manual transfusion', async () => {
@@ -139,22 +158,107 @@ describe('nursing transfusion monitoring', () => {
     expect(dialog.getByLabelText('Código de la unidad 1')).toHaveValue('MANUAL-UNIT');
     expect(dialog.getByLabelText('Componente 1')).toHaveValue('redCells');
     expect(dialog.getByLabelText('Lugar 1')).toHaveAttribute('placeholder', 'Lugar');
+    expect(dialog.queryByRole('button', { name: 'Imprimir hoja' })).toBeNull();
+  });
+
+  it('confirms the handoff to the physician and locks the sheet after saving the end time', async () => {
+    const sheet = await openSheet();
+    const dialog = within(sheet);
+    const save = dialog.getByRole('button', { name: 'Guardar registro' });
+
+    fireEvent.change(dialog.getByLabelText('Hora de inicio'), { target: { value: '00:00' } });
+    fireEvent.change(dialog.getByLabelText('Hora 1'), { target: { value: '00:05' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Añadir hora de control' }));
+    fireEvent.change(dialog.getByLabelText('Hora 2'), { target: { value: '12:00' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(showSnackbar).toHaveBeenCalledTimes(1));
+    expect(sheet).toBeVisible();
+
+    fireEvent.change(dialog.getByLabelText('Hora de término'), { target: { value: '13:30' } });
+    fireEvent.click(save);
+    const confirm = within(screen.getByRole('dialog', { name: 'Enviar Hoja de conducción a revisión' }));
+    expect(saveHemovigilance).toHaveBeenCalledTimes(1);
+    fireEvent.click(confirm.getByRole('button', { name: 'Guardar y enviar' }));
+    await waitFor(() => expect(dialog.getByLabelText('Talla (cm)')).toHaveAttribute('readonly'));
+    expect(sheet).toBeVisible();
+    expect(dialog.queryByRole('button', { name: 'Guardar registro' })).toBeNull();
+    expect(dialog.queryByRole('button', { name: 'Imprimir hoja' })).toBeNull();
+    expect(showSnackbar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Hoja de conducción guardada y disponible para revisión médica.',
+        kind: 'success',
+      }),
+    );
+    fireEvent.click(dialog.getAllByRole('button', { name: 'Cerrar' })[0]);
+    await waitFor(() => expect(screen.getByRole('row', { name: /UNIT-20/ })).toBeVisible());
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('prints the saved monitoring sheet for a physician', async () => {
+    session.physician = true;
+    vi.mocked(listPatientHemovigilance).mockResolvedValue([
+      {
+        ...unit,
+        sections: {
+          conduction: {
+            ...past.sections.conduction,
+            fields: {
+              ...past.sections.conduction.fields,
+              startTime: '00:00',
+              endTime: '13:30',
+              time0: '00:05',
+              time1: '12:00',
+            },
+          },
+        },
+      },
+    ]);
+    const dialog = within(await openSheet());
     fireEvent.click(dialog.getByRole('button', { name: 'Imprimir hoja' }));
     const [document, title] = vi.mocked(printDocument).mock.calls[0];
     expect(title).toBe('Hoja de conducción: HC-ORD-20-UNIT-20');
-    render(document);
+    const printed = render(document);
     expect(screen.getByRole('heading', { level: 1, name: 'Hoja de conducción: HC-ORD-20-UNIT-20' })).toBeVisible();
-    expect(screen.queryByText('MANUAL-UNIT')).toBeNull();
-    const printedSheet = within(screen.getByRole('article'));
+    const printedSheet = within(printed.getByRole('article'));
+    expect(printedSheet.getByText(new RegExp(`Nombre y apellido.*${unit.order.patientName}`))).toBeVisible();
     expect(printedSheet.getByText(/N.º de historia clínica/)).toBeVisible();
+    expect(printedSheet.getByRole('img', { name: 'Hospital Santa Clotilde' })).toHaveAttribute(
+      'src',
+      expect.stringMatching(/^data:image\/png;base64,/),
+    );
     expect(printedSheet.queryByText(/Asociación Civil Pango|Lote de bolsa|Cantidad transfundida/)).toBeNull();
     expect(printedSheet.queryByRole('img', { name: 'Pango' })).toBeNull();
     expect(printedSheet.queryByRole('heading', { name: 'Solicitud transfusional' })).toBeNull();
+    expect(printedSheet.getByText('12:00 AM')).toBeVisible();
+    expect(printedSheet.getByText('01:30 PM')).toBeVisible();
     const monitoring = within(printedSheet.getByRole('table', { name: 'Conducción de la transfusión' }));
-    expect(within(monitoring.getAllByRole('row')[0]).getAllByRole('cell')).toHaveLength(6);
+    const times = within(monitoring.getAllByRole('row')[0]);
+    expect(times.getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
+      '12:05 AM',
+      '12:00 PM',
+      '',
+      '',
+      '',
+      '',
+    ]);
   });
 
-  it('requires ordered times, caps the table at six, and saves before going to the FR02', async () => {
+  it('leaves the sheet and its values open when saving fails', async () => {
+    vi.mocked(saveHemovigilance).mockRejectedValueOnce(new Error('Test rejection'));
+    const dialog = within(await openSheet());
+    fireEvent.change(dialog.getByLabelText('Hora de inicio'), { target: { value: '09:30' } });
+    fireEvent.change(dialog.getByLabelText('Hora 1'), { target: { value: '09:35' } });
+    fireEvent.change(dialog.getByLabelText('Hora de término'), { target: { value: '10:30' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Guardar registro' }));
+    const confirm = within(screen.getByRole('dialog', { name: 'Enviar Hoja de conducción a revisión' }));
+    fireEvent.click(confirm.getByRole('button', { name: 'Guardar y enviar' }));
+    expect(await confirm.findByText(/^No se pudo guardar el registro/)).toBeVisible();
+    expect(dialog.getByLabelText('Hora de término')).toHaveValue('10:30');
+    expect(dialog.getByLabelText('Hora de término')).not.toHaveAttribute('readonly');
+    expect(showSnackbar).not.toHaveBeenCalled();
+  });
+
+  it('requires ordered controls and saved start and stop times before reporting a reaction', async () => {
     const sheet = await openSheet();
     const dialog = within(sheet);
     fireEvent.change(dialog.getByLabelText('Hora de inicio'), { target: { value: '09:30' } });
@@ -182,11 +286,16 @@ describe('nursing transfusion monitoring', () => {
       target: { value: cardiovascular.getByRole<HTMLOptionElement>('option', { name: 'Normal' }).value },
     });
     fireEvent.click(dialog.getByRole('button', { name: 'Reportar reacción adversa' }));
-    const confirm = within(screen.getByRole('dialog', { name: '¿Desea cambiar de sección?' }));
-    expect(confirm.getByLabelText('Guardar el avance antes de salir')).toBeChecked();
-    fireEvent.click(confirm.getByRole('button', { name: 'Salir' }));
+    expect(dialog.getByText(/^Guarde la hora de inicio y la hora de suspensión/)).toBeVisible();
+    fireEvent.change(dialog.getByLabelText('Hora de suspensión'), { target: { value: '10:10' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Guardar registro' }));
+    await waitFor(() => expect(showSnackbar).toHaveBeenCalled());
+    fireEvent.click(dialog.getByRole('button', { name: 'Reportar reacción adversa' }));
     const report = within(await screen.findByRole('dialog', { name: 'Reporte de reacción FR02: UNIT-20' }));
     expect(report.getByLabelText('Hora de inicio')).toHaveValue('09:30');
+    expect(report.getByLabelText('Hora de inicio')).toHaveAttribute('readonly');
+    expect(report.getByLabelText('Hora de suspensión')).toHaveValue('10:10');
+    expect(report.getByLabelText('Hora de suspensión')).toHaveAttribute('readonly');
     expect(report.getByLabelText('Cantidad transfundida (mL)')).toBeVisible();
     expect(report.queryByRole('button', { name: 'Imprimir FR08' })).toBeNull();
     expect(saveHemovigilance).toHaveBeenCalledWith(
@@ -195,6 +304,7 @@ describe('nursing transfusion monitoring', () => {
       expect.objectContaining({
         cardiovascular: 'normal',
         time5: '10:06',
+        stopTime: '10:10',
         weight: '60',
         responsiblePhysician: 'Doctora Ejemplo',
         physicianRegistration: 'CMP-1234',
@@ -202,6 +312,77 @@ describe('nursing transfusion monitoring', () => {
       expect.objectContaining({ personUuid: 'nurse' }),
     );
     expect(showSnackbar).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', isLowContrast: true }));
+    expect(report.getByText('CEP-5678')).toBeVisible();
+    vi.mocked(searchPremedications).mockResolvedValue([{ uuid: 'drug', display: 'Paracetamol', retired: false }]);
+    fireEvent.change(report.getByRole('searchbox', { name: 'Premedicación previa a transfusión' }), {
+      target: { value: 'para' },
+    });
+    fireEvent.click(await report.findByRole('button', { name: 'Paracetamol' }));
+    fireEvent.change(report.getByLabelText('Cantidad transfundida (mL)'), { target: { value: '100' } });
+    fireEvent.change(report.getByLabelText('Número de cama'), { target: { value: 'Cama 5' } });
+    fireEvent.click(report.getByRole('checkbox', { name: 'Escalofríos' }));
+    fireEvent.click(report.getByRole('button', { name: 'Guardar registro' }));
+    await waitFor(() =>
+      expect(saveHemovigilance).toHaveBeenCalledWith(
+        expect.anything(),
+        'report',
+        expect.objectContaining({
+          premedicationConceptUuid: 'drug',
+          premedication: 'Paracetamol',
+          bed: 'Cama 5',
+          transfused: '100',
+        }),
+        expect.objectContaining({ license: 'CEP-5678' }),
+      ),
+    );
+  });
+
+  it('lets the physician verify the read-only report, records Bank notification and enables repeat printing', async () => {
+    session.physician = true;
+    const reportAt = '2026-11-19T11:10:00Z';
+    const reviewedAt = '2026-11-19T13:00:00Z';
+    vi.mocked(listPatientHemovigilance).mockResolvedValue([
+      {
+        ...unit,
+        sections: {
+          report: {
+            ...past.sections.conduction,
+            at: reportAt,
+            fields: { startTime: '09:30', stopTime: '10:10', bed: 'Cama 5' },
+          },
+        },
+      },
+    ]);
+    const sheet = within(await openSheet());
+    fireEvent.click(sheet.getByRole('button', { name: 'Ver reporte de reacción adversa' }));
+    const report = within(await screen.findByRole('dialog', { name: 'Reporte de reacción FR02: UNIT-20' }));
+    expect(report.getByLabelText('Número de cama')).toHaveAttribute('readonly');
+    expect(report.getByLabelText('Hora de notificación al médico')).toHaveValue(
+      localDateTime(new Date(reportAt)).slice(11, 16),
+    );
+    expect(report.getByLabelText('Hora de notificación al Banco de Sangre')).toHaveValue('');
+    expect(report.queryByRole('button', { name: 'Revisión médica' })).toBeNull();
+    expect(report.queryByRole('button', { name: 'Reporte de reacción FR02' })).toBeNull();
+    expect(report.queryByLabelText('Observaciones de la revisión médica')).toBeNull();
+    expect(report.getByText('CMP-1234')).toBeVisible();
+    const print = report.getByRole('button', { name: 'Imprimir FR02' });
+    expect(print).toBeDisabled();
+    const review = report.getByRole('button', { name: 'Registrar revisión' });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    await waitFor(() => expect(print).toBeEnabled());
+    expect(report.getByLabelText('Hora de notificación al Banco de Sangre')).toHaveValue(
+      localDateTime(new Date(reviewedAt)).slice(11, 16),
+    );
+    expect(saveHemovigilance).toHaveBeenCalledWith(
+      expect.anything(),
+      'review',
+      {},
+      expect.objectContaining({ license: 'CMP-1234' }),
+    );
+    fireEvent.click(print);
+    fireEvent.click(print);
+    expect(printDocument).toHaveBeenCalledTimes(2);
   });
 
   it('asks what to do on X and keeps changes until the user decides', async () => {
@@ -230,7 +411,11 @@ describe('nursing transfusion monitoring', () => {
     const dialog = within(await openSheet());
     const field = dialog.getByRole('combobox', { name: 'Estado cardiovascular' });
     expect(field).toHaveValue('');
-    expect(within(field).queryByRole('option', { name: 'Sin determinar' })).toBeNull();
+    const options = within(field).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Normal',
+      'Infarto de miocardio, HTA, valvulopatía o angina',
+    ]);
     expect(dialog.getByText('Sin determinar')).toBeVisible();
   });
 });

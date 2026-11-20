@@ -21,7 +21,8 @@
       "meta": {
         "slot": "blood-bank-patient-transfusions-slot",
         "path": "Transfusiones",
-        "title": "Transfusiones"
+        "title": "Transfusiones",
+        "layoutMode": "anchored"
       },
       "order": 25,
       "online": true,

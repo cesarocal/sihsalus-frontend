@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import hospitalLogo from '../collection/hospital-santa-clotilde.png';
+import hospitalLogo from '../collection/hospital-santa-clotilde.png?inline';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { transfusionBloodGroupLabel } from '../transfusions/transfusion-blood-group';
 import {
@@ -18,6 +18,7 @@ import {
   priorTransfusionKeys,
   reactionSigns,
   reactionVitalKeys,
+  reportNotificationTimes,
   studies,
   type UnitCase,
   vitalKeys,
@@ -69,8 +70,8 @@ function DateText({ value }: { value?: string }) {
     </>
   ) : null;
 }
-function TimeText({ value }: { value?: string }) {
-  if (!value) return <>____ : ____ AM/PM</>;
+function TimeText({ value, showBlank = true }: { value?: string; showBlank?: boolean }) {
+  if (!value) return showBlank ? <>____ : ____ AM/PM</> : null;
   const [hours, minutes] = value.split(':');
   const hour = Number(hours);
   return (
@@ -169,7 +170,7 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
         <tbody>
           <tr>
             <td colSpan={6}>
-              {t('patientName')}&nbsp; {order.patientName}
+              {t('printPatientName')}&nbsp; {order.patientName}
             </td>
             <td colSpan={4}>
               {t('printHistoryNumber')}&nbsp; {order.historyNumber}
@@ -242,8 +243,17 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
       <section>
         <h2>CONDUCCIÓN DE LA TRANSFUSIÓN</h2>
         <Line>
-          <Field label={t('startTime')}>{fields.startTime}</Field>
-          <Field label={t('endTime')}>{fields.endTime}</Field>
+          <Field label={t('startTime')}>
+            <TimeText value={fields.startTime} showBlank={false} />
+          </Field>
+          {fields.stopTime && (
+            <Field label={t('stopTime')}>
+              <TimeText value={fields.stopTime} showBlank={false} />
+            </Field>
+          )}
+          <Field label={t('endTime')}>
+            <TimeText value={fields.endTime} showBlank={false} />
+          </Field>
         </Line>
         <table aria-label={t('monitoring')}>
           <colgroup>
@@ -254,7 +264,9 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
             <tr>
               <th scope="row">Parámetro / hora</th>
               {columns.map((col) => (
-                <td key={col}>{fields[`time${col}`]}</td>
+                <td key={col}>
+                  <TimeText value={fields[`time${col}`]} showBlank={false} />
+                </td>
               ))}
             </tr>
             {vitalKeys.map((key) => (
@@ -336,6 +348,7 @@ const fr02Components: [string, string[]][] = [
 export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate }) {
   const { dispatch, order, sections } = unit;
   const report = sections.report?.fields ?? {};
+  const notifications = reportNotificationTimes(sections);
   const bank = sections.investigation?.fields ?? {};
   const other = !fr02Components.some(([, codes]) => codes.includes(dispatch.component));
   const review = sections.review?.actor;
@@ -378,7 +391,7 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
         <Line>
           <Field label="HC N.º">{order.historyNumber}</Field>
           <Field label="Servicio">{order.service}</Field>
-          <Field label="Cama N.º">{order.bed}</Field>
+          <Field label="Cama N.º">{report.bed ?? order.bed}</Field>
         </Line>
         <Line>
           <Field label="I. N.º Unidad o Componente">{dispatch.unitCode}</Field>
@@ -406,10 +419,10 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
         </Line>
         <Line>
           <Field label="Hora de notificación al médico">
-            <TimeText value={report.doctorNotified} />
+            <TimeText value={notifications.doctorNotified} />
           </Field>
           <Field label="Hora de notificación al Banco de Sangre">
-            <TimeText value={report.bankNotified} />
+            <TimeText value={notifications.bankNotified} />
           </Field>
         </Line>
         <Line>

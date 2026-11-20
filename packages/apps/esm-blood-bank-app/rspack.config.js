@@ -4,6 +4,13 @@ const { resolve } = require('node:path');
 module.exports = (env, argv) => {
   const config = defaultConfig(env, argv);
 
+  // The conduction print document embeds this logo in its isolated iframe.
+  config.module.rules.push({
+    test: /hospital-santa-clotilde\.png$/,
+    resourceQuery: /^\?inline$/,
+    type: 'asset/inline',
+  });
+
   if (config.mode === 'development') {
     // A production build cleans dist. Keep live development chunks outside it
     // so validation cannot remove files still referenced by the running server.
