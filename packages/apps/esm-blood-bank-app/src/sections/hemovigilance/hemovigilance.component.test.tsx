@@ -174,6 +174,10 @@ describe('nursing transfusion monitoring', () => {
     await waitFor(() => expect(showSnackbar).toHaveBeenCalledTimes(1));
     expect(sheet).toBeVisible();
 
+    const antecedentes = within(dialog.getByRole('region', { name: 'Antecedentes' }));
+    const reactions = within(dialog.getByRole('region', { name: 'Reacciones adversas' }));
+    fireEvent.click(antecedentes.getByRole('checkbox', { name: 'Alergia a medicamentos' }));
+    fireEvent.click(reactions.getByRole('checkbox', { name: 'Urticaria' }));
     fireEvent.change(dialog.getByLabelText('Hora de término'), { target: { value: '13:30' } });
     fireEvent.click(save);
     const confirm = within(screen.getByRole('dialog', { name: 'Enviar Hoja de conducción a revisión' }));
@@ -181,6 +185,14 @@ describe('nursing transfusion monitoring', () => {
     fireEvent.click(confirm.getByRole('button', { name: 'Guardar y enviar' }));
     await waitFor(() => expect(dialog.getByLabelText('Talla (cm)')).toHaveAttribute('readonly'));
     expect(sheet).toBeVisible();
+    const markedHistory = antecedentes.getByRole('checkbox', { name: 'Alergia a medicamentos', checked: true });
+    expect(markedHistory).toHaveAttribute('aria-readonly', 'true');
+    expect(antecedentes.getByRole('checkbox', { name: 'Uso de drogas EV', checked: false })).toBeVisible();
+    expect(reactions.getByRole('checkbox', { name: 'Urticaria', checked: true })).toBeVisible();
+    expect(reactions.getByRole('checkbox', { name: 'Tos', checked: false })).toBeVisible();
+    fireEvent.click(markedHistory);
+    expect(markedHistory).toBeChecked();
+    expect(saveHemovigilance).toHaveBeenCalledTimes(2);
     expect(dialog.queryByRole('button', { name: 'Guardar registro' })).toBeNull();
     expect(dialog.queryByRole('button', { name: 'Imprimir hoja' })).toBeNull();
     expect(showSnackbar).toHaveBeenCalledWith(
@@ -371,6 +383,8 @@ describe('nursing transfusion monitoring', () => {
               diastolicBefore: '80',
               systolicAfter: '130',
               diastolicAfter: '85',
+              chills: 'yes',
+              sepsis: 'yes',
             },
           },
         },
@@ -384,6 +398,18 @@ describe('nursing transfusion monitoring', () => {
       localDateTime(new Date(reportAt)).slice(11, 16),
     );
     expect(report.queryByLabelText('Hora de notificación al Banco de Sangre')).not.toBeInTheDocument();
+    const symptoms = within(report.getByRole('region', { name: 'Síntomas clínicos' }));
+    expect(symptoms.getByRole('checkbox', { name: 'Escalofríos', checked: true })).toHaveAttribute(
+      'aria-readonly',
+      'true',
+    );
+    expect(symptoms.getByRole('checkbox', { name: 'Cianosis', checked: false })).toBeVisible();
+    const conditions = within(report.getByRole('region', { name: 'Paciente se encuentra en' }));
+    expect(conditions.getByRole('checkbox', { name: 'Sepsis', checked: true })).toHaveAttribute(
+      'aria-readonly',
+      'true',
+    );
+    expect(conditions.getByRole('checkbox', { name: 'CID', checked: false })).toBeVisible();
     expect(report.getByRole('spinbutton', { name: 'Sistólica · Pre' })).toHaveAttribute('readonly');
     expect(report.queryByRole('button', { name: 'Revisión médica' })).toBeNull();
     expect(report.queryByRole('button', { name: 'Reporte de reacción FR02' })).toBeNull();

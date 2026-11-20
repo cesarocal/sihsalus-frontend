@@ -1,5 +1,5 @@
 import { Button, Checkbox, Select, SelectItem, TextArea, TextInput } from '@carbon/react';
-import { Add } from '@carbon/react/icons';
+import { Add, Checkmark } from '@carbon/react/icons';
 import { type ReactNode, useId } from 'react';
 import { formatListDate } from '../../shared/format-list-date';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
@@ -140,29 +140,48 @@ export function HemovigilanceFields({
     />
   );
   const checklist = (title: string, keys: string[], detailsKey?: string, detailsTrigger = 'otherSymptom') => {
+    const isSheetSection = stage === 'conduction' || stage === 'report';
     const content = (
       <>
         <div className={styles.checks}>
-          {keys.map((key) =>
-            readOnly ? (
+          {keys.map((key) => {
+            const checked = fields[key] === 'yes';
+            if (!readOnly)
+              return (
+                <Checkbox
+                  key={key}
+                  id={`hemo-${stage}-${key}`}
+                  labelText={t(key)}
+                  checked={checked}
+                  onChange={(_, { checked }) => change(key, checked ? 'yes' : '')}
+                />
+              );
+            if (isSheetSection)
+              return (
+                <span
+                  key={key}
+                  role="checkbox"
+                  aria-checked={checked}
+                  aria-readonly="true"
+                  className={styles.readOnlyCheck}
+                >
+                  <span className={styles.readOnlyCheckBox} aria-hidden="true">
+                    {checked && <Checkmark size={18} />}
+                  </span>
+                  {t(key)}
+                </span>
+              );
+            return (
               <span key={key}>
-                {fields[key] === 'yes' ? '☒' : '☐'} {t(key)}
+                {checked ? '☒' : '☐'} {t(key)}
               </span>
-            ) : (
-              <Checkbox
-                key={key}
-                id={`hemo-${stage}-${key}`}
-                labelText={t(key)}
-                checked={fields[key] === 'yes'}
-                onChange={(_, { checked }) => change(key, checked ? 'yes' : '')}
-              />
-            ),
-          )}
+            );
+          })}
         </div>
         {detailsKey && fields[detailsTrigger] === 'yes' && input(detailsKey)}
       </>
     );
-    return stage === 'conduction' || stage === 'report' ? (
+    return isSheetSection ? (
       <SheetSection title={t(title)}>{content}</SheetSection>
     ) : (
       <fieldset className={styles.block}>
