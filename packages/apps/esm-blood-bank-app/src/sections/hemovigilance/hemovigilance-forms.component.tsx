@@ -1,15 +1,23 @@
-import { Checkbox, TextArea, TextInput } from '@carbon/react';
+import { Button, Checkbox, Select, SelectItem, TextArea, TextInput } from '@carbon/react';
+import { Add } from '@carbon/react/icons';
 import type { ReactNode } from 'react';
 import { formatListDate } from '../../shared/format-list-date';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
-import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { componentDefinitions, componentTypes } from '../laboratory/fractionation/fractionation-rules';
 import { transfusionBloodGroupLabel } from '../transfusions/transfusion-blood-group';
 import {
   antecedentKeys,
   conditions,
-  conductionSigns,
+  conductionCode,
+  conductionSignKeys,
   type Fields,
   findings,
+  manualHistoryRows,
+  maxMonitoringColumns,
+  monitoringColumns,
+  operatingRoomOptions,
+  priorConductionValues,
+  priorTransfusionKeys,
   reactionSigns,
   reactionVitalKeys,
   reportTimes,
@@ -58,6 +66,8 @@ export function HemovigilanceFields({
   setFields,
   readOnly,
   copied = {},
+  unit,
+  history = [],
   t,
 }: {
   stage: Stage;
@@ -65,6 +75,8 @@ export function HemovigilanceFields({
   setFields: (fields: Fields) => void;
   readOnly: boolean;
   copied?: Fields;
+  unit: UnitCase;
+  history?: UnitCase[];
   t: ProcessingTranslate;
 }) {
   const change = (key: string, value: string) => setFields({ ...fields, [key]: value });
@@ -120,58 +132,167 @@ export function HemovigilanceFields({
     </fieldset>
   );
 
-  if (stage === 'conduction')
+  if (stage === 'conduction') {
+    const { order, dispatch } = unit;
+    const manualRows = manualHistoryRows(fields);
+    const columns = monitoringColumns(fields);
+    const lastColumn = columns.length - 1;
+    const canRemoveColumn = lastColumn > 0 && !['time', ...vitalKeys].some((key) => fields[key + lastColumn]);
+    const readout = (key: string, value: string) => (
+      <div className={styles.readout}>
+        <span>{t(key)}</span>
+        <strong>{value || '—'}</strong>
+      </div>
+    );
+    const dateLabel = (value: string) => value.split('-').reverse().join('/');
+    const cellInput = (key: string, label: string, type = 'text', min?: string) => (
+      <input
+        className={styles.cellInput}
+        type={type}
+        aria-label={label}
+        min={min}
+        maxLength={500}
+        readOnly={readOnly}
+        value={fields[key] ?? ''}
+        onChange={(event) => change(key, event.target.value)}
+      />
+    );
     return (
       <>
-        <div className={styles.grid}>
-          {input('conductionDate', 'date')}
-          {input('weight', 'number')}
-          {input('height', 'number')}
-          {input('startTime', 'time')}
-          {input('endTime', 'time')}
-          {input('transfused', 'number')}
-        </div>
+        <section className={styles.identity} aria-label={t('conductionTitle', { code: conductionCode(unit) })}>
+          <div className={styles.identityHeading}>
+            <h3>{t('conductionTitle', { code: conductionCode(unit) })}</h3>
+            {readout('date', dateLabel(fields.conductionDate ?? ''))}
+          </div>
+          <div className={styles.identityRow}>
+            {readout('patientName', order.patientName)}
+            {readout('historyNumber', order.historyNumber)}
+            {readout('diagnosis', order.diagnosis)}
+          </div>
+          <div className={styles.identityVitals}>
+            {readout('age', order.age)}
+            {input('weight', 'number')}
+            {input('height', 'number')}
+            {readout('sex', t(order.sex === 'F' ? 'female' : 'male'))}
+            {readout('bloodGroup', transfusionBloodGroupLabel(order.bloodGroup, t))}
+          </div>
+          <div className={styles.identityRow}>
+            {readout('unitCode', dispatch.unitCode)}
+            {readout('bloodComponent', t(componentDefinitions[dispatch.component].key))}
+            {readout('unitBloodGroup', transfusionBloodGroupLabel(dispatch.bloodGroup, t))}
+          </div>
+        </section>
+        <fieldset className={styles.block}>
+          <legend>{t('transfusionRequest')}</legend>
+          <div className={styles.requestFields}>
+            {readout('requestCode', order.number)}
+            {readout('dispatchDate', formatListDate(dispatch.deliveredAt))}
+          </div>
+        </fieldset>
         {checklist('antecedents', antecedentKeys)}
         <fieldset className={styles.block}>
           <legend>{t('priorTransfusions')}</legend>
           <div className={styles.scrollArea}>
-            <table className={styles.monitoring}>
+            <table className={styles.sheetTable}>
               <thead>
                 <tr>
-                  {['date', 'units', 'component', 'priorReaction', 'place', 'notes'].map((key) => (
-                    <th key={key}>{t(key)}</th>
+                  {priorTransfusionKeys.map((key) => (
+                    <th key={key} scope="col">
+                      {t(key)}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {[0, 1, 2, 3, 4].map((row) => (
+                {history.map((entry) => {
+                  const values = priorConductionValues(entry, t);
+                  return (
+                    <tr key={conductionCode(entry)}>
+                      {priorTransfusionKeys.map((key) => (
+                        <td className={styles.importedCell} key={key}>
+                          {(key === 'date' ? dateLabel(values[key]) : values[key]) || '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+                {manualRows.map((row, index) => (
                   <tr key={row}>
-                    {['date', 'units', 'component', 'priorReaction', 'place', 'notes'].map((key) => (
-                      <td key={key}>
-                        {input(
-                          `history${row}${key}`,
-                          key === 'date' ? 'date' : key === 'units' ? 'number' : 'text',
-                          `${t(key)} ${row + 1}`,
-                          '',
-                        )}
-                      </td>
-                    ))}
+                    {priorTransfusionKeys.map((key) => {
+                      const field = `history${row}${key}`;
+                      const label = `${t(key)} ${index + 1}`;
+                      const legacyQuantity = key === 'unitCode' && fields[`history${row}units`];
+                      const component = fields[field] ?? '';
+                      return (
+                        <td key={key}>
+                          {key === 'component' ? (
+                            <select
+                              className={styles.cellInput}
+                              aria-label={label}
+                              disabled={readOnly}
+                              value={component}
+                              onChange={(event) => change(field, event.target.value)}
+                            >
+                              <option value="">{t('chooseComponent')}</option>
+                              {component && !Object.hasOwn(componentDefinitions, component) && (
+                                <option value={component}>{component}</option>
+                              )}
+                              {componentTypes.map((type) => (
+                                <option key={type} value={type}>
+                                  {t(componentDefinitions[type].key)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            cellInput(field, label, key === 'date' ? 'date' : 'text')
+                          )}
+                          {legacyQuantity && (
+                            <small className={styles.legacyValue}>
+                              {t('legacyQuantity', { quantity: legacyQuantity })}
+                            </small>
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
+                {!history.length && !manualRows.length && (
+                  <tr>
+                    <td colSpan={priorTransfusionKeys.length} className={styles.importedCell}>
+                      {t('noConductionHistory')}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
+          {!readOnly && (
+            <Button
+              type="button"
+              kind="tertiary"
+              size="sm"
+              renderIcon={Add}
+              className={styles.tableAction}
+              onClick={() => change(`history${(manualRows.at(-1) ?? -1) + 1}date`, '')}
+            >
+              {t('addPriorTransfusion')}
+            </Button>
+          )}
         </fieldset>
         <fieldset className={styles.block}>
           <legend>{t('monitoring')}</legend>
+          <div className={styles.conductionTimes}>
+            {input('startTime', 'time')}
+            {input('endTime', 'time')}
+          </div>
           <div className={styles.scrollArea}>
-            <table className={styles.monitoring}>
+            <table className={`${styles.sheetTable} ${styles.monitoring}`}>
               <thead>
                 <tr>
                   <th scope="col">{t('measurement')}</th>
-                  {[0, 1, 2, 3, 4].map((column) => (
+                  {columns.map((column) => (
                     <th scope="col" key={column}>
-                      {input(`time${column}`, 'time', `${t('time')} ${column + 1}`, '')}
+                      {cellInput(`time${column}`, `${t('time')} ${column + 1}`, 'time', fields[`time${column - 1}`])}
                     </th>
                   ))}
                 </tr>
@@ -180,30 +301,80 @@ export function HemovigilanceFields({
                 {vitalKeys.map((key) => (
                   <tr key={key}>
                     <th scope="row">{t(key)}</th>
-                    {[0, 1, 2, 3, 4].map((column) => (
-                      <td key={column}>{input(key + column, 'text', `${t(key)} ${column + 1}`, '')}</td>
+                    {columns.map((column) => (
+                      <td key={column}>{cellInput(key + column, `${t(key)} ${column + 1}`)}</td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {!readOnly && (
+            <div className={`${styles.actions} ${styles.tableAction}`}>
+              <Button
+                type="button"
+                kind="tertiary"
+                size="sm"
+                renderIcon={Add}
+                disabled={columns.length >= maxMonitoringColumns}
+                onClick={() => change('monitoringColumns', String(columns.length + 1))}
+              >
+                {t('addMonitoringTime')}
+              </Button>
+              {canRemoveColumn && (
+                <Button
+                  type="button"
+                  kind="ghost"
+                  size="sm"
+                  onClick={() => change('monitoringColumns', String(lastColumn))}
+                >
+                  {t('removeEmptyMonitoringTime')}
+                </Button>
+              )}
+            </div>
+          )}
+          <div className={styles.volumeField}>{input('transfused', 'number')}</div>
         </fieldset>
         <fieldset className={styles.block}>
           <legend>{t('operatingRoom')}</legend>
-          <div className={styles.grid}>
-            {['consciousness', 'cardiovascular', 'pulmonary'].flatMap((key) =>
-              [1, 2, 3].map((column) => input(key + column, 'text', `${t(key)} ${column}`)),
-            )}
+          <div className={styles.identityRow}>
+            {Object.entries(operatingRoomOptions).map(([key, options]) => {
+              const stored = fields[key] ?? '';
+              const selected = options.some((option) => option === stored) ? stored : '';
+              const legacy = stored
+                ? t(stored)
+                : [1, 2, 3]
+                    .map((column) => fields[key + column])
+                    .filter(Boolean)
+                    .join(' / ');
+              return (
+                <div key={key}>
+                  <Select
+                    id={`hemo-conduction-${key}`}
+                    labelText={t(key)}
+                    value={selected}
+                    disabled={readOnly}
+                    onChange={(event) => change(key, event.target.value)}
+                  >
+                    <SelectItem value="" text={t('chooseClinicalState')} />
+                    {options.map((option) => (
+                      <SelectItem key={option} value={option} text={t(option)} />
+                    ))}
+                  </Select>
+                  {legacy && !selected && <small className={styles.legacyValue}>{legacy}</small>}
+                </div>
+              );
+            })}
           </div>
         </fieldset>
-        {checklist('adverseSigns', conductionSigns, 'otherSymptomText')}
-        <div className={styles.grid}>
-          {input('responsiblePhysician')}
-          {input('physicianRegistration')}
+        {checklist('adverseSigns', conductionSignKeys(unit.sections.conduction?.fields ?? fields), 'otherSymptomText')}
+        <div className={styles.requestFields}>
+          {readout('responsiblePhysician', fields.responsiblePhysician)}
+          {readout('physicianRegistration', fields.physicianRegistration)}
         </div>
       </>
     );
+  }
   if (stage === 'report')
     return (
       <>

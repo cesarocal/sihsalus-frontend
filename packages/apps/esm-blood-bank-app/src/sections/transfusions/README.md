@@ -297,6 +297,13 @@ y el UUID de la orden identifican cada hoja y reporte.
 - Cada paso guarda un encuentro local con el tipo y el privilegio de edición
   correspondiente. Las observaciones conservan el registro y la revisión
   anterior cuando se actualiza la conducción.
+- La hoja identifica la solicitud y la unidad con el código estable
+  `HC-<número de orden>-<código de unidad>`. Enfermería ve el médico y el CMP
+  del FR08. El historial automático se construye con hojas de conducción previas
+  del paciente y muestra la ubicación guardada al entregar sus unidades. Las
+  transfusiones previas que se añaden a mano se guardan en la hoja actual.
+- El control empieza con una columna y admite hasta seis. Cada columna
+  requiere una hora y la siguiente debe ser igual o posterior a la anterior.
 - Los documentos A4 usan el formato institucional de conducción y el FR02,
   con espacio para firmas físicas. Este circuito trabaja con el inventario y
   los pacientes de prueba. La entrega clínica requiere el OMOD de Banco de Sangre.

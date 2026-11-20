@@ -27,7 +27,7 @@ type Encounter = {
   uuid: string;
   encounterDatetime: string;
   visit: Ref | null;
-  location: Ref | null;
+  location: (Ref & { display?: string }) | null;
   patient: Ref;
   encounterType: Ref;
   obs?: { concept: Ref; value: unknown }[];
@@ -59,7 +59,7 @@ async function encounters(patientId: string, encounterType?: string) {
         ...(encounterType ? { encounterType } : {}),
         limit: '100',
         startIndex: String(startIndex),
-        v: 'custom:(uuid,encounterDatetime,patient:(uuid),encounterType:(uuid),obs:(concept:(uuid),value))',
+        v: 'custom:(uuid,encounterDatetime,patient:(uuid),location:(uuid,display),encounterType:(uuid),obs:(concept:(uuid),value))',
       }),
     );
     for (const row of data.results) {
@@ -125,7 +125,7 @@ function combineCases(orders: TransfusionOrder[], events: Awaited<ReturnType<typ
     const deliveries = event.deliveredUnits ?? (event.dispatch ? [event.dispatch] : []);
     for (const dispatch of deliveries) {
       const id = `${order.id}/${dispatch.unitCode}`;
-      if (!map.has(id)) map.set(id, { order, dispatch, sections: {} });
+      if (!map.has(id)) map.set(id, { order, dispatch, deliveryLocation: row.location?.display, sections: {} });
     }
   }
   for (const [id, unit] of map) {
@@ -156,7 +156,8 @@ async function persist(order: TransfusionOrder, event: Event) {
   );
   if (parent.patient.uuid !== order.patientId || !parent.visit || !parent.location)
     throw new Error('INVALID_HEMOVIGILANCE_ENCOUNTER');
-  await openmrsFetch(`${restBaseUrl}/encounter`, {
+  const at = new Date().toISOString();
+  const { data } = await openmrsFetch<Ref>(`${restBaseUrl}/encounter`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -164,10 +165,11 @@ async function persist(order: TransfusionOrder, event: Event) {
       visit: parent.visit.uuid,
       location: parent.location.uuid,
       encounterType: demoMetadata.encounters[event.kind],
-      encounterDatetime: new Date().toISOString(),
+      encounterDatetime: at,
       obs: [{ concept: demoMetadata.text, value: JSON.stringify(event) }],
     }),
   });
+  return { uuid: data.uuid, at };
 }
 
 export async function recordDemoDispatch(request: TransfusionRequest) {
@@ -216,7 +218,7 @@ export async function saveHemovigilance(unit: UnitCase, kind: Stage, fields: Fie
     Object.values(fields).some((value) => typeof value !== 'string' || value.length > 500)
   )
     throw new Error('HEMOVIGILANCE_CONFLICT');
-  await persist(unit.order, {
+  const record = await persist(unit.order, {
     version: 1,
     kind,
     orderId: unit.order.id,
@@ -225,6 +227,7 @@ export async function saveHemovigilance(unit: UnitCase, kind: Stage, fields: Fie
     fields,
     actor,
   });
+  return { ...record, fields, actor };
 }
 
 export async function actorLicense(personUuid: string, providerUuid: string) {

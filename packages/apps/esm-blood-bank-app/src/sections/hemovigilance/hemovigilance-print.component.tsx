@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { formatListDate } from '../../shared/format-list-date';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import hospitalLogo from '../collection/hospital-santa-clotilde.png';
 import pangoLogo from '../collection/pango.png';
@@ -7,9 +8,16 @@ import { transfusionBloodGroupLabel } from '../transfusions/transfusion-blood-gr
 import {
   antecedentKeys,
   conditions,
-  conductionSigns,
+  conductionCode,
+  conductionFields,
+  conductionSignKeys,
   type Fields,
   findings,
+  manualHistoryRows,
+  monitoringColumns,
+  operatingRoomOptions,
+  priorConductionValues,
+  priorTransfusionKeys,
   reactionSigns,
   reactionVitalKeys,
   studies,
@@ -49,6 +57,8 @@ tr, section, header { break-inside:avoid; }
 .conduction .signatures { margin-top:4mm; }
 .conduction .monitorLabel { width:23%; }
 .conduction .letterhead img { max-height:22mm; }
+.conduction .historySection { break-inside:auto; }
+.conduction .sectionHeading { break-after:avoid; }
 .footReference { font-size:7pt; margin-top:1mm; }
 `;
 
@@ -104,18 +114,29 @@ function CheckGrid({
   );
 }
 
-export function ConductionPrint({ unit, t }: { unit: UnitCase; t: ProcessingTranslate }) {
-  const { dispatch, order, sections } = unit;
-  const fields = sections.conduction?.fields ?? {};
-  const histories = ['date', 'units', 'component', 'priorReaction', 'place', 'notes'];
-  const component = {
-    ST: 'wholeBlood',
-    PG: 'redCells',
-    PFC: 'freshFrozenPlasma',
-    PLAQ: 'platelets',
-    CRIOP: 'cryoprecipitate',
-    GRL: 'washedRedCells',
-  };
+export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history: UnitCase[]; t: ProcessingTranslate }) {
+  const { dispatch, order } = unit;
+  const fields = conductionFields(unit);
+  const columns = monitoringColumns(fields);
+  const histories = [
+    ...history.map((entry) => ({ id: conductionCode(entry), ...priorConductionValues(entry, t) })),
+    ...manualHistoryRows(fields).map((row) => {
+      const get = (key: string) => fields[`history${row}${key}`] ?? '';
+      const component = get('component');
+      const quantity = get('units');
+      return {
+        id: `manual-${row}`,
+        date: get('date'),
+        unitCode: [get('unitCode'), quantity && t('legacyQuantity', { quantity })].filter(Boolean).join(' / '),
+        component: Object.hasOwn(componentDefinitions, component)
+          ? t(componentDefinitions[component as keyof typeof componentDefinitions].key)
+          : component,
+        priorReaction: get('priorReaction'),
+        place: get('place'),
+        notes: get('notes'),
+      };
+    }),
+  ];
   return (
     <article className="conduction">
       <header className="letterhead">
@@ -138,7 +159,7 @@ export function ConductionPrint({ unit, t }: { unit: UnitCase; t: ProcessingTran
         <img src={pangoLogo} alt="Pango" />
       </header>
       <div className="titleRow">
-        <h1>HOJA DE CONDUCCIÓN DE TRANSFUSIONES</h1>
+        <h1>{t('conductionTitle', { code: conductionCode(unit) })}</h1>
         <div>
           <strong>CENTRO DE HEMOTERAPIA TIPO I</strong>
           <div className="sheetDate">
@@ -149,87 +170,107 @@ export function ConductionPrint({ unit, t }: { unit: UnitCase; t: ProcessingTran
       <table>
         <tbody>
           <tr>
-            <td colSpan={3}>NOMBRE&nbsp; {order.patientName}</td>
-            <td>DIAGNÓSTICO&nbsp; {order.diagnosis}</td>
+            <td colSpan={6}>
+              {t('patientName')}&nbsp; {order.patientName}
+            </td>
+            <td colSpan={4}>
+              {t('historyNumber')}&nbsp; {order.historyNumber}
+            </td>
+            <td colSpan={5}>
+              {t('diagnosis')}&nbsp; {order.diagnosis}
+            </td>
           </tr>
           <tr>
-            <td>N.º de LOTE&nbsp; {dispatch.lot}</td>
+            <td colSpan={2}>
+              {t('age')}&nbsp; {order.age}
+            </td>
             <td colSpan={3}>
-              Componente&nbsp;{' '}
-              {Object.entries(component).map(([label, code]) => (
-                <span key={code} style={{ marginRight: '2mm' }}>
-                  <Box checked={dispatch.component === code} label={label} />
-                </span>
-              ))}
-              {!Object.values(component).includes(dispatch.component) &&
-                t(componentDefinitions[dispatch.component].key)}
+              {t('weight')}&nbsp; {fields.weight}
+            </td>
+            <td colSpan={3}>
+              {t('height')}&nbsp; {fields.height}
+            </td>
+            <td colSpan={2}>
+              {t('sex')}&nbsp; {order.sex}
+            </td>
+            <td colSpan={5}>
+              {t('bloodGroup')}&nbsp; {transfusionBloodGroupLabel(order.bloodGroup, t)}
             </td>
           </tr>
           <tr>
-            <td>Edad&nbsp; {order.age}</td>
-            <td>
-              Peso&nbsp; {fields.weight} &nbsp; Talla&nbsp; {fields.height}
+            <td colSpan={5}>
+              {t('unitCode')}&nbsp; {dispatch.unitCode}
             </td>
-            <td>
-              Sexo&nbsp; <Box checked={order.sex === 'M'} label="M" /> <Box checked={order.sex === 'F'} label="F" />
+            <td colSpan={5}>
+              {t('bloodComponent')}&nbsp; {t(componentDefinitions[dispatch.component].key)}
             </td>
-            <td>GRUPO SANGUÍNEO&nbsp; {transfusionBloodGroupLabel(order.bloodGroup, t)}</td>
+            <td colSpan={5}>
+              {t('unitBloodGroup')}&nbsp; {transfusionBloodGroupLabel(dispatch.bloodGroup, t)}
+            </td>
           </tr>
         </tbody>
       </table>
       <section>
+        <h2>{t('transfusionRequest')}</h2>
+        <Line>
+          <Field label={t('requestCode')}>{order.number}</Field>
+          <Field label={t('dispatchDate')}>{formatListDate(dispatch.deliveredAt)}</Field>
+        </Line>
+      </section>
+      <section>
         <h2>ANTECEDENTES</h2>
         <CheckGrid keys={antecedentKeys} fields={fields} columns={4} t={t} />
       </section>
-      <section>
-        <h2>TRANSFUSIONES PREVIAS</h2>
+      <section className="historySection">
+        <h2 className="sectionHeading">TRANSFUSIONES PREVIAS</h2>
         <table>
           <thead>
             <tr>
-              {histories.map((key) => (
+              {priorTransfusionKeys.map((key) => (
                 <th key={key}>{t(key).toUpperCase()}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {[0, 1, 2, 3, 4].map((row) => (
-              <tr key={row}>
-                {histories.map((key) => (
-                  <td key={key}>
-                    {key === 'date' ? (
-                      <DateText value={fields[`history${row}${key}`]} />
-                    ) : (
-                      fields[`history${row}${key}`]
-                    )}
-                  </td>
-                ))}
+            {histories.length ? (
+              histories.map((row) => (
+                <tr key={row.id}>
+                  {priorTransfusionKeys.map((key) => (
+                    <td key={key}>{key === 'date' ? <DateText value={row.date} /> : row[key]}</td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={priorTransfusionKeys.length} />
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </section>
       <section>
         <h2>CONDUCCIÓN DE LA TRANSFUSIÓN</h2>
+        <Line>
+          <Field label={t('startTime')}>{fields.startTime}</Field>
+          <Field label={t('endTime')}>{fields.endTime}</Field>
+          <Field label={t('transfused')}>{fields.transfused}</Field>
+        </Line>
         <table>
           <colgroup>
             <col className="monitorLabel" />
-            <col span={5} />
+            <col span={columns.length} />
           </colgroup>
           <tbody>
             <tr>
-              <td colSpan={3}>Hora de inicio&nbsp; {fields.startTime}</td>
-              <td colSpan={3}>Hora de término&nbsp; {fields.endTime}</td>
-            </tr>
-            <tr>
               <th scope="row">Parámetro / hora</th>
-              {[0, 1, 2, 3, 4].map((col) => (
+              {columns.map((col) => (
                 <td key={col}>{fields[`time${col}`]}</td>
               ))}
             </tr>
             {vitalKeys.map((key) => (
               <tr key={key}>
                 <th scope="row">{t(key)}</th>
-                {[0, 1, 2, 3, 4].map((col) => (
+                {columns.map((col) => (
                   <td key={col}>{fields[key + col]}</td>
                 ))}
               </tr>
@@ -242,34 +283,30 @@ export function ConductionPrint({ unit, t }: { unit: UnitCase; t: ProcessingTran
         <table>
           <thead>
             <tr>
-              <th>ESTADOS CLÍNICOS</th>
-              {[1, 2, 3].map((col) => (
-                <th key={col}>{col}</th>
+              {Object.keys(operatingRoomOptions).map((key) => (
+                <th key={key}>{t(key)}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {['consciousness', 'cardiovascular', 'pulmonary'].map((key) => (
-              <tr key={key}>
-                <th scope="row">{t(key)}</th>
-                {[1, 2, 3].map((col) => (
-                  <td key={col}>{fields[key + col]}</td>
-                ))}
-              </tr>
-            ))}
+            <tr>
+              {Object.keys(operatingRoomOptions).map((key) => (
+                <td key={key}>
+                  {fields[key]
+                    ? t(fields[key])
+                    : [1, 2, 3]
+                        .map((col) => fields[key + col])
+                        .filter(Boolean)
+                        .join(' / ')}
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
-        <small>
-          (1) Consciente &nbsp; · &nbsp; (2) Somnoliento o desorientado &nbsp; · &nbsp; (3) Coma
-          <br />
-          (1) Normal &nbsp; · &nbsp; (2) Infarto de miocardio, HTA, valvulopatía, angina
-          <br />
-          (1) Normal &nbsp; · &nbsp; (2) Enfermedad parenquimal pulmonar, asma, EPOC
-        </small>
       </section>
       <section>
         <h2>REACCIONES ADVERSAS</h2>
-        <CheckGrid keys={conductionSigns} fields={fields} columns={4} t={t} />
+        <CheckGrid keys={conductionSignKeys(fields)} fields={fields} columns={4} t={t} />
         {fields.otherSymptom === 'yes' && <Field label={t('otherSymptom')}>{fields.otherSymptomText}</Field>}
       </section>
       <table className="signatures">
@@ -292,7 +329,7 @@ export function ConductionPrint({ unit, t }: { unit: UnitCase; t: ProcessingTran
         </tbody>
       </table>
       <p className="footReference">
-        FR08 {order.number} · Unidad {dispatch.unitCode}
+        {t('lot')}&nbsp; {dispatch.lot}
       </p>
     </article>
   );
