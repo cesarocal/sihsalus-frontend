@@ -12,6 +12,9 @@ import {
   useProcessingData,
 } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
+import { hemoPrivileges } from '../hemovigilance/hemovigilance';
+import { BankHemovigilance } from '../hemovigilance/hemovigilance.component';
+import { isLocalHemovigilance, recordDemoDispatch } from '../hemovigilance/hemovigilance.resource';
 import { IssuedTransfusionOrderDialog } from './issued-transfusion-order-dialog.component';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionHistory } from './transfusion-history.component';
@@ -79,6 +82,7 @@ export function TransfusionsPage({
   const [preparing, setPreparing] = useState(false);
   const [prepareFailed, setPrepareFailed] = useState(false);
   const [archive, setArchive] = useState<'history' | 'book' | null>(null);
+  const [reactionQueue, setReactionQueue] = useState(false);
   const preparingRequest = useRef(false);
   const reloadOrders = orders.reload;
   useEffect(() => {
@@ -98,6 +102,9 @@ export function TransfusionsPage({
     (workspaceFailed || ordersFailed) && !(loadWorkspace && !workspaceFailed) && !(readableConfig && !ordersFailed);
   const archiveUnavailable = loading || !loadWorkspace || workspaceFailed;
   const issued = readableConfig && !ordersFailed ? (orders.data ?? []) : [];
+  const canInvestigate = Boolean(
+    readableConfig && isLocalHemovigilance(useMockData) && userHasAccess(hemoPrivileges.bank, user),
+  );
   const issuedById = new Map(issued.map((item) => [item.order.id, item]));
   const requests = loadWorkspace && !workspaceFailed ? (workspace.data?.requests ?? []) : [];
   const requestById = new Map(requests.filter((item) => item.issuedOrder).map((item) => [item.order.id, item]));
@@ -213,6 +220,11 @@ export function TransfusionsPage({
             closeButtonLabelText={t('clearSearch')}
             onChange={(event) => setSearch(event.target.value)}
           />
+          {canInvestigate && (
+            <Button kind="tertiary" disabled={loading || ordersFailed} onClick={() => setReactionQueue(true)}>
+              {t('txReactionQueue')}
+            </Button>
+          )}
           <Button kind="tertiary" renderIcon={Book} disabled={archiveUnavailable} onClick={() => setArchive('book')}>
             {t('txBook')}
           </Button>
@@ -312,6 +324,7 @@ export function TransfusionsPage({
           orderConfig={readableConfig}
           units={workspace.data?.units ?? []}
           api={api}
+          onDelivered={isLocalHemovigilance(useMockData) && readableConfig ? recordDemoDispatch : undefined}
           onSaved={workspace.reload}
           onClose={() => {
             setActive(null);
@@ -332,6 +345,9 @@ export function TransfusionsPage({
         />
       )}
       {archive === 'history' && <TransfusionHistory requests={shownRequests} onClose={() => setArchive(null)} t={t} />}
+      {reactionQueue && canInvestigate && (
+        <BankHemovigilance orders={issued.map(({ order }) => order)} onClose={() => setReactionQueue(false)} />
+      )}
       {archive === 'book' && (
         <TransfusionHistory
           bookEntries={(workspace.data?.bookEntries ?? []).filter((entry) =>

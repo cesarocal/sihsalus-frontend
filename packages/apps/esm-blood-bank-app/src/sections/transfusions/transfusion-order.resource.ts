@@ -181,10 +181,11 @@ export async function loadOrderRecipient(config: TransfusionOrderConfig, patient
   };
 }
 
-function readOrder(row: RestOrder, config: TransfusionOrderConfig): IssuedTransfusionOrder | null {
-  if (row.voided || row.action === 'DISCONTINUE' || row.orderType?.uuid !== config.orderTypeUuid) return null;
-  if (!row.concept?.uuid) throw new Error('FR08_ORDER_METADATA_UNAVAILABLE');
-  if (row.concept.uuid !== config.conceptUuid) return null;
+function readOrder(row: RestOrder, config?: TransfusionOrderConfig): IssuedTransfusionOrder | null {
+  if (row.voided || row.action === 'DISCONTINUE' || (config && row.orderType?.uuid !== config.orderTypeUuid))
+    return null;
+  if (!row.concept?.uuid || !row.orderType?.uuid) throw new Error('FR08_ORDER_METADATA_UNAVAILABLE');
+  if (config && row.concept.uuid !== config.conceptUuid) return null;
   const stored: { format?: unknown; request?: Snapshot } = JSON.parse(row.instructions);
   const request = stored?.request;
   const scheduledDate = request?.priority === 'scheduled' ? row.scheduledDate || request.scheduledDate : undefined;
@@ -251,6 +252,17 @@ async function readOrders(config: TransfusionOrderConfig, patientUuid?: string, 
 }
 export const listIssuedTransfusionOrders = (config: TransfusionOrderConfig, patientUuid?: string) =>
   readOrders(config, patientUuid);
+
+/** Used only for a known FR08 UUID linked from a delivered-unit encounter. */
+export async function readLinkedFr08(uuid: string, patientUuid: string) {
+  const { data } = await openmrsFetch<RestOrder>(
+    `${restBaseUrl}/order/${encodeURIComponent(uuid)}?v=${encodeURIComponent(orderRep)}`,
+  );
+  if (data.uuid !== uuid || data.patient?.uuid !== patientUuid) throw new Error('FR08_RECIPIENT_MISMATCH');
+  const order = readOrder(data);
+  if (!order) throw new Error('FR08_ORDER_UNAVAILABLE');
+  return order.order;
+}
 
 export async function createTransfusionOrder(
   config: TransfusionOrderConfig,

@@ -14,6 +14,29 @@
   ],
   "extensions": [
     {
+      "component": "hemovigilanceLink",
+      "name": "blood-bank-patient-transfusions-link",
+      "slot": "patient-chart-dashboard-slot",
+      "privileges": "app:hoja.clinica.transfusiones",
+      "meta": {
+        "slot": "blood-bank-patient-transfusions-slot",
+        "path": "Transfusiones",
+        "title": "Transfusiones"
+      },
+      "order": 25,
+      "online": true,
+      "offline": false
+    },
+    {
+      "component": "hemovigilanceChart",
+      "name": "blood-bank-patient-transfusions",
+      "slot": "blood-bank-patient-transfusions-slot",
+      "privileges": "app:hoja.clinica.transfusiones",
+      "meta": { "fullWidth": true },
+      "online": true,
+      "offline": false
+    },
+    {
       "component": "transfusionOrderAction",
       "name": "transfusion-order-action",
       "slot": "order-basket-slot",

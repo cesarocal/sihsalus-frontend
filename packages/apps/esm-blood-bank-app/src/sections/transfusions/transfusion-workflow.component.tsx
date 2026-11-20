@@ -42,6 +42,7 @@ export function TransfusionWorkflow({
   units,
   api,
   onSaved,
+  onDelivered,
   onClose,
   t,
 }: {
@@ -51,6 +52,7 @@ export function TransfusionWorkflow({
   units: TransferUnit[];
   api: TransfusionsApi;
   onSaved: () => void;
+  onDelivered?: (request: TransfusionRequest) => Promise<void>;
   onClose: () => void;
   t: ProcessingTranslate;
 }) {
@@ -493,10 +495,16 @@ export function TransfusionWorkflow({
           onConfirm={() => {
             void (async () => {
               const result = await execute(
-                () =>
-                  confirm === 'assign'
-                    ? api.assign(request.id, request.revision, draft.selectedUnitIds, draft.selectionVerified)
-                    : api.deliver(request.id, request.revision, { ...draft, deliveredBy: operator }),
+                async () => {
+                  if (confirm === 'assign')
+                    return api.assign(request.id, request.revision, draft.selectedUnitIds, draft.selectionVerified);
+                  const delivered = await api.deliver(request.id, request.revision, {
+                    ...draft,
+                    deliveredBy: operator,
+                  });
+                  await onDelivered?.(delivered);
+                  return delivered;
+                },
                 confirm === 'assign' ? 'txAssignmentSaved' : 'txDeliverySaved',
               );
               setConfirm(null);

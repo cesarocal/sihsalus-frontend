@@ -7,6 +7,7 @@ import BloodBankHomeDashboardLink from './home-redirect/blood-bank-home-dashboar
 import BloodBankHomeRedirect from './home-redirect/blood-bank-home-redirect.extension';
 import BloodBankNav from './navigation/blood-bank-nav.extension';
 import Root from './root.component';
+import { HemovigilanceChart, HemovigilanceLink } from './sections/hemovigilance/hemovigilance.component';
 import TransfusionOrderAction from './sections/transfusions/transfusion-order-action.extension';
 
 export const importTranslation = require.context('../translations', false, /.json$/, 'lazy');
@@ -27,6 +28,8 @@ export function startupApp() {
 
 export const root = getSyncLifecycle(Root, options);
 export const transfusionOrderAction = getSyncLifecycle(TransfusionOrderAction, options);
+export const hemovigilanceLink = getSyncLifecycle(HemovigilanceLink, options);
+export const hemovigilanceChart = getSyncLifecycle(HemovigilanceChart, options);
 export const bloodBankAppMenuLink = getSyncLifecycle(AppMenuLink, options);
 export const bloodBankNav = getSyncLifecycle(BloodBankNav, options);
 export const bloodBankHomeDashboardLink = getSyncLifecycle(BloodBankHomeDashboardLink, options);

@@ -277,6 +277,28 @@ La emisión médica usa la extensión `order-basket-slot` vinculada al paciente 
 su visita. La relación entre la orden de OpenMRS y el OMOD de Banco de Sangre
 requiere la integración de backend.
 
+## Hemovigilancia de prueba
+
+En el frontend local con `useMockData`, la entrega de inventario simulado
+vinculada a un FR08 crea un encuentro de entrega para el paciente marcado con
+el atributo **Paciente sintético de hemovigilancia**. La ficha consulta los
+encuentros de ese paciente y abre el FR08 por su UUID. El código de la unidad
+y el UUID de la orden identifican cada hoja y reporte.
+
+- Enfermería consulta las unidades entregadas y registra conducción y reporte
+  FR02. El médico registra su revisión y Banco de Sangre la investigación.
+- Cada paso guarda un encuentro local con el tipo y el privilegio de edición
+  correspondiente. Las observaciones conservan el registro y la revisión
+  anterior cuando se actualiza la conducción.
+- Los documentos A4 usan el formato institucional de conducción y el FR02,
+  con espacio para firmas físicas. Este circuito trabaja con el inventario y
+  los pacientes de prueba. La entrega clínica requiere el OMOD de Banco de Sangre.
+
+La preparación local requiere los tipos de encuentro, el concepto de texto y
+el atributo de paciente definidos en `hemovigilance.ts`, junto con los
+privilegios de ficha, registro, revisión e investigación del módulo. Los
+tipos de encuentro deben usar esos privilegios de edición en OpenMRS.
+
 ## Validación y reversión
 
 Ver [evidencia de validación](VALIDATION.md). Las pruebas mock no demuestran
