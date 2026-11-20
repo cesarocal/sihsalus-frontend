@@ -161,6 +161,8 @@
     "bankNotified": "Hora de notificación al Banco de Sangre",
     "urineTime": "Hora de recolección de orina",
     "pressure": "Presión arterial",
+    "systolic": "Sistólica",
+    "diastolic": "Diastólica",
     "pulse": "Frecuencia del pulso",
     "respirations": "Frecuencia respiratoria",
     "temperature": "Temperatura",

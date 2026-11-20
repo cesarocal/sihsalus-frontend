@@ -161,6 +161,8 @@
     "bankNotified": "Blood Bank notification time",
     "urineTime": "Urine collection time",
     "pressure": "Blood pressure",
+    "systolic": "Systolic",
+    "diastolic": "Diastolic",
     "pulse": "Pulse",
     "respirations": "Respiratory rate",
     "temperature": "Temperature",

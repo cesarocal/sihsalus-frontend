@@ -5,6 +5,7 @@ import { componentDefinitions } from '../laboratory/fractionation/fractionation-
 import { transfusionBloodGroupLabel } from '../transfusions/transfusion-blood-group';
 import {
   antecedentKeys,
+  type Actor,
   conditions,
   conductionCode,
   conductionFields,
@@ -18,6 +19,7 @@ import {
   priorTransfusionKeys,
   reactionSigns,
   reactionVitalKeys,
+  reactionVitalLabel,
   reportNotificationTimes,
   studies,
   type UnitCase,
@@ -59,7 +61,12 @@ tr, section, header { break-inside:avoid; }
 .conduction .letterhead img { max-height:22mm; }
 .conduction .historySection { break-inside:auto; }
 .conduction .sectionHeading { break-after:avoid; }
-.footReference { font-size:7pt; margin-top:1mm; }
+.vitalReading { display:inline-block; }
+.vitalReading + .vitalReading { margin-inline-start:2mm; }
+.fr02Signatures { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:9mm; margin:5mm 4mm 0; }
+.fr02Signer { border-top:.55pt solid; padding-top:1mm; text-align:center; overflow-wrap:anywhere; }
+.fr02Signer span { display:block; }
+.bankTimeLine { flex:0 0 16mm; min-height:3mm; border-bottom:.55pt solid; text-align:center; white-space:nowrap; }
 `;
 
 function DateText({ value }: { value?: string }) {
@@ -70,15 +77,15 @@ function DateText({ value }: { value?: string }) {
     </>
   ) : null;
 }
-function TimeText({ value, showBlank = true }: { value?: string; showBlank?: boolean }) {
-  if (!value) return showBlank ? <>____ : ____ AM/PM</> : null;
+function printTimeParts(value: string) {
   const [hours, minutes] = value.split(':');
   const hour = Number(hours);
-  return (
-    <>
-      {String(hour % 12 || 12).padStart(2, '0')}:{minutes} {hour < 12 ? 'AM' : 'PM'}
-    </>
-  );
+  return [`${String(hour % 12 || 12).padStart(2, '0')}:${minutes}`, hour < 12 ? 'AM' : 'PM'];
+}
+
+function TimeText({ value, showBlank = true }: { value?: string; showBlank?: boolean }) {
+  if (!value) return showBlank ? <>____ : ____ AM/PM</> : null;
+  return <>{printTimeParts(value).join(' ')}</>;
 }
 
 const Line = ({ children }: { children: ReactNode }) => <div className="line">{children}</div>;
@@ -345,6 +352,33 @@ const fr02Components: [string, string[]][] = [
   ['Glóbulos Rojos Desleucocitados', ['leukoreducedRedCells']],
 ];
 
+function formatFr02Pressure(report: Fields, phase: 'Before' | 'After') {
+  const systolic = report[`systolic${phase}`];
+  const diastolic = report[`diastolic${phase}`];
+  return systolic || diastolic ? `${systolic || '____'}/${diastolic || '____'}` : report[`pressure${phase}`];
+}
+
+function Fr02Signer({ label, registration, actor }: { label: string; registration: string; actor?: Actor }) {
+  return (
+    <div className="fr02Signer">
+      <span>{label}</span>
+      {actor?.name && <span>{actor.name}</span>}
+      <span>{[registration, actor?.license].filter(Boolean).join(' ')}</span>
+    </div>
+  );
+}
+
+function BankNotificationTime({ value }: { value?: string }) {
+  const [time, period] = value ? printTimeParts(value) : [':', 'AM/PM'];
+  return (
+    <span className="field">
+      <span>Hora</span>
+      <span className="bankTimeLine">{time}</span>
+      <span>{period}</span>
+    </span>
+  );
+}
+
 export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate }) {
   const { dispatch, order, sections } = unit;
   const report = sections.report?.fields ?? {};
@@ -434,10 +468,16 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
         {[0, 2].map((row) => (
           <Line key={row}>
             {reactionVitalKeys.slice(row, row + 2).map((key) => (
-              <Field
-                key={key}
-                label={key === 'temperature' ? 'Fiebre (T°)' : t(key)}
-              >{`Pre: ${report[key + 'Before'] || '________'}   Post: ${report[key + 'After'] || '________'}`}</Field>
+              <Field key={key} label={key === 'temperature' ? 'Fiebre (T°)' : reactionVitalLabel(key, t)}>
+                <span className="vitalReading">
+                  Pre:{' '}
+                  {(key === 'pressure' ? formatFr02Pressure(report, 'Before') : report[key + 'Before']) || '________'}
+                </span>
+                <span className="vitalReading">
+                  Post:{' '}
+                  {(key === 'pressure' ? formatFr02Pressure(report, 'After') : report[key + 'After']) || '________'}
+                </span>
+              </Field>
             ))}
           </Line>
         ))}
@@ -445,14 +485,10 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
         {report.otherSymptom === 'yes' && <p>{report.otherSymptomText}</p>}
         <p>Paciente se encuentra en</p>
         <CheckGrid keys={conditions} fields={report} columns={5} t={t} />
-        <Line>
-          <Field label="Firma y CEP de Enfermera">
-            {[sections.report?.actor.name, sections.report?.actor.license].filter(Boolean).join(' · ')}
-          </Field>
-          <Field label="Firma, Sello y CMP del Médico">
-            {[review?.name, review?.license].filter(Boolean).join(' · ')}
-          </Field>
-        </Line>
+        <div className="fr02Signatures">
+          <Fr02Signer label="Firma de Enfermería" registration="CEP" actor={sections.report?.actor} />
+          <Fr02Signer label="Firma y sello del médico" registration="CMP" actor={review} />
+        </div>
       </section>
       <section>
         <h2>Para ser llenado por el médico del Banco de Sangre o Servicio de Medicina Transfusional</h2>
@@ -466,9 +502,7 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
           <Field label="Fecha">
             <DateText value={bank.notificationDate} />
           </Field>
-          <Field label="Hora">
-            <TimeText value={bank.notificationTime} />
-          </Field>
+          <BankNotificationTime value={bank.notificationTime} />
         </Line>
         <h3>III. Estudios de Laboratorio Adicionales</h3>
         <CheckGrid keys={studies} fields={bank} columns={2} t={t} />
@@ -494,7 +528,6 @@ export function Fr02Print({ unit, t }: { unit: UnitCase; t: ProcessingTranslate 
         </div>
       </section>
       <div>Original: Historia Clínica &nbsp; · &nbsp; Copia: Servicio de Medicina Transfusional</div>
-      <p className="footReference">FR08 {order.number}</p>
     </article>
   );
 }

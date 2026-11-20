@@ -518,6 +518,7 @@ function UnitCaseDialog({
             nurse={unit.sections.report?.actor ?? (canEdit('report') ? actor : undefined)}
             reviewer={unit.sections.review?.actor ?? (physicianReport ? actor : undefined)}
             readOnly={!canEdit(stage) || busy}
+            hideBankNotification={physicianReport}
             setFields={(value) => {
               setEditor((current) => ({ ...current, fields: value, changed: true }));
               setError('');

@@ -170,6 +170,14 @@
 
   legend { padding-inline: .375rem; font-size: .875rem; font-weight: 600; }
 }
+.pressurePhase {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.5rem), 1fr));
+  align-content: start;
+  gap: .375rem;
+
+  > span { grid-column: 1 / -1; font-size: .8125rem; font-weight: 600; }
+}
 
 .readout {
   display: grid;

@@ -320,7 +320,17 @@ describe('nursing transfusion monitoring', () => {
     fireEvent.click(await report.findByRole('button', { name: 'Paracetamol' }));
     fireEvent.change(report.getByLabelText('Cantidad transfundida (mL)'), { target: { value: '100' } });
     fireEvent.change(report.getByLabelText('Número de cama'), { target: { value: 'Cama 5' } });
-    fireEvent.click(report.getByRole('checkbox', { name: 'Escalofríos' }));
+    expect(report.getByRole('group', { name: 'Presión arterial (mmHg)' })).toBeVisible();
+    expect(report.getByRole('group', { name: 'Frecuencia del pulso (ppm)' })).toBeVisible();
+    expect(report.getByRole('group', { name: 'Frecuencia respiratoria (rpm)' })).toBeVisible();
+    for (const [name, value] of [
+      ['Sistólica · Pre', '120'],
+      ['Diastólica · Pre', '80'],
+      ['Sistólica · Post', '130'],
+      ['Diastólica · Post', '85'],
+    ]) {
+      fireEvent.change(report.getByRole('spinbutton', { name }), { target: { value } });
+    }
     fireEvent.click(report.getByRole('button', { name: 'Guardar registro' }));
     await waitFor(() =>
       expect(saveHemovigilance).toHaveBeenCalledWith(
@@ -331,13 +341,17 @@ describe('nursing transfusion monitoring', () => {
           premedication: 'Paracetamol',
           bed: 'Cama 5',
           transfused: '100',
+          systolicBefore: '120',
+          diastolicBefore: '80',
+          systolicAfter: '130',
+          diastolicAfter: '85',
         }),
         expect.objectContaining({ license: 'CEP-5678' }),
       ),
     );
   });
 
-  it('lets the physician verify the read-only report, records Bank notification and enables repeat printing', async () => {
+  it('keeps Bank notification off the physician screen and includes it in the printable FR02', async () => {
     session.physician = true;
     const reportAt = '2026-11-19T11:10:00Z';
     const reviewedAt = '2026-11-19T13:00:00Z';
@@ -348,7 +362,16 @@ describe('nursing transfusion monitoring', () => {
           report: {
             ...past.sections.conduction,
             at: reportAt,
-            fields: { startTime: '09:30', stopTime: '10:10', bed: 'Cama 5' },
+            actor: { ...past.sections.conduction.actor, license: '5678' },
+            fields: {
+              startTime: '09:30',
+              stopTime: '10:10',
+              bed: 'Cama 5',
+              systolicBefore: '120',
+              diastolicBefore: '80',
+              systolicAfter: '130',
+              diastolicAfter: '85',
+            },
           },
         },
       },
@@ -360,7 +383,8 @@ describe('nursing transfusion monitoring', () => {
     expect(report.getByLabelText('Hora de notificación al médico')).toHaveValue(
       localDateTime(new Date(reportAt)).slice(11, 16),
     );
-    expect(report.getByLabelText('Hora de notificación al Banco de Sangre')).toHaveValue('');
+    expect(report.queryByLabelText('Hora de notificación al Banco de Sangre')).not.toBeInTheDocument();
+    expect(report.getByRole('spinbutton', { name: 'Sistólica · Pre' })).toHaveAttribute('readonly');
     expect(report.queryByRole('button', { name: 'Revisión médica' })).toBeNull();
     expect(report.queryByRole('button', { name: 'Reporte de reacción FR02' })).toBeNull();
     expect(report.queryByLabelText('Observaciones de la revisión médica')).toBeNull();
@@ -371,9 +395,7 @@ describe('nursing transfusion monitoring', () => {
     await waitFor(() => expect(review).toBeEnabled());
     fireEvent.click(review);
     await waitFor(() => expect(print).toBeEnabled());
-    expect(report.getByLabelText('Hora de notificación al Banco de Sangre')).toHaveValue(
-      localDateTime(new Date(reviewedAt)).slice(11, 16),
-    );
+    expect(report.queryByLabelText('Hora de notificación al Banco de Sangre')).not.toBeInTheDocument();
     expect(saveHemovigilance).toHaveBeenCalledWith(
       expect.anything(),
       'review',
@@ -383,6 +405,24 @@ describe('nursing transfusion monitoring', () => {
     fireEvent.click(print);
     fireEvent.click(print);
     expect(printDocument).toHaveBeenCalledTimes(2);
+    const [document] = vi.mocked(printDocument).mock.calls[0];
+    const printed = within(render(document).getByRole('article'));
+    const bankTime = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(new Date(reviewedAt));
+    expect(printed.getByText('Hora de notificación al Banco de Sangre').parentElement).toHaveTextContent(bankTime);
+    expect(printed.getByText('Presión arterial (mmHg)').parentElement).toHaveTextContent(
+      /Pre: 120\/80\s*Post: 130\/85/,
+    );
+    expect(printed.getByText('Frecuencia respiratoria (rpm)')).toBeVisible();
+    expect(printed.getByText('Frecuencia del pulso (ppm)')).toBeVisible();
+    expect(printed.getByText('Enfermera Ejemplo').parentElement).toHaveClass('fr02Signer');
+    expect(printed.getByText('CEP 5678').parentElement).toHaveClass('fr02Signer');
+    expect(printed.getByText('Médico Ejemplo').parentElement).toHaveClass('fr02Signer');
+    expect(printed.queryByText('FR08 ORD-20')).not.toBeInTheDocument();
+    expect(printed.getByText('AM/PM').previousElementSibling).toHaveTextContent(/^:$/);
   });
 
   it('asks what to do on X and keeps changes until the user decides', async () => {

@@ -19,8 +19,10 @@ import {
   operatingRoomOptions,
   priorConductionValues,
   priorTransfusionKeys,
+  reactionPressureKeys,
   reactionSigns,
   reactionVitalKeys,
+  reactionVitalLabel,
   reportTimes,
   type Stage,
   studies,
@@ -89,6 +91,7 @@ export function HemovigilanceFields({
   fields,
   setFields,
   readOnly,
+  hideBankNotification = false,
   nurse,
   reviewer,
   unit,
@@ -99,6 +102,7 @@ export function HemovigilanceFields({
   fields: Fields;
   setFields: (fields: Fields) => void;
   readOnly: boolean;
+  hideBankNotification?: boolean;
   nurse?: Actor;
   reviewer?: Actor;
   unit: UnitCase;
@@ -427,6 +431,7 @@ export function HemovigilanceFields({
   }
   if (stage === 'report') {
     const { order, dispatch } = unit;
+    const hasLegacyPressure = Boolean(fields.pressureBefore || fields.pressureAfter);
     return (
       <div className={styles.conductionLayout}>
         <SheetSection title={t('reactionPatientAndUnit')}>
@@ -451,7 +456,11 @@ export function HemovigilanceFields({
           </div>
         </SheetSection>
         <SheetSection title={t('reactionTransfusionDetails')}>
-          <div className={styles.reactionTimes}>{reportTimes.map((key) => input(key, 'time'))}</div>
+          <div className={styles.reactionTimes}>
+            {reportTimes
+              .filter((key) => !hideBankNotification || key !== 'bankNotified')
+              .map((key) => input(key, 'time'))}
+          </div>
           <div className={styles.reactionMedication}>
             {readOnly ? (
               input('premedication')
@@ -468,9 +477,20 @@ export function HemovigilanceFields({
           <div className={styles.reactionVitals}>
             {reactionVitalKeys.map((key) => (
               <fieldset key={key} className={styles.vitalPair}>
-                <legend>{t(key)}</legend>
-                {input(key + 'Before', 'text', `${t(key)} · ${t('before')}`, t('before'))}
-                {input(key + 'After', 'text', `${t(key)} · ${t('after')}`, t('after'))}
+                <legend>{reactionVitalLabel(key, t)}</legend>
+                {(['Before', 'After'] as const).map((period) => {
+                  const phase = t(period === 'Before' ? 'before' : 'after');
+                  if (key !== 'pressure' || hasLegacyPressure)
+                    return input(key + period, 'text', `${reactionVitalLabel(key, t)} · ${phase}`, phase);
+                  return (
+                    <div key={period} className={styles.pressurePhase}>
+                      <span>{phase}</span>
+                      {reactionPressureKeys.map((measure) =>
+                        input(measure + period, 'number', `${t(measure)} · ${phase}`, t(measure)),
+                      )}
+                    </div>
+                  );
+                })}
               </fieldset>
             ))}
           </div>

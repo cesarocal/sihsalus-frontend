@@ -62,7 +62,14 @@ export const vitalKeys = [
   'bleeding',
   'bloodLoss',
 ];
-export const reactionVitalKeys = ['temperature', 'pressure', 'pulse', 'respirations'];
+export const reactionVitalKeys = ['temperature', 'pressure', 'pulse', 'respirations'] as const;
+export const reactionPressureKeys = ['systolic', 'diastolic'] as const;
+const reactionVitalUnits = { temperature: '', pressure: 'mmHg', pulse: 'ppm', respirations: 'rpm' } as const;
+
+export function reactionVitalLabel(key: (typeof reactionVitalKeys)[number], t: ProcessingTranslate) {
+  const unit = reactionVitalUnits[key];
+  return unit ? `${t(key)} (${unit})` : t(key);
+}
 export const antecedentKeys = [
   'ivDrugs',
   'drugAllergy',
@@ -267,7 +274,7 @@ export function validStage(stage: Stage, fields: Fields, saved: UnitCase['sectio
           Number.isFinite(Number(fields.transfused)) &&
           Number(fields.transfused) >= 0 &&
           (reactionSigns.some((key) => fields[key] === 'yes') ||
-            reactionVitalKeys.some(
+            [...reactionVitalKeys, ...reactionPressureKeys].some(
               (key) =>
                 fields[key + 'Before'] && fields[key + 'After'] && fields[key + 'Before'] !== fields[key + 'After'],
             )),
