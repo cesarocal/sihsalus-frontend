@@ -164,6 +164,68 @@ test("workspace rail reserves desktop chart space without changing overlay or ta
   assert.equal(bottomRail.y + bottomRail.height, 1024);
 });
 
+test('transfusion status cards clear the selection border with the pointer still over them', async (t) => {
+  const fixture = await mkdtemp(path.join(tmpdir(), 'sihsalus-transfusion-card-'));
+  t.after(() => rm(fixture, { recursive: true, force: true }));
+  const workspace = path.join(repositoryRoot, 'packages/apps/esm-blood-bank-app');
+  const config = loadConfig(workspace, 'rspack.config.js');
+  const workspaceRequire = createRequire(path.join(workspace, 'package.json'));
+  const source = (file) => JSON.stringify(path.join(workspace, 'src/sections', file));
+  const entry = path.join(fixture, 'entry.js');
+  const outputPath = path.join(fixture, 'dist');
+  await writeFile(
+    entry,
+    [
+      `import summary from ${source('applicant-selection/selection.scss')};`,
+      `import transfusions from ${source('transfusions/transfusions.scss')};`,
+      "const card = document.querySelector('[aria-pressed]');",
+      "card.classList.add(summary.summaryTile, transfusions.inboxStatusCard);",
+      "card.addEventListener('click', () => card.setAttribute('aria-pressed', card.getAttribute('aria-pressed') === 'false'));",
+    ].join('\n'),
+  );
+  await compile(
+    {
+      context: workspace,
+      mode: config.mode,
+      entry,
+      output: { ...config.output, path: outputPath, filename: 'styles.js', publicPath: '' },
+      module: config.module,
+      resolve: config.resolve,
+      optimization: config.optimization,
+      devtool: false,
+      performance: false,
+    },
+    rspack,
+  );
+
+  const context = await browser.newContext({ offline: true });
+  t.after(() => context.close());
+  const page = await context.newPage();
+  await page.setContent(
+    '<!doctype html><button>Previous control</button><button class="cds--tile" aria-pressed="false">Pending</button>',
+  );
+  await page.addStyleTag({ path: workspaceRequire.resolve('@carbon/styles/css/styles.min.css') });
+  await page.addScriptTag({ path: path.join(outputPath, 'styles.js') });
+  const card = page.getByRole('button', { name: 'Pending' });
+  const border = await card.evaluate((element) => getComputedStyle(element).borderTopColor);
+
+  await card.click();
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
+  await expect(card).not.toHaveCSS('border-top-color', border);
+  await card.click();
+  await expect(card).toHaveAttribute('aria-pressed', 'false');
+  await card.hover();
+  await expect.poll(() => card.evaluate((element) => element.matches(':hover'))).toBe(true);
+  await expect(card).toHaveCSS('border-top-color', border);
+  await expect(card).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+
+  await page.getByRole('button', { name: 'Previous control' }).click();
+  await page.keyboard.press('Tab');
+  await expect(card).toBeFocused();
+  await expect(card).not.toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(card).toHaveCSS('border-top-color', border);
+});
+
 before(async () => {
   browser = await chromium.launch();
 });
