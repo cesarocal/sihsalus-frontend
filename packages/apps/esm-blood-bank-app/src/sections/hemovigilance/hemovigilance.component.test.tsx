@@ -101,6 +101,9 @@ describe('nursing transfusion monitoring', () => {
     expect(dialog.getByText(localDateTime().slice(0, 10).split('-').reverse().join('/'))).toBeVisible();
     expect(dialog.getByText('Doctora Ejemplo')).toBeVisible();
     expect(dialog.getByText('CMP-1234')).toBeVisible();
+    expect(dialog.getByRole('heading', { name: 'Solicitud transfusional' })).toBeVisible();
+    expect(dialog.queryByLabelText('Cantidad transfundida (mL)')).toBeNull();
+    expect(dialog.queryByRole('button', { name: /^Imprimir$/ })).toBeNull();
     expect(dialog.getByRole('row', { name: /UNIT-19.*Fiebre, Urticaria.*Hospital Ejemplo/ })).toBeVisible();
     expect(dialog.queryByText('DELIVERY-ONLY')).toBeNull();
     expect(dialog.queryByRole('button', { name: 'Hoja de conducción' })).toBeNull();
@@ -109,12 +112,20 @@ describe('nursing transfusion monitoring', () => {
     fireEvent.change(dialog.getByRole('combobox', { name: 'Componente 1' }), { target: { value: 'redCells' } });
     expect(dialog.getByLabelText('Código de la unidad 1')).toHaveValue('MANUAL-UNIT');
     expect(dialog.getByLabelText('Componente 1')).toHaveValue('redCells');
+    expect(dialog.getByLabelText('Lugar 1')).toHaveAttribute('placeholder', 'Lugar');
     fireEvent.click(dialog.getByRole('button', { name: 'Imprimir hoja' }));
     const [document, title] = vi.mocked(printDocument).mock.calls[0];
     expect(title).toBe('Hoja de conducción: HC-ORD-20-UNIT-20');
     render(document);
     expect(screen.getByRole('heading', { level: 1, name: 'Hoja de conducción: HC-ORD-20-UNIT-20' })).toBeVisible();
     expect(screen.queryByText('MANUAL-UNIT')).toBeNull();
+    const printedSheet = within(screen.getByRole('article'));
+    expect(printedSheet.getByText(/N.º de historia clínica/)).toBeVisible();
+    expect(printedSheet.queryByText(/Asociación Civil Pango|Lote de bolsa|Cantidad transfundida/)).toBeNull();
+    expect(printedSheet.queryByRole('img', { name: 'Pango' })).toBeNull();
+    expect(printedSheet.queryByRole('heading', { name: 'Solicitud transfusional' })).toBeNull();
+    const monitoring = within(printedSheet.getByRole('table', { name: 'Conducción de la transfusión' }));
+    expect(within(monitoring.getAllByRole('row')[0]).getAllByRole('cell')).toHaveLength(6);
   });
 
   it('requires ordered times, caps the table at six, and saves before going to the FR02', async () => {
@@ -150,6 +161,8 @@ describe('nursing transfusion monitoring', () => {
     fireEvent.click(confirm.getByRole('button', { name: 'Salir' }));
     const report = within(await screen.findByRole('dialog', { name: 'Reporte de reacción FR02: UNIT-20' }));
     expect(report.getByLabelText('Hora de inicio')).toHaveValue('09:30');
+    expect(report.getByLabelText('Cantidad transfundida (mL)')).toBeVisible();
+    expect(report.queryByRole('button', { name: 'Imprimir FR08' })).toBeNull();
     expect(saveHemovigilance).toHaveBeenCalledWith(
       unit,
       'conduction',

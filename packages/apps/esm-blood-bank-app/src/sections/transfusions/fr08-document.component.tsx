@@ -258,34 +258,24 @@ export function PrintFr08({
   t,
   label,
   disabled = false,
-  onPrintError,
 }: {
   order: TransfusionOrder;
   t: ProcessingTranslate;
   label?: string;
   disabled?: boolean;
-  onPrintError?: () => void;
 }) {
   const [failed, setFailed] = useState(false);
-  const fail = onPrintError ?? (() => setFailed(true));
   const print = () => {
     setFailed(false);
     try {
-      printDocument(<Fr08Document order={order} t={t} />, t('fr08Title'), fail, fr08PrintCss);
+      printDocument(<Fr08Document order={order} t={t} />, t('fr08Title'), () => setFailed(true), fr08PrintCss);
     } catch {
-      fail();
+      setFailed(true);
     }
   };
   return (
     <>
-      <Button
-        kind="tertiary"
-        size="sm"
-        onClick={print}
-        renderIcon={Printer}
-        disabled={disabled}
-        title={label && onPrintError ? t('fr08Print') : undefined}
-      >
+      <Button kind="tertiary" size="sm" onClick={print} renderIcon={Printer} disabled={disabled}>
         {label ?? t('fr08Print')}
       </Button>
       {failed && <InlineNotification kind="error" hideCloseButton title={t('printFailed')} />}

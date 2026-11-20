@@ -304,6 +304,7 @@ y el UUID de la orden identifican cada hoja y reporte.
   transfusiones previas que se añaden a mano se guardan en la hoja actual.
 - El control empieza con una columna y admite hasta seis. Cada columna
   requiere una hora y la siguiente debe ser igual o posterior a la anterior.
+  La impresión de la hoja siempre reserva las seis columnas.
 - Los documentos A4 usan el formato institucional de conducción y el FR02,
   con espacio para firmas físicas. Este circuito trabaja con el inventario y
   los pacientes de prueba. La entrega clínica requiere el OMOD de Banco de Sangre.

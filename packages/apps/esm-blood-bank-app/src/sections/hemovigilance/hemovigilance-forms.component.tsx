@@ -1,6 +1,6 @@
 import { Button, Checkbox, Select, SelectItem, TextArea, TextInput } from '@carbon/react';
 import { Add } from '@carbon/react/icons';
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { formatListDate } from '../../shared/format-list-date';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { componentDefinitions, componentTypes } from '../laboratory/fractionation/fractionation-rules';
@@ -27,6 +27,19 @@ import {
   vitalKeys,
 } from './hemovigilance';
 import styles from './hemovigilance.scss';
+
+function SheetSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  const headingId = useId();
+  return (
+    <section className={styles.sheetCard} aria-labelledby={headingId}>
+      <header className={styles.cardHeader}>
+        <h3 id={headingId}>{title}</h3>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
 
 export function CaseFields({ unit, t }: { unit: UnitCase; t: ProcessingTranslate }) {
   const { order, dispatch } = unit;
@@ -108,29 +121,38 @@ export function HemovigilanceFields({
       onChange={(event) => change(key, event.target.value)}
     />
   );
-  const checklist = (title: string, keys: string[], detailsKey?: string, detailsTrigger = 'otherSymptom') => (
-    <fieldset className={styles.block}>
-      <legend>{t(title)}</legend>
-      <div className={styles.checks}>
-        {keys.map((key) =>
-          readOnly ? (
-            <span key={key}>
-              {fields[key] === 'yes' ? '☒' : '☐'} {t(key)}
-            </span>
-          ) : (
-            <Checkbox
-              key={key}
-              id={`hemo-${stage}-${key}`}
-              labelText={t(key)}
-              checked={fields[key] === 'yes'}
-              onChange={(_, { checked }) => change(key, checked ? 'yes' : '')}
-            />
-          ),
-        )}
-      </div>
-      {detailsKey && fields[detailsTrigger] === 'yes' && input(detailsKey)}
-    </fieldset>
-  );
+  const checklist = (title: string, keys: string[], detailsKey?: string, detailsTrigger = 'otherSymptom') => {
+    const content = (
+      <>
+        <div className={styles.checks}>
+          {keys.map((key) =>
+            readOnly ? (
+              <span key={key}>
+                {fields[key] === 'yes' ? '☒' : '☐'} {t(key)}
+              </span>
+            ) : (
+              <Checkbox
+                key={key}
+                id={`hemo-${stage}-${key}`}
+                labelText={t(key)}
+                checked={fields[key] === 'yes'}
+                onChange={(_, { checked }) => change(key, checked ? 'yes' : '')}
+              />
+            ),
+          )}
+        </div>
+        {detailsKey && fields[detailsTrigger] === 'yes' && input(detailsKey)}
+      </>
+    );
+    return stage === 'conduction' ? (
+      <SheetSection title={t(title)}>{content}</SheetSection>
+    ) : (
+      <fieldset className={styles.block}>
+        <legend>{t(title)}</legend>
+        {content}
+      </fieldset>
+    );
+  };
 
   if (stage === 'conduction') {
     const { order, dispatch } = unit;
@@ -138,19 +160,20 @@ export function HemovigilanceFields({
     const columns = monitoringColumns(fields);
     const lastColumn = columns.length - 1;
     const canRemoveColumn = lastColumn > 0 && !['time', ...vitalKeys].some((key) => fields[key + lastColumn]);
-    const readout = (key: string, value: string) => (
-      <div className={styles.readout}>
-        <span>{t(key)}</span>
-        <strong>{value || '—'}</strong>
+    const readout = (key: string, value: string, className = '') => (
+      <div className={`${styles.readout} ${className}`.trim()}>
+        <dt>{t(key)}</dt>
+        <dd>{value || '—'}</dd>
       </div>
     );
     const dateLabel = (value: string) => value.split('-').reverse().join('/');
-    const cellInput = (key: string, label: string, type = 'text', min?: string) => (
+    const cellInput = (key: string, label: string, type = 'text', min?: string, placeholder = '—') => (
       <input
         className={styles.cellInput}
         type={type}
         aria-label={label}
         min={min}
+        placeholder={type === 'text' && !readOnly ? placeholder : undefined}
         maxLength={500}
         readOnly={readOnly}
         value={fields[key] ?? ''}
@@ -158,42 +181,59 @@ export function HemovigilanceFields({
       />
     );
     return (
-      <>
-        <section className={styles.identity} aria-label={t('conductionTitle', { code: conductionCode(unit) })}>
-          <div className={styles.identityHeading}>
-            <h3>{t('conductionTitle', { code: conductionCode(unit) })}</h3>
-            {readout('date', dateLabel(fields.conductionDate ?? ''))}
+      <div className={styles.conductionLayout}>
+        <SheetSection title={t('conductionTitle', { code: conductionCode(unit) })}>
+          <div className={styles.summaryGrid}>
+            <div>
+              <span className={styles.summaryLabel}>{t('patientName')}</span>
+              <h4 className={styles.recipientName}>{order.patientName}</h4>
+              <dl className={styles.recipientFacts}>
+                {readout('historyNumber', order.historyNumber)}
+                {readout('age', order.age)}
+                {readout('sex', t(order.sex === 'F' ? 'female' : 'male'))}
+                {readout('bloodGroup', transfusionBloodGroupLabel(order.bloodGroup, t))}
+                {readout('diagnosis', order.diagnosis, styles.diagnosis)}
+              </dl>
+              <div className={styles.bodyMeasurements}>
+                {input('weight', 'number')}
+                {input('height', 'number')}
+              </div>
+            </div>
+            <div className={styles.unitSummary}>
+              <h4>{t('unitTitle')}</h4>
+              <dl className={styles.unitFacts}>
+                {readout('unitCode', dispatch.unitCode)}
+                {readout('bloodComponent', t(componentDefinitions[dispatch.component].key))}
+                {readout('unitBloodGroup', transfusionBloodGroupLabel(dispatch.bloodGroup, t))}
+              </dl>
+            </div>
           </div>
-          <div className={styles.identityRow}>
-            {readout('patientName', order.patientName)}
-            {readout('historyNumber', order.historyNumber)}
-            {readout('diagnosis', order.diagnosis)}
-          </div>
-          <div className={styles.identityVitals}>
-            {readout('age', order.age)}
-            {input('weight', 'number')}
-            {input('height', 'number')}
-            {readout('sex', t(order.sex === 'F' ? 'female' : 'male'))}
-            {readout('bloodGroup', transfusionBloodGroupLabel(order.bloodGroup, t))}
-          </div>
-          <div className={styles.identityRow}>
-            {readout('unitCode', dispatch.unitCode)}
-            {readout('bloodComponent', t(componentDefinitions[dispatch.component].key))}
-            {readout('unitBloodGroup', transfusionBloodGroupLabel(dispatch.bloodGroup, t))}
-          </div>
-        </section>
-        <fieldset className={styles.block}>
-          <legend>{t('transfusionRequest')}</legend>
-          <div className={styles.requestFields}>
+        </SheetSection>
+        <SheetSection title={t('transfusionRequest')}>
+          <dl className={styles.requestFields}>
             {readout('requestCode', order.number)}
             {readout('dispatchDate', formatListDate(dispatch.deliveredAt))}
-          </div>
-        </fieldset>
+          </dl>
+        </SheetSection>
         {checklist('antecedents', antecedentKeys)}
-        <fieldset className={styles.block}>
-          <legend>{t('priorTransfusions')}</legend>
+        <SheetSection
+          title={t('priorTransfusions')}
+          action={
+            !readOnly && (
+              <Button
+                type="button"
+                kind="tertiary"
+                size="sm"
+                renderIcon={Add}
+                onClick={() => change(`history${(manualRows.at(-1) ?? -1) + 1}date`, '')}
+              >
+                {t('addPriorTransfusion')}
+              </Button>
+            )
+          }
+        >
           <div className={styles.scrollArea}>
-            <table className={styles.sheetTable}>
+            <table className={`${styles.sheetTable} ${styles.historyTable}`} aria-label={t('priorTransfusions')}>
               <thead>
                 <tr>
                   {priorTransfusionKeys.map((key) => (
@@ -217,7 +257,7 @@ export function HemovigilanceFields({
                   );
                 })}
                 {manualRows.map((row, index) => (
-                  <tr key={row}>
+                  <tr key={row} className={styles.manualHistory}>
                     {priorTransfusionKeys.map((key) => {
                       const field = `history${row}${key}`;
                       const label = `${t(key)} ${index + 1}`;
@@ -244,7 +284,7 @@ export function HemovigilanceFields({
                               ))}
                             </select>
                           ) : (
-                            cellInput(field, label, key === 'date' ? 'date' : 'text')
+                            cellInput(field, label, key === 'date' ? 'date' : 'text', undefined, t(key))
                           )}
                           {legacyQuantity && (
                             <small className={styles.legacyValue}>
@@ -266,32 +306,49 @@ export function HemovigilanceFields({
               </tbody>
             </table>
           </div>
-          {!readOnly && (
-            <Button
-              type="button"
-              kind="tertiary"
-              size="sm"
-              renderIcon={Add}
-              className={styles.tableAction}
-              onClick={() => change(`history${(manualRows.at(-1) ?? -1) + 1}date`, '')}
-            >
-              {t('addPriorTransfusion')}
-            </Button>
-          )}
-        </fieldset>
-        <fieldset className={styles.block}>
-          <legend>{t('monitoring')}</legend>
+        </SheetSection>
+        <SheetSection title={t('monitoring')}>
           <div className={styles.conductionTimes}>
+            <dl className={styles.conductionDate}>
+              {readout('conductionDate', dateLabel(fields.conductionDate ?? ''))}
+            </dl>
             {input('startTime', 'time')}
             {input('endTime', 'time')}
           </div>
+          {!readOnly && (
+            <div className={`${styles.actions} ${styles.monitoringActions}`}>
+              {canRemoveColumn && (
+                <Button
+                  type="button"
+                  kind="ghost"
+                  size="sm"
+                  onClick={() => change('monitoringColumns', String(lastColumn))}
+                >
+                  {t('removeEmptyMonitoringTime')}
+                </Button>
+              )}
+              <Button
+                type="button"
+                kind="tertiary"
+                size="sm"
+                renderIcon={Add}
+                disabled={columns.length >= maxMonitoringColumns}
+                onClick={() => change('monitoringColumns', String(columns.length + 1))}
+              >
+                {t('addMonitoringTime')}
+              </Button>
+            </div>
+          )}
           <div className={styles.scrollArea}>
-            <table className={`${styles.sheetTable} ${styles.monitoring}`}>
+            <table className={`${styles.sheetTable} ${styles.monitoring}`} aria-label={t('monitoring')}>
               <thead>
                 <tr>
                   <th scope="col">{t('measurement')}</th>
                   {columns.map((column) => (
                     <th scope="col" key={column}>
+                      <span className={styles.controlTime}>
+                        {t('time')} {column + 1}
+                      </span>
                       {cellInput(`time${column}`, `${t('time')} ${column + 1}`, 'time', fields[`time${column - 1}`])}
                     </th>
                   ))}
@@ -309,34 +366,8 @@ export function HemovigilanceFields({
               </tbody>
             </table>
           </div>
-          {!readOnly && (
-            <div className={`${styles.actions} ${styles.tableAction}`}>
-              <Button
-                type="button"
-                kind="tertiary"
-                size="sm"
-                renderIcon={Add}
-                disabled={columns.length >= maxMonitoringColumns}
-                onClick={() => change('monitoringColumns', String(columns.length + 1))}
-              >
-                {t('addMonitoringTime')}
-              </Button>
-              {canRemoveColumn && (
-                <Button
-                  type="button"
-                  kind="ghost"
-                  size="sm"
-                  onClick={() => change('monitoringColumns', String(lastColumn))}
-                >
-                  {t('removeEmptyMonitoringTime')}
-                </Button>
-              )}
-            </div>
-          )}
-          <div className={styles.volumeField}>{input('transfused', 'number')}</div>
-        </fieldset>
-        <fieldset className={styles.block}>
-          <legend>{t('operatingRoom')}</legend>
+        </SheetSection>
+        <SheetSection title={t('operatingRoom')}>
           <div className={styles.identityRow}>
             {Object.entries(operatingRoomOptions).map(([key, options]) => {
               const stored = fields[key] ?? '';
@@ -366,13 +397,13 @@ export function HemovigilanceFields({
               );
             })}
           </div>
-        </fieldset>
+        </SheetSection>
         {checklist('adverseSigns', conductionSignKeys(unit.sections.conduction?.fields ?? fields), 'otherSymptomText')}
-        <div className={styles.requestFields}>
+        <dl className={`${styles.sheetCard} ${styles.requestFields}`}>
           {readout('responsiblePhysician', fields.responsiblePhysician)}
           {readout('physicianRegistration', fields.physicianRegistration)}
-        </div>
-      </>
+        </dl>
+      </div>
     );
   }
   if (stage === 'report')

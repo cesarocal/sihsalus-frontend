@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
-import { formatListDate } from '../../shared/format-list-date';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import hospitalLogo from '../collection/hospital-santa-clotilde.png';
-import pangoLogo from '../collection/pango.png';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { transfusionBloodGroupLabel } from '../transfusions/transfusion-blood-group';
 import {
@@ -14,7 +12,7 @@ import {
   type Fields,
   findings,
   manualHistoryRows,
-  monitoringColumns,
+  maxMonitoringColumns,
   operatingRoomOptions,
   priorConductionValues,
   priorTransfusionKeys,
@@ -39,7 +37,7 @@ table { border-collapse:collapse; width:100%; table-layout:fixed; }
 th,td { border:.6pt solid; text-align:left; padding:.65mm 1.2mm; height:4.5mm; overflow-wrap:anywhere; }
 thead th { font-size:8pt; }
 tr, section, header { break-inside:avoid; }
-.letterhead { display:grid; grid-template-columns:27mm 1fr 27mm; align-items:center; text-align:center; font-size:8pt; margin-bottom:3mm; }
+.letterhead { display:grid; grid-template-columns:27mm 1fr; align-items:center; text-align:center; font-size:8pt; margin-bottom:3mm; padding-inline-end:27mm; }
 .letterhead img { max-width:25mm; max-height:23mm; margin:auto; }
 .titleRow { display:flex; justify-content:space-between; align-items:end; gap:3mm; margin-bottom:1mm; }
 .titleRow h1 { font-size:11pt; }
@@ -54,7 +52,8 @@ tr, section, header { break-inside:avoid; }
 .recommendations { min-height:34mm; white-space:pre-wrap; overflow-wrap:anywhere; }
 .signatures { margin-top:6mm; }
 .conduction th, .conduction td { font-size:8.5pt; height:4.15mm; padding:.55mm 1mm; }
-.conduction .signatures { margin-top:4mm; }
+.conduction .signatures { width:min(100%, 157mm); margin:4mm auto 0; break-inside:avoid; }
+.conduction .signatures :is(th,td) { text-align:center; vertical-align:middle; }
 .conduction .monitorLabel { width:23%; }
 .conduction .letterhead img { max-height:22mm; }
 .conduction .historySection { break-inside:auto; }
@@ -117,7 +116,7 @@ function CheckGrid({
 export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history: UnitCase[]; t: ProcessingTranslate }) {
   const { dispatch, order } = unit;
   const fields = conductionFields(unit);
-  const columns = monitoringColumns(fields);
+  const columns = Array.from({ length: maxMonitoringColumns }, (_, index) => index);
   const histories = [
     ...history.map((entry) => ({ id: conductionCode(entry), ...priorConductionValues(entry, t) })),
     ...manualHistoryRows(fields).map((row) => {
@@ -151,12 +150,11 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
           <strong>COOPERACIÓN AL SERVICIO DE LA COMUNIDAD</strong>
           <br />
           <small>
-            Ministerio de Salud / Vicariato Apostólico de San José del Amazonas / Asociación Civil Pango
+            Ministerio de Salud / Vicariato Apostólico de San José del Amazonas
             <br />
             APARTADO 216 – IQUITOS – PERÚ
           </small>
         </div>
-        <img src={pangoLogo} alt="Pango" />
       </header>
       <div className="titleRow">
         <h1>{t('conductionTitle', { code: conductionCode(unit) })}</h1>
@@ -174,7 +172,7 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
               {t('patientName')}&nbsp; {order.patientName}
             </td>
             <td colSpan={4}>
-              {t('historyNumber')}&nbsp; {order.historyNumber}
+              {t('printHistoryNumber')}&nbsp; {order.historyNumber}
             </td>
             <td colSpan={5}>
               {t('diagnosis')}&nbsp; {order.diagnosis}
@@ -211,13 +209,6 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
         </tbody>
       </table>
       <section>
-        <h2>{t('transfusionRequest')}</h2>
-        <Line>
-          <Field label={t('requestCode')}>{order.number}</Field>
-          <Field label={t('dispatchDate')}>{formatListDate(dispatch.deliveredAt)}</Field>
-        </Line>
-      </section>
-      <section>
         <h2>ANTECEDENTES</h2>
         <CheckGrid keys={antecedentKeys} fields={fields} columns={4} t={t} />
       </section>
@@ -253,9 +244,8 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
         <Line>
           <Field label={t('startTime')}>{fields.startTime}</Field>
           <Field label={t('endTime')}>{fields.endTime}</Field>
-          <Field label={t('transfused')}>{fields.transfused}</Field>
         </Line>
-        <table>
+        <table aria-label={t('monitoring')}>
           <colgroup>
             <col className="monitorLabel" />
             <col span={columns.length} />
@@ -328,9 +318,6 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
           </tr>
         </tbody>
       </table>
-      <p className="footReference">
-        {t('lot')}&nbsp; {dispatch.lot}
-      </p>
     </article>
   );
 }

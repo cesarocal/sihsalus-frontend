@@ -20,7 +20,6 @@ import { notifySuccess } from '../../shared/notify-success';
 import { printDocument } from '../../shared/print-document';
 import { ProcessingTable, type ProcessingTranslate, useProcessingData } from '../../shared/processing-page.component';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
-import { PrintFr08 } from '../transfusions/fr08-document.component';
 import type { TransfusionOrder } from '../transfusions/transfusions.types';
 import { transfusionOperatorName } from '../transfusions/transfusions-rules';
 import { useTransfusionsTranslation } from '../transfusions/use-transfusions-translation';
@@ -328,7 +327,7 @@ function UnitCaseDialog({
     ? t('unitConductionTitle', { code: unit.dispatch.unitCode })
     : `${t(bank ? 'openFr02' : 'report')}: ${unit.dispatch.unitCode}`;
   const audit = (saved || canEdit(stage)) && (
-    <dl className={styles.caseFields}>
+    <dl className={conduction ? `${styles.sheetCard} ${styles.conductionAudit}` : styles.caseFields}>
       <div>
         <dt>{t(stage === 'report' ? 'nurse' : 'recordedBy')}</dt>
         <dd>{(canEdit(stage) ? actor : saved?.actor)?.name || '—'}</dd>
@@ -362,7 +361,7 @@ function UnitCaseDialog({
         }}
       >
         <ModalHeader title={title} iconDescription={t('close')} closeModal={close} />
-        <ModalBody ref={bodyRef}>
+        <ModalBody ref={bodyRef} className={conduction ? styles.conductionBody : undefined}>
           {error && (
             <InlineNotification
               className={styles.notification}
@@ -430,7 +429,6 @@ function UnitCaseDialog({
                 >
                   {t('printConduction')}
                 </Button>
-                <PrintFr08 order={unit.order} t={t} label={t('print')} disabled={busy} onPrintError={printError} />
                 {(unit.sections.report || canEdit('report')) && (
                   <Button
                     kind="tertiary"
@@ -456,7 +454,6 @@ function UnitCaseDialog({
                     {t('backToConduction')}
                   </Button>
                 )}
-                <PrintFr08 order={unit.order} t={t} label={t('printFr08')} disabled={busy} onPrintError={printError} />
                 <Button
                   kind="ghost"
                   size="sm"
