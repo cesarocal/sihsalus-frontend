@@ -18,6 +18,46 @@ export const donorCollectionDecisions = ['continue', 'stopWithUnit', 'stopWithou
 export const donorVitalFields = ['systolic', 'diastolic', 'pulse', 'respirations', 'oxygen'] as const;
 export type DonorVitals = Partial<Record<(typeof donorVitalFields)[number], string>>;
 
+export const donorReactionOptions = {
+  site: ['hospital', 'campaign', 'mobileUnit'],
+  donorFrequency: ['firstTime', 'regular', 'occasional'],
+  donorConditions: ['previousReactions', 'anxiety', 'inaccessibleVein', 'fastingOverFiveHours'],
+  environment: ['adequate', 'excessiveHeat', 'cold'],
+  localReactions: ['hematoma', 'arterialPuncture', 'nervePuncture', 'inflammation', 'thrombophlebitis', 'cellulitis'],
+  consciousness: ['lost', 'preserved'],
+  vasovagalSite: ['onSite', 'offSite'],
+  generalSymptoms: [
+    'pallor',
+    'weakness',
+    'headache',
+    'dizziness',
+    'blurredVision',
+    'nausea',
+    'vomiting',
+    'chills',
+    'cyanosis',
+  ],
+  severeSymptoms: ['stroke', 'myocardialInfarction', 'seizures', 'death'],
+} as const;
+
+type ReactionOption<K extends keyof typeof donorReactionOptions> = (typeof donorReactionOptions)[K][number];
+export type DonorBloodPressure = Pick<DonorVitals, 'systolic' | 'diastolic'>;
+
+export interface InstitutionalDonorReaction {
+  site?: ReactionOption<'site'>;
+  donorFrequency?: ReactionOption<'donorFrequency'>;
+  donorConditions?: Array<ReactionOption<'donorConditions'>>;
+  environment?: ReactionOption<'environment'>;
+  localReactions?: Array<ReactionOption<'localReactions'>>;
+  consciousness?: ReactionOption<'consciousness'>;
+  vasovagalSite?: ReactionOption<'vasovagalSite'>;
+  generalSymptoms?: Array<ReactionOption<'generalSymptoms'>>;
+  severeSymptoms?: Array<ReactionOption<'severeSymptoms'>>;
+  donationStartPressure?: DonorBloodPressure;
+  twentyMinutePressure?: DonorBloodPressure;
+  profession?: string;
+}
+
 export interface DonorReactionReport {
   phase: (typeof donorReactionPhases)[number];
   occurredAt: string;
@@ -28,6 +68,7 @@ export interface DonorReactionReport {
   notifiedAt: string;
   initialVitals: DonorVitals;
   finalVitals: DonorVitals;
+  institutional?: InstitutionalDonorReaction;
 }
 
 export interface DonorReactionAssessment {
@@ -43,12 +84,20 @@ export interface DonorReaction extends DonorReactionReport {
   id: string;
   reportedBy: string;
   reportedAt: string;
-  assessment?: DonorReactionAssessment & { evaluatedBy: string; evaluatedAt: string };
+  assessment?: DonorReactionAssessment & {
+    evaluatedBy: string;
+    evaluatedAt: string;
+  };
 }
 
 export type DonorReactionUpdate =
   | { action: 'report'; id: string; report: DonorReactionReport; actor: string }
-  | { action: 'assess'; id: string; assessment: DonorReactionAssessment; actor: string };
+  | {
+      action: 'assess';
+      id: string;
+      assessment: DonorReactionAssessment;
+      actor: string;
+    };
 
 export interface DonorReactionIdentity {
   name: string;
@@ -58,9 +107,13 @@ export interface DonorReactionIdentity {
   modality: string;
   bagLot: string;
   volume: string;
+  donationType?: string;
+  donationDate?: string;
+  collectionService?: string;
   age?: string;
   sex?: string;
   weight?: string;
+  height?: string;
   hemoglobin?: string;
   hematocrit?: string;
 }
@@ -73,6 +126,21 @@ export interface DonorReactionView {
 const text = (value: string) => Boolean(value.trim()) && value.length <= 500;
 const validVitals = (values: DonorVitals) =>
   Object.values(values).every((value) => !value || /^\d{1,3}(\.\d{1,2})?$/.test(value));
+
+function validInstitutionalReport(report?: InstitutionalDonorReaction) {
+  if (!report) return true;
+  const validOptions = Object.entries(donorReactionOptions).every(([key, options]) => {
+    const value = report[key as keyof typeof donorReactionOptions];
+    const allowed: readonly string[] = options;
+    return !value || (Array.isArray(value) ? value.every((item) => allowed.includes(item)) : allowed.includes(value));
+  });
+  return (
+    validOptions &&
+    validVitals(report.donationStartPressure ?? {}) &&
+    validVitals(report.twentyMinutePressure ?? {}) &&
+    (report.profession?.length ?? 0) <= 120
+  );
+}
 
 export function validDonorReactionReport(report: DonorReactionReport) {
   const occurred = Date.parse(report.occurredAt);
@@ -87,7 +155,8 @@ export function validDonorReactionReport(report: DonorReactionReport) {
     text(report.initialCare) &&
     text(report.notifiedTo) &&
     validVitals(report.initialVitals) &&
-    validVitals(report.finalVitals)
+    validVitals(report.finalVitals) &&
+    validInstitutionalReport(report.institutional)
   );
 }
 

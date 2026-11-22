@@ -130,9 +130,14 @@ pestaña que usa Extracción. El contrato real pendiente
 reporte a una extracción real y generar el encuentro clínico del donante. El
 backend debe verificar la identidad, la revisión y los permisos de la
 operación y guardar el vínculo con `banco_reaccion_adversa_donacion` y las
-observaciones del encuentro. El formato imprimible usa como referencia el
-Anexo 15 del Hospital Lima Este–Vitarte y queda sujeto a la plantilla que
-apruebe Santa Clotilde.
+observaciones del encuentro. El imprimible sigue el formato institucional de
+Santa Clotilde y conserva la evaluación médica como sección adicional.
+La identificación, las mediciones del examen físico y los datos confirmados
+de Extracción se muestran en solo lectura. La presión al inicio de la donación
+y a los veinte minutos se registra por separado de los signos vitales de la
+reacción. El lugar, las condiciones, los síntomas y la profesión se registran
+cuando se conocen. El nombre de quien notifica y el de quien evalúa se toman
+de la sesión y se guardan junto con la fecha y hora de cada registro.
 
 Todas las cabeceras del ESM muestran a la derecha la ubicación activa de `useSession` y la fecha/hora local con `formatDatetime`. `src/shared/blood-bank-page-header.component.tsx` reutiliza `PageHeaderContent` para las pantallas operativas y comparte el contexto con las cabeceras de Inicio, Inventario y las bases de pantalla. El reloj se actualiza mientras la pantalla está abierta; no se fija un hospital en el código.
 

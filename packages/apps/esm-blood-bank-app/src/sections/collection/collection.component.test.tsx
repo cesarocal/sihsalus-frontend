@@ -7,7 +7,8 @@ import { createMockApplicantSelectionApi } from '../../api/mock-applicant-select
 import { createMockProcessingApi } from '../../api/mock-blood-bank-processing.api';
 import { CollectionPage } from './collection-page.component';
 import { CollectionLabelDocument, DonationCertificateDocument } from './collection-documents.component';
-import { newCollection } from './collection-rules';
+import { collectionReactionIdentity, newCollection } from './collection-rules';
+import { DonorReactionPrint } from './donor-reaction-document.component';
 import { applicationsMock } from '../../mocks/applicant-selection.mock';
 import { CollectionWorkflow } from './collection-workflow.component';
 import { ScreeningPage } from '../laboratory/screening/screening-page.component';
@@ -83,22 +84,49 @@ describe('collection and screening screens', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
     fireEvent.click(screen.getByRole('button', { name: t('radNew') }));
     const dialog = within(screen.getByRole('dialog', { name: t('radTitle') }));
+    expect(dialog.getByText('170')).toBeVisible();
+    expect(dialog.getByLabelText(t('radReportedBy'))).toHaveProperty('readOnly', true);
+    fireEvent.change(dialog.getByLabelText(t('radSite')), { target: { value: 'campaign' } });
+    const twentyMinute = within(dialog.getByRole('group', { name: t('radTwentyMinutePressure') }));
+    const systolic = twentyMinute.getByLabelText(t('radVital_systolic'));
+    expect(systolic).toHaveValue('');
+    fireEvent.change(systolic, { target: { value: '110' } });
+    fireEvent.change(twentyMinute.getByLabelText(t('radVital_diastolic')), { target: { value: '70' } });
     fireEvent.change(dialog.getByLabelText(t('radType')), { target: { value: 'vasovagal' } });
+    fireEvent.change(dialog.getByLabelText(t('radConsciousness')), { target: { value: 'preserved' } });
+    fireEvent.click(dialog.getByRole('checkbox', { name: t('radOption_pallor') }));
+    fireEvent.click(dialog.getByRole('checkbox', { name: t('radOption_dizziness') }));
+    fireEvent.change(dialog.getByLabelText(t('radProfession')), { target: { value: 'Tecnóloga médica' } });
     fireEvent.change(dialog.getByLabelText(t('radSigns')), { target: { value: 'Signos prueba' } });
     fireEvent.change(dialog.getByLabelText(t('radInitialCare')), { target: { value: 'Atención prueba' } });
     fireEvent.change(dialog.getByLabelText(t('radNotifiedTo')), { target: { value: 'Médico de prueba' } });
     fireEvent.click(dialog.getByRole('button', { name: t('radSave') }));
     expect(await dialog.findByText(t('radPending'))).toBeVisible();
+    expect(dialog.getByText('110/70 mmHg')).toBeVisible();
+    expect(dialog.getByText('Palidez, Mareos')).toBeVisible();
     expect(dialog.queryByRole('button', { name: t('radSaveAssessment') })).not.toBeInTheDocument();
     expect(dialog.getByRole('button', { name: t('radPrint') })).toBeEnabled();
     const close = dialog.getAllByRole('button', { name: t('close') }).at(-1);
     if (!close) throw new Error('Reaction dialog has no close action');
     fireEvent.click(close);
     expect(screen.getByRole('button', { name: t('next') })).toBeDisabled();
-    expect(
-      (await processing.collection.listCollections()).find(({ donorReactions }) => donorReactions?.length)?.registry
-        .complications,
-    ).toBe('yes');
+    const record = (await processing.collection.listCollections()).find(({ donorReactions }) => donorReactions?.length);
+    const report = record?.donorReactions?.[0];
+    if (!record || !report) throw new Error('Saved donor reaction not found');
+    expect(record.registry.complications).toBe('yes');
+    expect(report.institutional).toMatchObject({
+      site: 'campaign',
+      consciousness: 'preserved',
+      generalSymptoms: ['pallor', 'dizziness'],
+      profession: 'Tecnóloga médica',
+      twentyMinutePressure: { systolic: '110', diastolic: '70' },
+    });
+    const printed = renderToStaticMarkup(<DonorReactionPrint identity={collectionReactionIdentity(record)} report={report} t={t} />);
+    expect(printed).toContain(t('radInstitutionalTitle'));
+    expect(printed).toContain('110/70 mmHg');
+    expect(printed).toContain('✓</span>Palidez');
+    expect(printed).toContain('Tecnóloga médica');
+    expect(printed).not.toContain(t('radMedicalSignature'));
   });
   it('keeps the original modal open when cancelling X and preserves a saved partial label on reopen', async () => {
     render(<CollectionPage api={api().collection} />);

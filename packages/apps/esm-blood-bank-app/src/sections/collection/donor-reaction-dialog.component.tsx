@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   ComposedModal,
   InlineNotification,
   ModalBody,
@@ -7,18 +8,20 @@ import {
   ModalHeader,
   Select,
   SelectItem,
+  Tag,
   TextArea,
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState } from 'react';
 import { formatListDate } from '../../shared/format-list-date';
 import { notifySuccess } from '../../shared/notify-success';
-import { printDocument, processingPrintCss } from '../../shared/print-document';
+import { printDocument } from '../../shared/print-document';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import {
   donorCollectionDecisions,
+  donorReactionOptions,
   donorReactionPhases,
   donorReactionSeverities,
   donorReactionTypes,
@@ -29,20 +32,18 @@ import {
   type DonorReactionReport,
   type DonorReactionUpdate,
   type DonorVitals,
+  type InstitutionalDonorReaction,
   validDonorReactionAssessment,
   validDonorReactionReport,
 } from './donor-reaction';
+import {
+  DonorReactionPrint,
+  DonorReactionRecordedDetails,
+  DonorReactionSection,
+  DonorReactionSummary,
+  donorReactionPrintCss,
+} from './donor-reaction-document.component';
 import styles from './donor-reaction.scss';
-
-const reactionPrintCss = `${processingPrintCss}
-  body { font-size: 9pt; }
-  h2 { margin: 0 0 8pt; }
-  section { margin-top: 8pt; border: 1px solid #666; }
-  section h3 { margin: 0; padding: 4pt; border-bottom: 1px solid #999; }
-  dl { margin: 0; padding: 4pt; gap: 3pt 8pt; }
-  dd { margin: 1pt 0 3pt; }
-  footer { margin-top: 14pt; }
-`;
 
 function emptyReport(ended: boolean): DonorReactionReport {
   const now = localDateTime();
@@ -57,91 +58,6 @@ function emptyReport(ended: boolean): DonorReactionReport {
     initialVitals: {},
     finalVitals: {},
   };
-}
-
-function ReactionDocument({
-  identity,
-  report,
-  t,
-}: {
-  identity: DonorReactionIdentity;
-  report?: DonorReaction;
-  t: ProcessingTranslate;
-}) {
-  const section = (title: string, values: [string, string | undefined][]) => (
-    <section>
-      <h3>{t(title)}</h3>
-      <dl>
-        {values.map(([key, value]) => (
-          <div key={key}>
-            <dt>{t(key)}</dt>
-            <dd>{value || '—'}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-  const vitals = (key: 'initialVitals' | 'finalVitals') =>
-    section(
-      key === 'initialVitals' ? 'radInitialVitals' : 'radFinalVitals',
-      donorVitalFields.map((field) => [`radVital_${field}`, report?.[key][field]]),
-    );
-  const assessment = report?.assessment;
-  return (
-    <>
-      {section('radDonorData', [
-        ['donorName', identity.name],
-        ['number', identity.applicationNumber],
-        ['document', identity.document],
-        ['modality', identity.modality && t(identity.modality)],
-        ['unitCode', identity.unitCode],
-        ['bagLot', identity.bagLot],
-        ['extractedVolume', identity.volume],
-        ['age', identity.age],
-        ['sex', identity.sex && t(identity.sex === 'F' ? 'female' : 'male')],
-        ['radWeight', identity.weight],
-        ['hemoglobin', identity.hemoglobin],
-        ['hematocrit', identity.hematocrit],
-      ])}
-      {report && (
-        <>
-          {section('radEventData', [
-            ['radType', t(`radType_${report.type}`)],
-            ['radPhase', t(`radPhase_${report.phase}`)],
-            ['radOccurredAt', formatListDate(report.occurredAt)],
-            ['radRecordedAt', formatListDate(report.reportedAt)],
-            ['radSigns', report.signs],
-            ['radInitialCare', report.initialCare],
-            ['radNotifiedTo', report.notifiedTo],
-            ['radNotifiedAt', formatListDate(report.notifiedAt)],
-            ['radReportedBy', report.reportedBy],
-          ])}
-          {vitals('initialVitals')}
-          {vitals('finalVitals')}
-          {assessment &&
-            section('radAssessment', [
-              ['reactionSeverity', t(`severity_${assessment.severity}`)],
-              ['radDiagnosis', assessment.diagnosis],
-              ['radCare', assessment.care],
-              ['radRecommendations', assessment.recommendations],
-              ['radOutcome', assessment.outcome],
-              ['radDecision', t(`radDecision_${assessment.collectionDecision}`)],
-              ['radEvaluatedBy', assessment.evaluatedBy],
-              ['radEvaluatedAt', formatListDate(assessment.evaluatedAt)],
-            ])}
-        </>
-      )}
-    </>
-  );
-}
-
-function ReactionBlock({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className={styles.block}>
-      <h3>{title}</h3>
-      {children}
-    </section>
-  );
 }
 
 export function DonorReactionDialog({
@@ -181,6 +97,7 @@ export function DonorReactionDialog({
   const inFlight = useRef(false);
   const attempt = useRef('');
   const existing = reports.find(({ id }) => id === selected);
+  const institutional = report.institutional ?? {};
   const editReport = !existing && Boolean(onSave);
   const editAssessment = Boolean(existing && !existing.assessment && canAssess && onSave);
   const assessmentEnded = ended || existing?.phase !== 'during';
@@ -211,7 +128,12 @@ export function DonorReactionDialog({
     const update: DonorReactionUpdate | undefined = normalized
       ? { action: 'report', id: attempt.current, report: normalized, actor }
       : existing && editAssessment && validDonorReactionAssessment(normalizedAssessment)
-        ? { action: 'assess', id: existing.id, assessment: normalizedAssessment, actor }
+        ? {
+            action: 'assess',
+            id: existing.id,
+            assessment: normalizedAssessment,
+            actor,
+          }
         : undefined;
     if (!update) return;
     setError('');
@@ -237,19 +159,10 @@ export function DonorReactionDialog({
     const showError = () => setError('printFailed');
     try {
       printDocument(
-        <article>
-          <h2>{t('radTitle')}</h2>
-          <p>
-            {t('radStatus')}: {t(existing.assessment ? 'radEvaluatedStatus' : 'radPending')}
-          </p>
-          <ReactionDocument identity={identity} report={existing} t={t} />
-          <footer>{t('radSignature')}</footer>
-        </article>,
+        <DonorReactionPrint identity={identity} report={existing} t={t} />,
         t('radTitle'),
         showError,
-        reactionPrintCss,
-        undefined,
-        { widthMm: 180, heightMm: 265 },
+        donorReactionPrintCss,
       );
     } catch {
       showError();
@@ -281,8 +194,78 @@ export function DonorReactionDialog({
       onChange={(event) => change(event.target.value)}
     />
   );
+  const updateInstitutional = (update: Partial<InstitutionalDonorReaction>) =>
+    setReport({ ...report, institutional: { ...institutional, ...update } });
+  const optionalChoice = <K extends 'site' | 'donorFrequency' | 'environment' | 'consciousness' | 'vasovagalSite'>(
+    key: K,
+    label: string,
+  ) => (
+    <Select
+      id={`${prefix}-${key}`}
+      labelText={t(label)}
+      value={institutional[key] ?? ''}
+      onChange={(event) =>
+        updateInstitutional({
+          [key]: (event.target.value || undefined) as InstitutionalDonorReaction[K],
+        })
+      }
+    >
+      <SelectItem value="" text={t('radUnspecified')} />
+      {donorReactionOptions[key].map((choice) => (
+        <SelectItem key={choice} value={choice} text={t(`radOption_${choice}`)} />
+      ))}
+    </Select>
+  );
+  const checklist = <V extends string>(
+    label: string,
+    values: readonly V[],
+    selected: V[] = [],
+    change: (value: V[]) => void,
+  ) => (
+    <fieldset className={styles.checkGroup}>
+      <legend>{t(label)}</legend>
+      <div className={styles.checks}>
+        {values.map((value) => (
+          <Checkbox
+            key={value}
+            id={`${prefix}-${label}-${value}`}
+            checked={selected.includes(value)}
+            labelText={t(`radOption_${value}`)}
+            onChange={(_, { checked }) =>
+              change(checked ? [...selected, value] : selected.filter((item) => item !== value))
+            }
+          />
+        ))}
+      </div>
+    </fieldset>
+  );
+  const pressureInputs = (key: 'donationStartPressure' | 'twentyMinutePressure', label: string) => (
+    <fieldset className={styles.checkGroup}>
+      <legend>{t(label)}</legend>
+      <div className={styles.pressureInputs}>
+        {(['systolic', 'diastolic'] as const).map((field) => (
+          <TextInput
+            key={field}
+            id={`${prefix}-${key}-${field}`}
+            labelText={t(`radVital_${field}`)}
+            inputMode="decimal"
+            maxLength={6}
+            value={institutional[key]?.[field] ?? ''}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (/^\d{0,3}(\.\d{0,2})?$/.test(value)) {
+                updateInstitutional({
+                  [key]: { ...institutional[key], [field]: value },
+                });
+              }
+            }}
+          />
+        ))}
+      </div>
+    </fieldset>
+  );
   const vitalInputs = (key: 'initialVitals' | 'finalVitals') => (
-    <ReactionBlock title={t(key === 'initialVitals' ? 'radInitialVitals' : 'radFinalVitals')}>
+    <DonorReactionSection title={t(key === 'initialVitals' ? 'radInitialVitals' : 'radFinalVitals')}>
       <div className={styles.fields}>
         {donorVitalFields.map((field) => (
           <TextInput
@@ -302,14 +285,21 @@ export function DonorReactionDialog({
           />
         ))}
       </div>
-    </ReactionBlock>
+    </DonorReactionSection>
   );
   const close = () => {
     if (!inFlight.current) onClose();
     else return false;
   };
   return (
-    <ComposedModal open size="lg" aria-label={t('radTitle')} onClose={close} preventCloseOnClickOutside>
+    <ComposedModal
+      open
+      size="lg"
+      className={styles.dialog}
+      aria-label={t('radTitle')}
+      onClose={close}
+      preventCloseOnClickOutside
+    >
       <ModalHeader title={t('radTitle')} iconDescription={t('close')} />
       <ModalBody className={styles.body}>
         {error && <InlineNotification hideCloseButton kind="error" title={t(error)} />}
@@ -343,16 +333,41 @@ export function DonorReactionDialog({
             ))}
           </Select>
         )}
-        <div className={styles.readout}>
-          <ReactionDocument identity={identity} report={existing} t={t} />
-        </div>
-        {existing && !existing.assessment && <p role="status">{t('radPending')}</p>}
+        {existing && (
+          <div className={styles.reportStatus} role="status">
+            <Tag type={existing.assessment ? 'green' : 'warm-gray'}>
+              {t(existing.assessment ? 'radEvaluatedStatus' : 'radPending')}
+            </Tag>
+          </div>
+        )}
+        <DonorReactionSummary identity={identity} t={t} />
+        {existing && <DonorReactionRecordedDetails report={existing} t={t} />}
         {editReport && (
-          <fieldset disabled={busy}>
-            <ReactionBlock title={t('radEventData')}>
+          <fieldset className={styles.form} disabled={busy}>
+            <DonorReactionSection title={t('radDonationConditions')}>
+              <div className={styles.fields}>
+                {optionalChoice('site', 'radSite')}
+                {optionalChoice('donorFrequency', 'radDonorFrequency')}
+                {optionalChoice('environment', 'radEnvironment')}
+              </div>
+              {checklist(
+                'radDonorConditions',
+                donorReactionOptions.donorConditions,
+                institutional.donorConditions,
+                (donorConditions) => updateInstitutional({ donorConditions }),
+              )}
+              <div className={styles.pressureFields}>
+                {pressureInputs('donationStartPressure', 'radDonationStartPressure')}
+                {pressureInputs('twentyMinutePressure', 'radTwentyMinutePressure')}
+              </div>
+            </DonorReactionSection>
+            <DonorReactionSection title={t('radEventData')}>
               <div className={styles.fields}>
                 {option(report.phase, 'radPhase', donorReactionPhases, 'radPhase', (phase) =>
-                  setReport({ ...report, phase: phase as DonorReactionReport['phase'] }),
+                  setReport({
+                    ...report,
+                    phase: phase as DonorReactionReport['phase'],
+                  }),
                 )}
                 {option(
                   report.type,
@@ -362,7 +377,19 @@ export function DonorReactionDialog({
                       identity.modality === 'apheresis' || (type !== 'citrate' && type !== 'apheresisComplication'),
                   ),
                   'radType',
-                  (type) => setReport({ ...report, type: type as DonorReactionReport['type'] }),
+                  (type) =>
+                    setReport({
+                      ...report,
+                      type: type as DonorReactionReport['type'],
+                      institutional:
+                        type === 'vasovagal'
+                          ? institutional
+                          : {
+                              ...institutional,
+                              consciousness: undefined,
+                              vasovagalSite: undefined,
+                            },
+                    }),
                 )}
                 <TextInput
                   id={`${prefix}-occurred`}
@@ -380,6 +407,44 @@ export function DonorReactionDialog({
                   value={report.notifiedAt}
                   onChange={(event) => setReport({ ...report, notifiedAt: event.target.value })}
                 />
+              </div>
+              {checklist(
+                'radLocalReactions',
+                donorReactionOptions.localReactions,
+                institutional.localReactions,
+                (localReactions) => updateInstitutional({ localReactions }),
+              )}
+              {report.type === 'vasovagal' && (
+                <div className={styles.pressureFields}>
+                  {optionalChoice('consciousness', 'radConsciousness')}
+                  {optionalChoice('vasovagalSite', 'radVasovagalSite')}
+                </div>
+              )}
+              {checklist(
+                'radGeneralSymptoms',
+                donorReactionOptions.generalSymptoms,
+                institutional.generalSymptoms,
+                (generalSymptoms) => updateInstitutional({ generalSymptoms }),
+              )}
+              {checklist(
+                'radSevereSymptoms',
+                donorReactionOptions.severeSymptoms,
+                institutional.severeSymptoms,
+                (severeSymptoms) => updateInstitutional({ severeSymptoms }),
+              )}
+              {note('radSigns', report.signs, (signs) => setReport({ ...report, signs }))}
+              {note('radInitialCare', report.initialCare, (initialCare) => setReport({ ...report, initialCare }))}
+            </DonorReactionSection>
+            <DonorReactionSection title={t('radReportingStaff')}>
+              <div className={styles.fields}>
+                <TextInput id={`${prefix}-actor`} labelText={t('radReportedBy')} readOnly value={actor ?? ''} />
+                <TextInput
+                  id={`${prefix}-profession`}
+                  labelText={t('radProfession')}
+                  maxLength={120}
+                  value={institutional.profession ?? ''}
+                  onChange={(event) => updateInstitutional({ profession: event.target.value })}
+                />
                 <TextInput
                   id={`${prefix}-notified-to`}
                   labelText={t('radNotifiedTo')}
@@ -387,21 +452,24 @@ export function DonorReactionDialog({
                   value={report.notifiedTo}
                   onChange={(event) => setReport({ ...report, notifiedTo: event.target.value })}
                 />
-                <TextInput id={`${prefix}-actor`} labelText={t('radReportedBy')} readOnly value={actor ?? ''} />
               </div>
-              {note('radSigns', report.signs, (signs) => setReport({ ...report, signs }))}
-              {note('radInitialCare', report.initialCare, (initialCare) => setReport({ ...report, initialCare }))}
-            </ReactionBlock>
-            {vitalInputs('initialVitals')}
-            {vitalInputs('finalVitals')}
+            </DonorReactionSection>
+            <details className={styles.extraVitals}>
+              <summary>{t('radAdditionalVitals')}</summary>
+              {vitalInputs('initialVitals')}
+              {vitalInputs('finalVitals')}
+            </details>
           </fieldset>
         )}
         {editAssessment && (
-          <fieldset disabled={busy}>
-            <ReactionBlock title={t('radAssessment')}>
+          <fieldset className={styles.form} disabled={busy}>
+            <DonorReactionSection title={t('radAssessment')}>
               <div className={styles.fields}>
                 {option(assessment.severity, 'severity', donorReactionSeverities, 'reactionSeverity', (severity) =>
-                  setAssessment({ ...assessment, severity: severity as DonorReactionAssessment['severity'] }),
+                  setAssessment({
+                    ...assessment,
+                    severity: severity as DonorReactionAssessment['severity'],
+                  }),
                 )}
                 {option(
                   normalizedAssessment.collectionDecision,
@@ -422,7 +490,7 @@ export function DonorReactionDialog({
               {note('radRecommendations', assessment.recommendations, (recommendations) =>
                 setAssessment({ ...assessment, recommendations }),
               )}
-            </ReactionBlock>
+            </DonorReactionSection>
           </fieldset>
         )}
       </ModalBody>
