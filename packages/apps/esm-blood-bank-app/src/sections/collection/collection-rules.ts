@@ -1,12 +1,32 @@
 import { ageOnDate, calculateReturnDate, isDate, today } from '../applicant-selection/selection-rules';
 import type { SelectionApplication } from '../applicant-selection/selection.types';
 import type { CollectionRecord, CollectionStep } from './collection.types';
+import type { DonorReactionIdentity } from './donor-reaction';
 import { bagLotExceedsLimit } from '../../shared/text-field-contracts';
 
 export const collectionSampleDefaults = { sampleType: 'Sangre', sampleContainer: 'Tubo' };
 
 export function fullName(application: SelectionApplication) {
   return `${application.personal.givenName} ${application.personal.familyName}`.trim();
+}
+
+export function collectionReactionIdentity(record: CollectionRecord): DonorReactionIdentity {
+  const { application, registry } = record;
+  const age = ageOnDate(application.personal.birthDate, registry.date);
+  return {
+    name: fullName(application),
+    applicationNumber: application.number,
+    document: `${application.admission.documentType} ${application.admission.documentNumber}`,
+    unitCode: record.completedSteps.includes('volume') ? record.unitCode : '',
+    modality: application.admission.modality,
+    bagLot: registry.bagLot,
+    volume: record.extractedVolume,
+    age: age === null ? '' : String(age),
+    sex: application.personal.sex,
+    weight: application.physical.weight,
+    hemoglobin: application.physical.hemoglobin,
+    hematocrit: application.physical.hematocrit,
+  };
 }
 export function newCollection(application: SelectionApplication): CollectionRecord {
   const date = today();

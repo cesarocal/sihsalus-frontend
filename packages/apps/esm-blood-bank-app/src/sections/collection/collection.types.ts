@@ -1,4 +1,5 @@
 import type { SelectionApplication } from '../applicant-selection/selection.types';
+import type { DonorReaction } from './donor-reaction';
 
 export const collectionSteps = ['label', 'volume', 'registry', 'certificate'] as const;
 export type CollectionStep = (typeof collectionSteps)[number];
@@ -45,6 +46,8 @@ export interface CollectionRecord {
   revision: number;
   application: SelectionApplication;
   consentEncounterUuid?: string;
+  donorReactions?: DonorReaction[];
+  interruptedWithoutUnit?: true;
   unitCode: string;
   sampleCode: string;
   completedSteps: CollectionStep[];

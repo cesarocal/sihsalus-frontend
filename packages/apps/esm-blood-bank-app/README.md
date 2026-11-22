@@ -109,7 +109,30 @@ El detalle no repite el nombre del donante debajo de la cabecera: lo conserva en
 
 Historial de donaciones incluye fechas Desde/Hasta (límites inclusivos), modalidad y búsqueda por código de unidad o número de postulación. Los filtros se combinan, reinician la paginación y pueden limpiarse; no editan registros ni cambian el orden de más reciente a más antiguo. Un rango invertido muestra una advertencia, no un falso historial vacío. El filtrado es local sobre los registros del contrato de lectura; antes de introducir paginación de servidor habrá que acordar filtros y orden con la API.
 
-Debajo aparece Historial de reacciones adversas del donante, con el mismo componente Carbon, paginación y estado vacío, independiente de los filtros de donaciones. Las columnas provisionales son Fecha, Código de unidad, Reacción y Severidad. `DonorDetail.adverseReactions` aporta exclusivamente ejemplos mock (Ana tiene un evento sintético; Luis no tiene registros). No se capturan ni deducen reacciones a partir del campo Complicaciones de Extracción, ni se modifican estados o exclusiones. El modelo, permisos clínicos y API de reacciones quedan pendientes de definir antes de cualquier integración real.
+El historial de reacciones adversas comparte los reportes del flujo de
+Extracción y conserva los ejemplos históricos de prueba. **Registrar reacción
+adversa** está disponible durante la colecta y desde el registro de una
+donación terminada. El mismo reporte se consulta y se imprime desde
+**Selección → Revisión**, **Registro de Donantes (FR06)** e **Historial del
+donante**. La marca de complicación se deriva del reporte.
+
+Para evaluar, el profesional médico requiere
+`app:home.bancoSangre.donantes.reacciones.evaluar` además del acceso a
+Extracción. El CSV de `openmrs-config/privileges` declara el privilegio. Una
+extracción activa con una reacción pendiente espera la evaluación. La
+interrupción sin unidad conserva el intento y su reporte, sin generar stock
+ni emitir constancia. La aptitud del donante y la disposición de la unidad
+siguen sus flujos propios.
+
+El flujo actual guarda datos sintéticos en el mismo almacenamiento por
+pestaña que usa Extracción. El contrato real pendiente
+`/ws/rest/v1/bloodbank/collections/{id}/donor-reactions` debe vincular el
+reporte a una extracción real y generar el encuentro clínico del donante. El
+backend debe verificar la identidad, la revisión y los permisos de la
+operación y guardar el vínculo con `banco_reaccion_adversa_donacion` y las
+observaciones del encuentro. El formato imprimible usa como referencia el
+Anexo 15 del Hospital Lima Este–Vitarte y queda sujeto a la plantilla que
+apruebe Santa Clotilde.
 
 Todas las cabeceras del ESM muestran a la derecha la ubicación activa de `useSession` y la fecha/hora local con `formatDatetime`. `src/shared/blood-bank-page-header.component.tsx` reutiliza `PageHeaderContent` para las pantallas operativas y comparte el contexto con las cabeceras de Inicio, Inventario y las bases de pantalla. El reloj se actualiza mientras la pantalla está abierta; no se fija un hospital en el código.
 

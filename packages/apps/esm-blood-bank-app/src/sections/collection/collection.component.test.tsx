@@ -21,6 +21,7 @@ const sessionPerson = vi.hoisted(() => ({ display: 'Rosa Torres García' }));
 
 vi.mock('@openmrs/esm-framework', () => ({
   useConfig: () => ({ useMockData: true }),
+  userHasAccess: () => false,
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
   PageHeaderContent: ({ title }: { title: string }) => <div>{title}</div>,
   useSession: () => ({
@@ -75,6 +76,29 @@ describe('collection and screening screens', () => {
     fireEvent.change(screen.getByLabelText('Buscar en la lista'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('tab', { name: 'Registro de donaciones' }));
     expect(await screen.findByRole('button', { name: 'Ver constancia' })).toBeInTheDocument();
+  });
+  it('captures a donor report without giving the collection operator access to medical assessment', async () => {
+    const processing = api();
+    render(<CollectionPage api={processing.collection} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Extraer sangre' }));
+    fireEvent.click(screen.getByRole('button', { name: t('radNew') }));
+    const dialog = within(screen.getByRole('dialog', { name: t('radTitle') }));
+    fireEvent.change(dialog.getByLabelText(t('radType')), { target: { value: 'vasovagal' } });
+    fireEvent.change(dialog.getByLabelText(t('radSigns')), { target: { value: 'Signos prueba' } });
+    fireEvent.change(dialog.getByLabelText(t('radInitialCare')), { target: { value: 'Atención prueba' } });
+    fireEvent.change(dialog.getByLabelText(t('radNotifiedTo')), { target: { value: 'Médico de prueba' } });
+    fireEvent.click(dialog.getByRole('button', { name: t('radSave') }));
+    expect(await dialog.findByText(t('radPending'))).toBeVisible();
+    expect(dialog.queryByRole('button', { name: t('radSaveAssessment') })).not.toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: t('radPrint') })).toBeEnabled();
+    const close = dialog.getAllByRole('button', { name: t('close') }).at(-1);
+    if (!close) throw new Error('Reaction dialog has no close action');
+    fireEvent.click(close);
+    expect(screen.getByRole('button', { name: t('next') })).toBeDisabled();
+    expect(
+      (await processing.collection.listCollections()).find(({ donorReactions }) => donorReactions?.length)?.registry
+        .complications,
+    ).toBe('yes');
   });
   it('keeps the original modal open when cancelling X and preserves a saved partial label on reopen', async () => {
     render(<CollectionPage api={api().collection} />);

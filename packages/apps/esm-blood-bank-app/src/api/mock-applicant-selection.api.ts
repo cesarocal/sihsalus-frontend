@@ -19,6 +19,7 @@ import {
 import type { ApplicantSelectionApi } from './applicant-selection.api';
 import { readProcessingState } from './mock-processing-store';
 import { readMockDonorDetails } from './mock-donors-store';
+import { collectionReactionIdentity } from '../sections/collection/collection-rules';
 
 export const selectionStorageKey = 'sihsalus.blood-bank.selection.mock.v1';
 interface MockState {
@@ -163,12 +164,23 @@ export function createMockApplicantSelectionApi(
   };
   return {
     async listApplications() {
-      const donatedIds = new Set(
-        readProcessingState(getStorage)
-          .collections.filter((record) => record.status === 'completed')
-          .map((record) => record.application.id),
+      const byApplication = new Map(
+        readProcessingState(getStorage).collections.map((record) => [record.application.id, record]),
       );
-      return structuredClone(read().applications.filter((application) => !donatedIds.has(application.id)));
+      return structuredClone(
+        read().applications.flatMap((application) => {
+          const collection = byApplication.get(application.id);
+          if (collection?.donorReactions?.length) {
+            return [
+              {
+                ...application,
+                reactionView: { identity: collectionReactionIdentity(collection), reports: collection.donorReactions },
+              },
+            ];
+          }
+          return collection?.status === 'completed' ? [] : [application];
+        }),
+      );
     },
     async lookupApplicant(identity) {
       return history(identity);

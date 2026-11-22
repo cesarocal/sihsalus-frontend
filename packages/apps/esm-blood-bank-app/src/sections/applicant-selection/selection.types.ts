@@ -1,3 +1,5 @@
+import type { DonorReactionView } from '../collection/donor-reaction';
+
 export const selectionSteps = ['admission', 'personal', 'physical', 'interview', 'qualification', 'review'] as const;
 export type SelectionStep = (typeof selectionSteps)[number];
 export type ApplicationStatus =
@@ -105,6 +107,7 @@ export interface SelectionApplication {
   revision: number;
   patientUuid?: string;
   visitUuid?: string;
+  reactionView?: DonorReactionView;
   status: ApplicationStatus;
   completedSteps: SelectionStep[];
   stoppedAfterPhysical: boolean;

@@ -15,6 +15,8 @@ import { showSnackbar } from '@openmrs/esm-framework';
 import { useEffect, useRef, useState } from 'react';
 import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
 import { printDocument } from '../../shared/print-document';
+import { useProcessingTranslation } from '../../shared/processing-page.component';
+import { DonorReactionDialog } from '../collection/donor-reaction-dialog.component';
 import { PaperConsentEditor, useDonorConsentSubject } from '../consents/paper-consent.component';
 import {
   hasActiveExclusion,
@@ -59,6 +61,8 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
   const [lookup, setLookup] = useState<'pending' | 'ready' | 'error'>('pending');
   const [saving, setSaving] = useState(false);
   const [savingConsent, setSavingConsent] = useState(false);
+  const [reactionOpen, setReactionOpen] = useState(false);
+  const reactionText = useProcessingTranslation();
   const [printFailed, setPrintFailed] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [closeRequested, setCloseRequested] = useState(false);
@@ -311,6 +315,9 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
     }
   };
 
+  if (reactionOpen && data.reactionView) {
+    return <DonorReactionDialog {...data.reactionView} onClose={() => setReactionOpen(false)} t={reactionText} />;
+  }
   return (
     <>
       <ComposedModal
@@ -410,6 +417,11 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
           {stage === 'review' ? (
             <>
               <SelectionReport application={data} t={t} />
+              {data.reactionView && (
+                <Button kind="tertiary" size="sm" onClick={() => setReactionOpen(true)}>
+                  {reactionText('radOpen')}
+                </Button>
+              )}
               {data.status === 'selected' && consentSubject && (
                 <PaperConsentEditor key={data.id} subject={consentSubject} onSaving={setSavingConsent} />
               )}

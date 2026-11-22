@@ -1,6 +1,6 @@
 import { Button, InlineNotification, SkeletonText } from '@carbon/react';
 import { Add, ArrowLeft } from '@carbon/react/icons';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { BloodBankApi } from '../../api';
 import { bloodBankPrivileges } from '../../access/blood-bank-privileges';
@@ -8,10 +8,13 @@ import { ProtectedSection } from '../../access/protected-section.component';
 import { applicantSelectionPath, donorsPath } from '../../constants';
 import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustration.component';
 import { BloodBankPageHeader } from '../../shared/blood-bank-page-header.component';
+import { formatListDate } from '../../shared/format-list-date';
 import { ProcessingTable, useProcessingData, useProcessingTranslation } from '../../shared/processing-page.component';
 import { donorApplicationState } from '../applicant-selection/donor-application';
 import { donorStatusKey, formatDonorDate } from './donor-utils';
 import { DonationHistoryTable } from './donation-history-table.component';
+import { DonorReactionDialog } from '../collection/donor-reaction-dialog.component';
+import type { DonorReactionView } from '../collection/donor-reaction';
 import styles from '../applicant-selection/selection.scss';
 
 export function DonorDetailPage({ api }: { api: BloodBankApi }) {
@@ -24,6 +27,7 @@ export function DonorDetailPage({ api }: { api: BloodBankApi }) {
     return donor;
   }, [api, donorId]);
   const { data, loading, failed, reload } = useProcessingData(load);
+  const [reaction, setReaction] = useState<DonorReactionView>();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (!loading && !failed) heading.current?.focus();
@@ -101,15 +105,32 @@ export function DonorDetailPage({ api }: { api: BloodBankApi }) {
                 <ProcessingTable
                   title={t('adverseReactionHistory')}
                   columns={['date', 'unitCode', 'reactionType', 'reactionSeverity']}
-                  rows={data.adverseReactions.map((record) => ({
-                    id: record.id,
-                    cells: [
-                      formatDonorDate(record.date),
-                      record.unitCode,
-                      t(`reaction_${record.reaction}`),
-                      t(`severity_${record.severity}`),
-                    ],
-                  }))}
+                  rows={data.adverseReactions.map((record) => {
+                    const name = t(
+                      record.reaction === 'dizziness' ? 'reaction_dizziness' : `radType_${record.reaction}`,
+                    );
+                    return {
+                      id: record.id,
+                      cells: [
+                        record.reactionView ? formatListDate(record.date) : formatDonorDate(record.date),
+                        record.unitCode || '—',
+                        record.reactionView ? (
+                          <Button
+                            key="report"
+                            kind="ghost"
+                            size="sm"
+                            aria-label={`${t('radOpen')} · ${name}`}
+                            onClick={() => setReaction(record.reactionView)}
+                          >
+                            {name}
+                          </Button>
+                        ) : (
+                          name
+                        ),
+                        record.severity ? t(`severity_${record.severity}`) : t('radPending'),
+                      ],
+                    };
+                  })}
                   loading={false}
                   failed={false}
                   reload={reload}
@@ -118,6 +139,7 @@ export function DonorDetailPage({ api }: { api: BloodBankApi }) {
                 />
               </div>
             </section>
+            {reaction && <DonorReactionDialog {...reaction} onClose={() => setReaction(undefined)} t={t} />}
           </>
         )}
       </div>

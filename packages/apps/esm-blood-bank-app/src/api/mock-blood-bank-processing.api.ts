@@ -1,5 +1,6 @@
 import { newCollection, validateCollection, validateCollectionDraft } from '../sections/collection/collection-rules';
 import { collectionSteps } from '../sections/collection/collection.types';
+import { validDonorReactionAssessment, validDonorReactionReport } from '../sections/collection/donor-reaction';
 import {
   globalScreeningResult,
   localDateTime,
@@ -81,6 +82,8 @@ export function createMockProcessingApi(
       if (!application || previous?.status === 'completed') throw new Error('COLLECTION_NOT_AVAILABLE');
       if ((previous?.revision ?? 0) !== input.revision) throw new Error('COLLECTION_CONFLICT');
       const canonical = previous ?? newCollection(application);
+      if (step && canonical.donorReactions?.some(({ assessment }) => !assessment))
+        throw new Error('DONOR_REACTION_AWAITING_ASSESSMENT');
       if (
         input.id !== canonical.id ||
         input.unitCode !== canonical.unitCode ||
@@ -105,6 +108,11 @@ export function createMockProcessingApi(
         certificate: input.certificate,
         application: canonical.application,
       });
+      if (record.donorReactions?.length) record.registry.complications = 'yes';
+      if (record.donorReactions?.some(({ assessment }) => assessment?.collectionDecision === 'stopWithUnit'))
+        record.registry.extractionStatus = 'incomplete';
+      if (step === 'registry' && record.registry.complications === 'yes' && !record.donorReactions?.length)
+        throw new Error('DONOR_REACTION_REQUIRED');
       // Drafts and completed stages share the same bound; never crop historical input.
       const draftErrors = validateCollectionDraft(record);
       if (draftErrors.includes('bagLotTooLong')) throw new Error('COLLECTION_TEXT_LIMIT');
@@ -127,6 +135,73 @@ export function createMockProcessingApi(
         state.screenings.push(newScreening(record));
       state.collections = [record, ...state.collections.filter((item) => item.id !== record.id)];
       // The unit, sample and stage transition share one atomic per-tab storage write.
+      writeProcessingState(getStorage, state);
+      return structuredClone(record);
+    },
+    async saveDonorReaction(collectionId, revision, update) {
+      const applications = await selection.listApplications();
+      const state = readProcessingState(getStorage);
+      const stored = state.collections.find(({ id }) => id === collectionId);
+      const application = applications.find(
+        ({ id, status }) => status === 'selected' && `mock-collection-${id}` === collectionId,
+      );
+      const canonical = stored ?? (application && newCollection(application));
+      if (!canonical || !update.actor.trim() || !update.id) throw new Error('DONOR_REACTION_NOT_AVAILABLE');
+      const reactions = canonical.donorReactions ?? [];
+      const current = reactions.find(({ id }) => id === update.id);
+      if (update.action === 'report' && current) return structuredClone(canonical);
+      if (canonical.revision !== revision) throw new Error('COLLECTION_CONFLICT');
+      const record = structuredClone(canonical);
+      const recordedAt = new Date().toISOString();
+      if (update.action === 'report') {
+        if (
+          !validDonorReactionReport(update.report) ||
+          (record.application.admission.modality !== 'apheresis' &&
+            ['citrate', 'apheresisComplication'].includes(update.report.type))
+        )
+          throw new Error('DONOR_REACTION_INVALID');
+        record.donorReactions = [
+          ...reactions,
+          {
+            ...update.report,
+            id: update.id,
+            reportedBy: update.actor,
+            reportedAt: recordedAt,
+          },
+        ];
+      } else {
+        if (!current || current.assessment || !validDonorReactionAssessment(update.assessment))
+          throw new Error('DONOR_REACTION_INVALID');
+        const { collectionDecision } = update.assessment;
+        const collectionEnded = record.completedSteps.includes('registry') || current.phase !== 'during';
+        const collected = record.completedSteps.includes('volume');
+        if (
+          collectionEnded !== (collectionDecision === 'alreadyEnded') ||
+          (collectionDecision === 'stopWithoutUnit' && collected)
+        )
+          throw new Error('DONOR_REACTION_INVALID_DECISION');
+        record.donorReactions = reactions.map((reaction) =>
+          reaction.id === update.id
+            ? { ...reaction, assessment: { ...update.assessment, evaluatedBy: update.actor, evaluatedAt: recordedAt } }
+            : reaction,
+        );
+        if (collectionDecision === 'stopWithoutUnit') {
+          // Labels can allocate a pending specimen before any blood was drawn. Preserve samples already in use.
+          state.screenings = state.screenings.filter(
+            (sample) => sample.collectionId !== collectionId || sample.revision > 0,
+          );
+          record.status = 'completed';
+          record.interruptedWithoutUnit = true;
+          record.registry.extractionStatus = 'incomplete';
+          record.registry.attendedBy ||= record.label.collectedBy || current.reportedBy;
+          if (!record.completedSteps.includes('registry')) record.completedSteps.push('registry');
+        }
+        if (collectionDecision === 'stopWithUnit') record.registry.extractionStatus = 'incomplete';
+      }
+      record.registry.complications = 'yes';
+      record.revision++;
+      record.updatedAt = recordedAt;
+      state.collections = [record, ...state.collections.filter(({ id }) => id !== collectionId)];
       writeProcessingState(getStorage, state);
       return structuredClone(record);
     },

@@ -4,6 +4,7 @@ import type {
   CollectionRecord,
   CollectionStep,
 } from '../sections/collection/collection.types';
+import type { DonorReactionUpdate } from '../sections/collection/donor-reaction';
 import type {
   ApheresisCandidate,
   ApheresisDraft,
@@ -18,6 +19,7 @@ export interface CollectionApi {
   listCollections(): Promise<CollectionRecord[]>;
   listLabelConcepts(field: CollectionConceptField): Promise<CollectionConcept[]>;
   saveCollection(record: CollectionRecord, step?: CollectionStep): Promise<CollectionRecord>;
+  saveDonorReaction(collectionId: string, revision: number, update: DonorReactionUpdate): Promise<CollectionRecord>;
 }
 export interface ScreeningApi {
   listAdditionalTestConcepts(): Promise<CollectionConcept[]>;
@@ -36,6 +38,8 @@ export interface ScreeningApi {
 /** Proposed OMOD contracts; these paths do not assert that a backend already exists. */
 export const processingEndpoints = {
   collections: '/ws/rest/v1/bloodbank/collections',
+  donorReactions: (collectionId: string) =>
+    `/ws/rest/v1/bloodbank/collections/${encodeURIComponent(collectionId)}/donor-reactions`,
   screenings: '/ws/rest/v1/bloodbank/screenings',
   screeningRepeats: (screeningId: string) =>
     `/ws/rest/v1/bloodbank/screenings/${encodeURIComponent(screeningId)}/repeats`,
@@ -50,6 +54,7 @@ export const openmrsCollectionApi: CollectionApi = {
   listCollections: unavailable,
   listLabelConcepts: unavailable,
   saveCollection: unavailable,
+  saveDonorReaction: unavailable,
 };
 export const openmrsScreeningApi: ScreeningApi = {
   listAdditionalTestConcepts: unavailable,

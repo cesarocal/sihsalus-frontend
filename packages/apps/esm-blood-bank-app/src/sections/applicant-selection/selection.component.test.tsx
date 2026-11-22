@@ -395,14 +395,16 @@ describe('applicant selection UI', () => {
     await waitFor(() => expect(screen.getByLabelText('Nombre completo del entrevistador')).toBeInTheDocument());
     expect(screen.getByLabelText('Apto')).toBeDisabled();
     expect(screen.queryByText(t('stoppedAfterPhysical'))).not.toBeInTheDocument();
-    expect(showSnackbar).toHaveBeenCalledExactlyOnceWith({
-      title: t('stoppedAfterPhysical'),
-      subtitle: t('physicalStopped'),
-      kind: 'info',
-      isLowContrast: true,
-      autoClose: true,
-      timeoutInMs: 5000,
-    });
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledExactlyOnceWith({
+        title: t('stoppedAfterPhysical'),
+        subtitle: t('physicalStopped'),
+        kind: 'info',
+        isLowContrast: true,
+        autoClose: true,
+        timeoutInMs: 5000,
+      }),
+    );
     expect((await api.listApplications()).find((a) => a.id === saved.id)?.status).toBe('awaitingQualification');
   });
 

@@ -106,13 +106,15 @@ export function CollectionPage({ api, shortcut }: { api: CollectionApi; shortcut
             fullName(record.application),
             `${record.application.admission.documentType} ${record.application.admission.documentNumber}`,
             t(record.application.admission.modality),
-            record.unitCode,
-            <Tag
-              key="status"
-              type={record.status === 'completed' ? 'green' : record.status === 'inProgress' ? 'blue' : 'gray'}
-            >
-              {t(record.status)}
-            </Tag>,
+            record.interruptedWithoutUnit ? '—' : record.unitCode,
+            <div key="status">
+              <Tag type={record.status === 'completed' ? 'green' : record.status === 'inProgress' ? 'blue' : 'gray'}>
+                {t(record.interruptedWithoutUnit ? 'radInterruptedStatus' : record.status)}
+              </Tag>
+              {record.donorReactions?.some(({ assessment }) => !assessment) && (
+                <Tag type="warm-gray">{t('radPending')}</Tag>
+              )}
+            </div>,
             <Button
               key="action"
               kind="ghost"
@@ -121,7 +123,15 @@ export function CollectionPage({ api, shortcut }: { api: CollectionApi; shortcut
                 setActive(record);
               }}
             >
-              {t(record.status === 'completed' ? 'viewCertificate' : record.revision ? 'resume' : 'collect')}
+              {t(
+                record.interruptedWithoutUnit
+                  ? 'radOpen'
+                  : record.status === 'completed'
+                    ? 'viewCertificate'
+                    : record.revision
+                      ? 'resume'
+                      : 'collect',
+              )}
             </Button>,
           ],
         }))}

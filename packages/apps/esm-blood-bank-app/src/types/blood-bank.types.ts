@@ -1,5 +1,6 @@
 import type { AdmissionData, PersonalData } from '../sections/applicant-selection/selection.types';
 import type { DonationRegistry } from '../sections/collection/collection.types';
+import type { DonorReaction, DonorReactionView } from '../sections/collection/donor-reaction';
 
 export type WorkItemStatus = 'Pendiente' | 'En proceso' | 'Completado' | 'Alerta';
 
@@ -61,6 +62,7 @@ export interface DonorDonation {
   complications: DonationRegistry['complications'];
   extractionStatus: DonationRegistry['extractionStatus'];
   attendedBy: string;
+  reactionView?: DonorReactionView;
 }
 
 /** Provisional, read-only UI projection; not a finalized clinical/API schema. */
@@ -68,8 +70,9 @@ export interface DonorAdverseReaction {
   id: string;
   date: string;
   unitCode: string;
-  reaction: 'dizziness';
-  severity: 'mild' | 'moderate' | 'severe';
+  reaction: 'dizziness' | DonorReaction['type'];
+  severity?: 'mild' | 'moderate' | 'severe';
+  reactionView?: DonorReactionView;
 }
 
 export interface DonorDetail {

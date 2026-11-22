@@ -8,6 +8,7 @@ export const bloodBankPrivileges = {
   donors: 'app:home.bancoSangre.donantes',
   applicantSelection: 'app:home.bancoSangre.seleccionPostulante',
   collection: 'app:home.bancoSangre.extraccionAferesis',
+  donorReactionAssessment: 'app:home.bancoSangre.donantes.reacciones.evaluar',
   screening: 'app:home.bancoSangre.laboratorio.tamizaje',
   donorFollowUp: 'app:home.bancoSangre.seguimientoDonante',
   recipientFollowUp: 'app:home.bancoSangre.seguimientoReceptor',

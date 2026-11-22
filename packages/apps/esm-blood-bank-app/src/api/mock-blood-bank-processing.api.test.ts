@@ -57,6 +57,105 @@ describe('collection and screening mock contracts', () => {
     expect(queued).toHaveLength(1);
     expect(queued.every((item) => item.application.status === 'selected')).toBe(true);
   });
+  it('records and assesses an interrupted donation once without generating stock or an unused specimen', async () => {
+    const { selection, api, record } = await collectionFixture();
+    const labeled = await api.collection.saveCollection({ ...record, extractedVolume: '' }, 'label');
+    const observedAt = new Date(Date.now() - 60_000).toISOString();
+    const event = {
+      action: 'report' as const,
+      id: 'test-rad-1',
+      actor: 'Operador de prueba',
+      report: {
+        type: 'vasovagal' as const,
+        phase: 'during' as const,
+        occurredAt: observedAt,
+        notifiedAt: observedAt,
+        signs: 'Signos de prueba',
+        initialCare: 'Atención de prueba',
+        notifiedTo: 'Médico de prueba',
+        initialVitals: {},
+        finalVitals: {},
+      },
+    };
+    const pending = await api.collection.saveDonorReaction(labeled.id, labeled.revision, event);
+    expect(pending.registry.complications).toBe('yes');
+    expect(await api.collection.saveDonorReaction(labeled.id, labeled.revision, event)).toEqual(pending);
+    await expect(api.collection.saveCollection({ ...pending, extractedVolume: '150' }, 'volume')).rejects.toThrow(
+      'DONOR_REACTION_AWAITING_ASSESSMENT',
+    );
+    const assessed = await api.collection.saveDonorReaction(pending.id, pending.revision, {
+      action: 'assess',
+      id: event.id,
+      actor: 'Médico de prueba',
+      assessment: {
+        severity: 'moderate',
+        diagnosis: 'Evaluación de prueba',
+        care: 'Atención registrada',
+        recommendations: 'Control',
+        outcome: 'Evaluado',
+        collectionDecision: 'stopWithoutUnit',
+      },
+    });
+    expect(assessed).toMatchObject({
+      status: 'completed',
+      interruptedWithoutUnit: true,
+      unitStatus: 'prepared',
+      registry: { complications: 'yes', extractionStatus: 'incomplete' },
+    });
+    expect((await api.screening.listScreenings()).some(({ collectionId }) => collectionId === assessed.id)).toBe(false);
+    expect(
+      (await selection.listApplications()).find(({ id }) => id === assessed.application.id)?.reactionView,
+    ).toMatchObject({ identity: { unitCode: '' }, reports: [{ id: event.id, assessment: { severity: 'moderate' } }] });
+    const registry = (await mockBloodBankApi.getDonorRegistry()).find(({ id }) => id === assessed.id);
+    expect(registry).toMatchObject({
+      unitCode: '',
+      complications: 'yes',
+      reactionView: { reports: [{ id: event.id }] },
+    });
+    const donor = await mockBloodBankApi.getDonorDetail(registry?.donorId ?? '');
+    expect(donor.adverseReactions).toMatchObject([{ id: event.id, reaction: 'vasovagal', severity: 'moderate' }]);
+  });
+  it('accepts a reaction after observation starts without changing a completed collection or its specimen', async () => {
+    const { api } = await collectionFixture();
+    const completed = (await api.collection.listCollections()).find(({ status }) => status === 'completed');
+    if (!completed) throw new Error('SYNTHETIC_COMPLETED_COLLECTION_MISSING');
+    const observedAt = new Date(Date.now() - 60_000).toISOString();
+    const pending = await api.collection.saveDonorReaction(completed.id, completed.revision, {
+      action: 'report',
+      id: 'test-rad-2',
+      actor: 'Operador de prueba',
+      report: {
+        type: 'delayedBleeding',
+        phase: 'observation',
+        occurredAt: observedAt,
+        notifiedAt: observedAt,
+        signs: 'Signos de prueba',
+        initialCare: 'Atención de prueba',
+        notifiedTo: 'Médico de prueba',
+        initialVitals: {},
+        finalVitals: {},
+      },
+    });
+    const assessed = await api.collection.saveDonorReaction(pending.id, pending.revision, {
+      action: 'assess',
+      id: 'test-rad-2',
+      actor: 'Médico de prueba',
+      assessment: {
+        severity: 'mild',
+        diagnosis: 'Evaluación de prueba',
+        care: 'Atención registrada',
+        recommendations: '',
+        outcome: 'Evaluado',
+        collectionDecision: 'alreadyEnded',
+      },
+    });
+    expect(assessed).toMatchObject({
+      status: 'completed',
+      unitStatus: completed.unitStatus,
+      registry: { complications: 'yes', extractionStatus: 'complete' },
+    });
+    expect((await api.screening.listScreenings()).some(({ collectionId }) => collectionId === assessed.id)).toBe(true);
+  });
   it.each([
     ['', '', '   ', false],
     ['CPDA-1', '', '', false],

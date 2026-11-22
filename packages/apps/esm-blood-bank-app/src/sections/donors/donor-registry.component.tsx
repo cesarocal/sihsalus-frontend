@@ -9,6 +9,8 @@ import {
   useProcessingTranslation,
 } from '../../shared/processing-page.component';
 import { formatDonorDate } from './donor-utils';
+import { DonorReactionDialog } from '../collection/donor-reaction-dialog.component';
+import type { DonorReactionView } from '../collection/donor-reaction';
 import styles from '../applicant-selection/selection.scss';
 
 export function DonorRegistry({ api, onBack }: { api: BloodBankApi; onBack: () => void }) {
@@ -17,6 +19,7 @@ export function DonorRegistry({ api, onBack }: { api: BloodBankApi; onBack: () =
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [modality, setModality] = useState('');
+  const [reaction, setReaction] = useState<DonorReactionView>();
   const records = (data ?? []).filter(
     (record) =>
       (!status || record.extractionStatus === status) &&
@@ -88,11 +91,19 @@ export function DonorRegistry({ api, onBack }: { api: BloodBankApi; onBack: () =
               record.applicationNumber,
               record.fullName,
               record.documentNumber,
-              record.unitCode,
+              record.unitCode || '—',
               record.bagLot || '—',
               t(record.modality),
               record.extractedVolume || '—',
-              record.complications ? t(record.complications) : '—',
+              record.reactionView ? (
+                <Button key="report" kind="ghost" size="sm" onClick={() => setReaction(record.reactionView)}>
+                  {t('yes')} · {t('radOpen')}
+                </Button>
+              ) : record.complications ? (
+                t(record.complications)
+              ) : (
+                '—'
+              ),
               record.extractionStatus ? t(record.extractionStatus) : '—',
               record.attendedBy || '—',
             ],
@@ -104,6 +115,7 @@ export function DonorRegistry({ api, onBack }: { api: BloodBankApi; onBack: () =
           t={t}
         />
       </div>
+      {reaction && <DonorReactionDialog {...reaction} onClose={() => setReaction(undefined)} t={t} />}
     </>
   );
 }

@@ -1,0 +1,24 @@
+.body,
+.body fieldset {
+  display: grid;
+  gap: .875rem;
+  min-inline-size: 0;
+}
+.block,
+.readout > section {
+  display: grid;
+  gap: .75rem;
+  margin-block-end: .75rem;
+  padding: 1rem;
+  border: 1px solid var(--cds-border-subtle-01);
+  background: var(--cds-layer-01);
+}
+.body h3 { font-size: 1rem; font-weight: 600; }
+.fields,
+.readout dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: .75rem 1rem;
+}
+.readout dt { color: var(--cds-text-secondary); font-size: .75rem; }
+.readout dd { overflow-wrap: anywhere; white-space: pre-wrap; margin-block-start: .25rem; }

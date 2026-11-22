@@ -9,9 +9,10 @@ import {
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
-import { useSession } from '@openmrs/esm-framework';
+import { userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useState } from 'react';
 import type { CollectionApi } from '../../api/blood-bank-processing.api';
+import { bloodBankPrivileges } from '../../access/blood-bank-privileges';
 import { useApiData } from '../../api/use-api-data';
 import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
@@ -28,7 +29,12 @@ import {
   donationCertificatePrintCss,
   DonationCertificateDocument,
 } from './collection-documents.component';
-import { validateCollection, validateCollectionDraft, validVolume } from './collection-rules';
+import {
+  collectionReactionIdentity,
+  validateCollection,
+  validateCollectionDraft,
+  validVolume,
+} from './collection-rules';
 import { PaperConsentSummary, useDonorConsentSubject, usePaperConsent } from '../consents/paper-consent.component';
 import {
   collectionSteps,
@@ -38,6 +44,7 @@ import {
   type DonationRegistry,
 } from './collection.types';
 import collectionStyles from './collection.scss';
+import { DonorReactionDialog } from './donor-reaction-dialog.component';
 
 const conceptUuidFields = {
   anticoagulant: 'anticoagulantConceptUuid',
@@ -71,6 +78,8 @@ export function CollectionWorkflow({
   const [failed, setFailed] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [reactionOpen, setReactionOpen] = useState(false);
+  const [newReaction, setNewReaction] = useState(false);
   const stage = collectionSteps[step];
   const finalized = storedRecord.status === 'completed';
   const consentSubject = useDonorConsentSubject(initial.application);
@@ -80,6 +89,11 @@ export function CollectionWorkflow({
   const locked = finalized || storedRecord.completedSteps.includes(stage);
   const editingLabel = stage === 'label' && !locked;
   const editingRegistry = stage === 'registry' && !locked;
+  const reactionReported = Boolean(storedRecord.donorReactions?.length);
+  const awaitingAssessment = storedRecord.donorReactions?.some(({ assessment }) => !assessment);
+  const stoppedWithUnit = storedRecord.donorReactions?.some(
+    ({ assessment }) => assessment?.collectionDecision === 'stopWithUnit',
+  );
   const record = {
     ...storedRecord,
     label: editingLabel ? { ...storedRecord.label, collectedBy: operatorName } : storedRecord.label,
@@ -108,6 +122,8 @@ export function CollectionWorkflow({
       return true;
     }
     const missing = advance ? validateCollection(record, stage) : validateCollectionDraft(record);
+    if (advance && stage === 'registry' && record.registry.complications === 'yes' && !reactionReported)
+      missing.push('radRequired');
     if (advance) validateLabelCatalogs(missing);
     setErrors(missing);
     setFailed('');
@@ -315,22 +331,70 @@ export function CollectionWorkflow({
   const extras =
     step === 0 ? (
       <>
-        <Button kind="ghost" renderIcon={Printer} disabled={saving || !consentGranted} onClick={() => void print('unit')}>
+        <Button
+          kind="ghost"
+          renderIcon={Printer}
+          disabled={saving || !consentGranted}
+          onClick={() => void print('unit')}
+        >
           {t('printUnit')}
         </Button>
-        <Button kind="ghost" renderIcon={Printer} disabled={saving || !consentGranted} onClick={() => void print('sample')}>
+        <Button
+          kind="ghost"
+          renderIcon={Printer}
+          disabled={saving || !consentGranted}
+          onClick={() => void print('sample')}
+        >
           {t('printSample')}
         </Button>
       </>
-    ) : step === 1 ? (
-      <Button kind="ghost" disabled>
-        {t('adverseReaction')}
-      </Button>
     ) : step === 3 ? (
       <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => void print('certificate')}>
         {t('printCertificate')}
       </Button>
     ) : null;
+  const openReaction = (startNew = false) => {
+    setNewReaction(startNew);
+    setReactionOpen(true);
+  };
+  if (reactionOpen || storedRecord.interruptedWithoutUnit) {
+    return (
+      <DonorReactionDialog
+        identity={collectionReactionIdentity(storedRecord)}
+        reports={storedRecord.donorReactions ?? []}
+        startNew={newReaction}
+        actor={operatorName}
+        canAssess={authenticated && userHasAccess(bloodBankPrivileges.donorReactionAssessment, user)}
+        ended={storedRecord.completedSteps.includes('registry')}
+        onSave={async (update) => {
+          const saved = await api.saveDonorReaction(record.id, record.revision, update);
+          setRecord(
+            saved.interruptedWithoutUnit || !dirty
+              ? saved
+              : {
+                  ...saved,
+                  label: storedRecord.label,
+                  extractedVolume: storedRecord.extractedVolume,
+                  certificate: storedRecord.certificate,
+                  registry: {
+                    ...storedRecord.registry,
+                    complications: 'yes',
+                    extractionStatus: saved.registry.extractionStatus || storedRecord.registry.extractionStatus,
+                  },
+                },
+          );
+          setErrors([]);
+          setFailed('');
+          if (saved.interruptedWithoutUnit) setDirty(false);
+        }}
+        onClose={() => {
+          if (storedRecord.interruptedWithoutUnit) onClose();
+          else setReactionOpen(false);
+        }}
+        t={t}
+      />
+    );
+  }
   return (
     <ProcessingModal
       title={t('collectionTitle')}
@@ -357,11 +421,19 @@ export function CollectionWorkflow({
         setFailed('');
       }}
       advanceLabel={t(step === 3 ? 'certificateSave' : 'next')}
-      advanceDisabled={!consentGranted || (step === 1 && !validVolume(record.extractedVolume))}
-      extraActions={extras}
+      advanceDisabled={!consentGranted || awaitingAssessment || (step === 1 && !validVolume(record.extractedVolume))}
+      extraActions={
+        <>
+          {extras}
+          <Button kind="ghost" disabled={saving} onClick={() => openReaction()}>
+            {t(reactionReported ? 'radOpen' : 'radNew')}
+          </Button>
+        </>
+      }
       t={t}
     >
       <CollectionIdentity record={record} t={t} />
+      {awaitingAssessment && <InlineNotification hideCloseButton kind="warning" title={t('radPending')} />}
       {checkingConsent && <PaperConsentSummary query={consent} subject={checkingConsent} />}
       {step === 0 && (
         <>
@@ -467,10 +539,11 @@ export function CollectionWorkflow({
                 name="collection-complications"
                 legendText={t('complications')}
                 valueSelected={record.registry.complications}
-                disabled={saving}
-                onChange={(value) =>
-                  change({ ...record, registry: { ...record.registry, complications: value as 'yes' | 'no' } })
-                }
+                disabled={saving || reactionReported}
+                onChange={(value) => {
+                  change({ ...record, registry: { ...record.registry, complications: value as 'yes' | 'no' } });
+                  if (value === 'yes') openReaction(true);
+                }}
               >
                 <RadioButton id="collection-complications-no" value="no" labelText={t('no')} />
                 <RadioButton id="collection-complications-yes" value="yes" labelText={t('yes')} />
@@ -479,7 +552,7 @@ export function CollectionWorkflow({
                 name="collection-outcome"
                 legendText={t('extractionStatus')}
                 valueSelected={record.registry.extractionStatus}
-                disabled={saving}
+                disabled={saving || stoppedWithUnit}
                 onChange={(value) =>
                   change({
                     ...record,
