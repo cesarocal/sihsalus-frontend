@@ -98,6 +98,7 @@ export function createMockProcessingApi(
         throw new Error('COLLECTION_REGISTRY_LOCKED');
       const record = structuredClone({
         ...canonical,
+        consentEncounterUuid: input.consentEncounterUuid ?? canonical.consentEncounterUuid,
         label: input.label,
         extractedVolume: input.extractedVolume,
         registry: input.registry,

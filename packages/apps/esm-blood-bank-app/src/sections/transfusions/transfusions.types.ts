@@ -62,6 +62,7 @@ export interface TransfusionDraft {
   reviewer: string;
   reviewVerified: boolean;
   consentVerified: boolean;
+  consentEncounterUuid?: string;
   urgentAuthorizationVerified?: boolean;
   sample: RecipientSample;
   selectedUnitIds: string[];

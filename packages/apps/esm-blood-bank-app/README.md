@@ -25,6 +25,39 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
 
 ## Contratos de integración
 
+### Consentimientos FR05 y FR12
+
+- En **Selección → Ver postulación → Revisión**, el evaluador imprime y registra
+  el FR05 de una postulación seleccionada vinculada a un paciente y una visita
+  de OpenMRS. **Extracción** requiere una decisión otorgada antes de etiquetar
+  y de guardar el volumen. Las extracciones históricas siguen consultables.
+- En **Órdenes**, el médico abre **Consentimiento FR12** después de emitir el
+  FR08. Para una orden ya emitida, abre el mismo diálogo con la flecha de la
+  tarjeta de transfusión y elige la solicitud. Banco de Sangre verifica el
+  folio y el estado vigente durante la atención. Enfermería los comprueba
+  antes del primer guardado de la conducción y conserva el UUID del encuentro
+  verificado. El despacho PC13 conserva su autorización FR08 independiente.
+  El arranque de una administración por excepción legal requiere su propio flujo.
+- Importar los CSV de [openmrs-config](openmrs-config) con Initializer en la
+  distribución de OpenMRS. Los UUID por defecto están en `paperConsent` y se
+  pueden configurar por entorno. Los autores necesitan un proveedor asociado,
+  `Get Encounters`, `Add Encounters`, los permisos de observaciones que exige
+  REST y el privilegio de su sección. Banco de Sangre y Enfermería requieren
+  lectura de encuentros y observaciones además de sus accesos existentes.
+- Cada decisión agrega un encuentro en la visita y una observación versionada
+  con el identificador de postulación o de orden, la decisión, la fecha, el
+  firmante y el folio. El original sigue en papel. No se suben firmas ni
+  huellas. El hospital debe aprobar los formularios y su circuito antes de
+  utilizarlos para atención clínica.
+- Selección y Extracción siguen usando el adaptador de prueba. La prueba local
+  del FR05 se habilita enlazando una postulación sintética por ID, paciente y
+  visita con `paperConsent.demoDonorApplicationId`,
+  `demoDonorPatientUuid` y `demoDonorVisitUuid`. El paciente debe tener el
+  marcador de prueba de Hemovigilancia y la visita debe pertenecerle. La
+  configuración de prueba solo se aplica en localhost con `useMockData`.
+  La integración real requiere que la API de postulaciones provea
+  `patientUuid` y `visitUuid`.
+
 - Ruta OpenMRS: `/blood-bank`.
 - Tras el login estándar, `/home` selecciona el dashboard de Banco de Sangre si es el único autorizado para el usuario. La extensión `homepage-dashboard-slot` redirige `/home/blood-bank` a `/blood-bank` sin requerir `app:home` ni cambiar el ESM de login. El módulo debe estar incluido en el SPA y el rol necesita `app:home.bancoSangre`.
 - Privilegio de entrada: `app:home.bancoSangre`, declarado en `src/routes.json` y centralizado para TypeScript en `src/access/blood-bank-privileges.ts`.

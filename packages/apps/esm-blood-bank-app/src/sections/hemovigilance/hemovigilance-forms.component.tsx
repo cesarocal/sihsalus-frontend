@@ -134,6 +134,7 @@ export function HemovigilanceFields({
     <TextArea
       id={`hemo-${stage}-${key}`}
       labelText={t(key)}
+      hideLabel
       value={fields[key] ?? ''}
       rows={3}
       maxLength={500}
@@ -142,7 +143,6 @@ export function HemovigilanceFields({
     />
   );
   const checklist = (title: string, keys: string[], detailsKey?: string, detailsTrigger = 'otherSymptom') => {
-    const isSheetSection = stage === 'conduction' || stage === 'report';
     const content = (
       <>
         <div className={styles.checks}>
@@ -158,24 +158,18 @@ export function HemovigilanceFields({
                   onChange={(_, { checked }) => change(key, checked ? 'yes' : '')}
                 />
               );
-            if (isSheetSection)
-              return (
-                <span
-                  key={key}
-                  role="checkbox"
-                  aria-checked={checked}
-                  aria-readonly="true"
-                  className={styles.readOnlyCheck}
-                >
-                  <span className={styles.readOnlyCheckBox} aria-hidden="true">
-                    {checked && <Checkmark size={18} />}
-                  </span>
-                  {t(key)}
-                </span>
-              );
             return (
-              <span key={key}>
-                {checked ? '☒' : '☐'} {t(key)}
+              <span
+                key={key}
+                role="checkbox"
+                aria-checked={checked}
+                aria-readonly="true"
+                className={styles.readOnlyCheck}
+              >
+                <span className={styles.readOnlyCheckBox} aria-hidden="true">
+                  {checked && <Checkmark size={18} />}
+                </span>
+                {t(key)}
               </span>
             );
           })}
@@ -183,14 +177,7 @@ export function HemovigilanceFields({
         {detailsKey && fields[detailsTrigger] === 'yes' && input(detailsKey)}
       </>
     );
-    return isSheetSection ? (
-      <SheetSection title={t(title)}>{content}</SheetSection>
-    ) : (
-      <fieldset className={styles.block}>
-        <legend>{t(title)}</legend>
-        {content}
-      </fieldset>
-    );
+    return <SheetSection title={t(title)}>{content}</SheetSection>;
   };
 
   if (stage === 'conduction') {
@@ -536,15 +523,17 @@ export function HemovigilanceFields({
     );
   }
   return (
-    <>
-      <div className={styles.grid}>
-        {input('notification')}
-        {input('notificationDate', 'date')}
-        {input('notificationTime', 'time')}
-      </div>
+    <div className={styles.conductionLayout}>
+      <SheetSection title={t('investigationNotification')}>
+        <div className={styles.investigationFields}>
+          {input('notification')}
+          {input('notificationDate', 'date')}
+          {input('notificationTime', 'time')}
+        </div>
+      </SheetSection>
       {checklist('additionalLaboratoryStudies', studies, 'otherStudyText', 'otherStudy')}
       {checklist('summary', findings, 'otherFindingText', 'otherFinding')}
-      {notes('recommendations')}
-    </>
+      <SheetSection title={t('recommendations')}>{notes('recommendations')}</SheetSection>
+    </div>
   );
 }

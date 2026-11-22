@@ -29,6 +29,8 @@ import { type FormEvent, useCallback, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BloodBankConfig } from '../../config-schema';
 import { useProcessingData } from '../../shared/processing-page.component';
+import { PaperConsentEditor, useConsentTranslation } from '../consents/paper-consent.component';
+import { recipientConsentSubject } from '../consents/paper-consent.resource';
 import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
 import { localDateTime } from '../laboratory/screening/screening-rules';
@@ -42,6 +44,7 @@ import {
   type Fr08Fields,
   fr08ScheduleFromInputs,
   type IssuedTransfusionOrder,
+  listIssuedTransfusionOrders,
   loadOrderRecipient,
   type TransfusionOrderConfig,
   transfusionOrdersChanged,
@@ -102,8 +105,10 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
   const { enabled, transfusionOrders } = useConfig<BloodBankConfig>();
   const { authenticated, user } = useSession();
   const [requestPatientUuid, setRequestPatientUuid] = useState<string>();
+  const [consentPatientUuid, setConsentPatientUuid] = useState<string>();
   const addButton = useRef<HTMLButtonElement>(null);
   const t = useTransfusionsTranslation();
+  const consentText = useConsentTranslation();
   if (
     !enabled ||
     !patientUuid ||
@@ -139,8 +144,8 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
             hasIconOnly
             kind="ghost"
             renderIcon={(props) => <ChevronDownIcon size={16} {...props} />}
-            iconDescription={t('fr08ExpandOrders')}
-            disabled
+            iconDescription={consentText('openRecipient')}
+            onClick={() => setConsentPatientUuid(patientUuid)}
           />
         </div>
       </Tile>
@@ -158,7 +163,92 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
           />,
           document.body,
         )}
+      {consentPatientUuid === patientUuid &&
+        createPortal(
+          <ExistingOrderConsent
+            key={patientUuid}
+            config={transfusionOrders}
+            patientUuid={patientUuid}
+            onClose={() => setConsentPatientUuid(undefined)}
+          />,
+          document.body,
+        )}
     </>
+  );
+}
+
+function ExistingOrderConsent({
+  config,
+  patientUuid,
+  onClose,
+}: {
+  config: TransfusionOrderConfig;
+  patientUuid: string;
+  onClose: () => void;
+}) {
+  const t = useConsentTranslation();
+  const load = useCallback(() => listIssuedTransfusionOrders(config, patientUuid), [config, patientUuid]);
+  const { data, loading, failed, reload } = useProcessingData(load);
+  const [id, setId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
+  const order = data?.find((entry) => !entry.stopped && entry.order.id === id)?.order;
+  return (
+    <ComposedModal
+      open
+      size="lg"
+      className={styles.fr08Modal}
+      preventCloseOnClickOutside
+      onClose={() => {
+        if (!inFlight.current) onClose();
+      }}
+    >
+      <ModalHeader title={t('openRecipient')} iconDescription={t('close')} />
+      <ModalBody className={styles.fr08ModalBody}>
+        {failed ? (
+          <>
+            <InlineNotification hideCloseButton kind="error" title={t('readFailed')} />
+            <Button kind="ghost" size="sm" onClick={reload}>
+              {t('retry')}
+            </Button>
+          </>
+        ) : (
+          <Select
+            id="fr12-order"
+            labelText={t('requestNumber')}
+            value={id}
+            disabled={saving || loading}
+            onChange={(event) => setId(event.target.value)}
+          >
+            <SelectItem
+              value=""
+              text={t(loading ? 'loading' : data?.some((entry) => !entry.stopped) ? 'selectRequest' : 'noRequest')}
+              disabled
+            />
+            {data
+              ?.filter((entry) => !entry.stopped)
+              .map(({ order }) => (
+                <SelectItem key={order.id} value={order.id} text={order.number} />
+              ))}
+          </Select>
+        )}
+        {order && !failed && (
+          <PaperConsentEditor
+            key={id}
+            subject={recipientConsentSubject(order)}
+            onSaving={(value) => {
+              inFlight.current = value;
+              setSaving(value);
+            }}
+          />
+        )}
+      </ModalBody>
+      <ModalFooter>
+        <Button kind="secondary" disabled={saving} onClick={onClose}>
+          {t('close')}
+        </Button>
+      </ModalFooter>
+    </ComposedModal>
   );
 }
 
@@ -172,6 +262,7 @@ function TransfusionOrderForm({
   onClose: () => void;
 }) {
   const t = useTransfusionsTranslation();
+  const consentText = useConsentTranslation();
   const session = useSession();
   const { activeVisit, currentVisit, currentVisitIsRetrospective } = useVisit(patientUuid);
   const load = useCallback(() => loadOrderRecipient(config, patientUuid), [config, patientUuid]);
@@ -184,6 +275,9 @@ function TransfusionOrderForm({
   const nextRow = useRef(1);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [editingConsent, setEditingConsent] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
+  const consentInFlight = useRef(false);
   const [issued, setIssued] = useState<IssuedTransfusionOrder>();
   const inFlight = useRef(false);
   const submissionId = useRef<string>();
@@ -305,13 +399,24 @@ function TransfusionOrderForm({
           event.stopPropagation();
       }}
       onClose={() => {
-        if (inFlight.current) return false;
+        if (inFlight.current || consentInFlight.current) return false;
         onClose();
       }}
     >
-      <ModalHeader title={t('fr08Title')} iconDescription={t('close')} />
+      <ModalHeader
+        title={editingConsent ? consentText('openRecipient') : t('fr08Title')}
+        iconDescription={t('close')}
+      />
       <ModalBody ref={modalBody} className={styles.fr08ModalBody} aria-label={t('fr08Title')} hasScrollingContent>
-        {issued ? (
+        {issued && editingConsent ? (
+          <PaperConsentEditor
+            subject={recipientConsentSubject(issued.order)}
+            onSaving={(value) => {
+              consentInFlight.current = value;
+              setSavingConsent(value);
+            }}
+          />
+        ) : issued ? (
           <Fr08Document order={issued.order} t={t} />
         ) : (
           <>
@@ -600,8 +705,18 @@ function TransfusionOrderForm({
         )}
       </ModalBody>
       <ModalFooter className={styles.fr08Footer}>
-        {issued && <PrintFr08 order={issued.order} t={t} />}
-        <Button kind="secondary" disabled={saving} onClick={onClose}>
+        {issued && !editingConsent && <PrintFr08 order={issued.order} t={t} />}
+        {issued && (
+          <Button
+            type="button"
+            kind="tertiary"
+            disabled={savingConsent}
+            onClick={() => setEditingConsent(!editingConsent)}
+          >
+            {editingConsent ? t('fr08Title') : consentText('openRecipient')}
+          </Button>
+        )}
+        <Button kind="secondary" disabled={saving || savingConsent} onClick={onClose}>
           {t('close')}
         </Button>
         {!issued && (

@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   ComposedModal,
   InlineLoading,
   InlineNotification,
@@ -19,6 +20,8 @@ import type { BloodBankConfig } from '../../config-schema';
 import { moduleName } from '../../constants';
 import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirmation.component';
 import { formatListDate } from '../../shared/format-list-date';
+import { PaperConsentSummary, useConsentTranslation, usePaperConsent } from '../consents/paper-consent.component';
+import { isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
 import { notifySuccess } from '../../shared/notify-success';
 import { printDocument, type PrintPageFit } from '../../shared/print-document';
 import {
@@ -346,6 +349,13 @@ function UnitCaseDialog({
   const actor = { name: transfusionOperatorName(session), personUuid, license };
   const saved = unit.sections[stage];
   const conduction = stage === 'conduction';
+  const consentText = useConsentTranslation();
+  const consentSubject = !bank && isClinicalUuid(unit.order.id) ? recipientConsentSubject(unit.order) : undefined;
+  const consent = usePaperConsent(conduction ? consentSubject : undefined);
+  const [checkedConsent, setCheckedConsent] = useState<string>();
+  const needsConsent = conduction && !!consentSubject && !unit.sections.conduction?.fields.startTime;
+  const consentVerified =
+    !needsConsent || (consent.latest?.decision === 'granted' && consent.latest.uuid === checkedConsent);
   const physician = session.authenticated && userHasAccess(hemoPrivileges.review, session.user);
   const canPrintConduction = Boolean(unit.sections.conduction?.fields.endTime) && !busy && !changed;
   const finalizing = conduction && Boolean(fields.endTime);
@@ -388,7 +398,7 @@ function UnitCaseDialog({
     }));
   };
   const save = async (action = stage): Promise<ExitSaveResult> => {
-    const values = action === 'review' ? {} : fields;
+    let values = action === 'review' ? {} : fields;
     if (saving.current || !canEdit(action) || (loadingLicense && (action === 'report' || action === 'review')))
       return 'failed';
     if (!validStage(action, values, unit.sections)) {
@@ -403,6 +413,14 @@ function UnitCaseDialog({
     setBusy(true);
     setError('');
     try {
+      if (action === 'conduction' && needsConsent) {
+        const [current] = await consent.read();
+        if (current?.decision !== 'granted' || current.uuid !== checkedConsent) {
+          setError('currentConsentRequired');
+          return 'failed';
+        }
+        values = { ...values, consentEncounterUuid: current.uuid };
+      }
       const record = await saveHemovigilance(unit, action, values, actor);
       setEditor((current) => {
         const unit = { ...current.unit, sections: { ...current.unit.sections, [action]: record } };
@@ -517,6 +535,20 @@ function UnitCaseDialog({
           )}
           {stage === 'investigation' && <h3 className={styles.sectionTitle}>{t(stage)}</h3>}
           {stage === 'investigation' && audit}
+          {conduction && consentSubject && (
+            <div className={styles.consentVerification}>
+              <PaperConsentSummary query={consent} subject={consentSubject} />
+              {needsConsent && canEdit('conduction') && (
+                <Checkbox
+                  id="hemo-verify-fr12"
+                  labelText={consentText('verify')}
+                  checked={consentVerified}
+                  disabled={busy || consent.latest?.decision !== 'granted'}
+                  onChange={(_event, { checked }) => setCheckedConsent(checked ? consent.latest?.uuid : undefined)}
+                />
+              )}
+            </div>
+          )}
           <HemovigilanceFields
             key={stage}
             stage={stage}
@@ -632,7 +664,7 @@ function UnitCaseDialog({
             {canEdit(stage) && (
               <Button
                 size="sm"
-                disabled={busy || !changed || (stage === 'report' && loadingLicense)}
+                disabled={busy || !changed || !consentVerified || (stage === 'report' && loadingLicense)}
                 onClick={async () => {
                   if (finalizing && !conductionError(fields)) {
                     setError('');

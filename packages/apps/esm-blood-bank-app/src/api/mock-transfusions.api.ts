@@ -111,7 +111,7 @@ export function createMockTransfusionsApi(
       if (
         !requestComplete(request.order) ||
         !draft.reviewVerified ||
-        !draft.consentVerified ||
+        (!draft.consentVerified && !(urgent && request.issuedOrder && draft.urgentAuthorizationVerified)) ||
         !draft.reviewer.trim() ||
         (urgent && draft.urgentAuthorizationVerified !== true)
       )

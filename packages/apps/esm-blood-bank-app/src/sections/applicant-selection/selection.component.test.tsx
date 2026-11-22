@@ -11,6 +11,7 @@ import type { SelectionApplication, SelectionStep } from './selection.types';
 import { showSnackbar } from '@openmrs/esm-framework';
 
 vi.mock('@openmrs/esm-framework', () => ({
+  useConfig: () => ({ useMockData: true }),
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
   PageHeaderContent: ({ title }: { title: string }) => <div>{title}</div>,
   useSession: () => ({ sessionLocation: { display: 'Hospital de prueba' } }),

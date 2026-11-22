@@ -38,7 +38,7 @@ const endpoint = (resource: string, params: Record<string, string>) =>
 export const isLocalHemovigilance = (useMockData: boolean) =>
   useMockData && ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
-async function eligible(patientId: string) {
+export async function isHemovigilanceTestPatient(patientId: string) {
   const { data } = await openmrsFetch<{ person: { attributes: { attributeType: Ref; value: string }[] } }>(
     endpoint(`patient/${encodeURIComponent(patientId)}`, {
       v: 'custom:(person:(attributes:(attributeType:(uuid),value)))',
@@ -88,7 +88,7 @@ export async function listRecordedDeliveries(orders: TransfusionOrder[]) {
   const orderPatients = new Map(orders.map((order) => [order.id, order.patientId]));
   const streams = await Promise.all(
     [...patients].map(async (patient) =>
-      (await eligible(patient)) ? encounters(patient, demoMetadata.encounters.dispatch) : [],
+      (await isHemovigilanceTestPatient(patient)) ? encounters(patient, demoMetadata.encounters.dispatch) : [],
     ),
   );
   const delivered = new Map<string, string>();
@@ -103,12 +103,14 @@ export async function listRecordedDeliveries(orders: TransfusionOrder[]) {
 
 export async function listHemovigilance(orders: TransfusionOrder[]): Promise<UnitCase[]> {
   const patients = new Set(orders.map((order) => order.patientId));
-  const streams = await Promise.all([...patients].map(async (id) => ((await eligible(id)) ? encounters(id) : [])));
+  const streams = await Promise.all(
+    [...patients].map(async (id) => ((await isHemovigilanceTestPatient(id)) ? encounters(id) : [])),
+  );
   return combineCases(orders, streams.flat());
 }
 
 export async function listPatientHemovigilance(patientUuid: string) {
-  if (!(await eligible(patientUuid))) return [];
+  if (!(await isHemovigilanceTestPatient(patientUuid))) return [];
   const events = await encounters(patientUuid);
   const orderIds = new Set(events.filter(({ event }) => event.kind === 'dispatch').map(({ event }) => event.orderId));
   const orders = await Promise.all([...orderIds].map((uuid) => readLinkedFr08(uuid, patientUuid)));
@@ -193,7 +195,8 @@ async function persist(order: TransfusionOrder, event: Event) {
 }
 
 export async function recordDemoDispatch(request: TransfusionRequest) {
-  if (!request.issuedOrder || !request.deliveredAt || !(await eligible(request.order.patientId))) return;
+  if (!request.issuedOrder || !request.deliveredAt || !(await isHemovigilanceTestPatient(request.order.patientId)))
+    return;
   const deliveredAt = request.deliveredAt;
   const existing = await listHemovigilance([request.order]);
   const assigned = request.assignments.filter(({ active }) => active);

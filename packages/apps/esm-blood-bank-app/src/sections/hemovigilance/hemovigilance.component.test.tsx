@@ -4,14 +4,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import spanish from '../../../translations/es.json';
 import { transfusionRequestsMock } from '../../mocks/transfusions.mock';
 import { printDocument } from '../../shared/print-document';
+import { listConsent } from '../consents/paper-consent.resource';
 import { localDateTime } from '../laboratory/screening/screening-rules';
 import type { UnitCase } from './hemovigilance';
 import { HemovigilanceChart } from './hemovigilance.component';
 import { listPatientHemovigilance, saveHemovigilance, searchPremedications } from './hemovigilance.resource';
 
 const session = vi.hoisted(() => ({ physician: false }));
+const consentMetadata = vi.hoisted(() => ({
+  donorEncounterTypeUuid: 'fr05',
+  recipientEncounterTypeUuid: 'fr12',
+  documentConceptUuid: 'document',
+  encounterRoleUuid: 'role',
+}));
 vi.mock('@openmrs/esm-framework', () => ({
-  useConfig: () => ({ useMockData: true }),
+  useConfig: () => ({ useMockData: true, paperConsent: consentMetadata }),
   useSession: () => ({
     authenticated: true,
     user: {
@@ -25,6 +32,11 @@ vi.mock('@openmrs/esm-framework', () => ({
   userHasAccess: (access: string | string[]) =>
     Array.isArray(access) || (session.physician ? access.endsWith('.revisar') : !access.endsWith('.revisar')),
   showSnackbar: vi.fn(),
+}));
+
+vi.mock(import('../consents/paper-consent.resource'), async (load) => ({
+  ...(await load()),
+  listConsent: vi.fn(),
 }));
 
 vi.mock('./hemovigilance.resource', () => ({
@@ -269,6 +281,40 @@ describe('nursing transfusion monitoring', () => {
     expect(dialog.getByLabelText('Hora de término')).toHaveValue('10:30');
     expect(dialog.getByLabelText('Hora de término')).not.toHaveAttribute('readonly');
     expect(showSnackbar).not.toHaveBeenCalled();
+  });
+
+  it('requires a verified recipient consent and stops the start when it was revoked in another session', async () => {
+    const clinicalOrder = {
+      ...unit.order,
+      id: '11111111-1111-4111-8111-111111111111',
+      patientId: '22222222-2222-4222-8222-222222222222',
+      encounterId: '33333333-3333-4333-8333-333333333333',
+    };
+    vi.mocked(listPatientHemovigilance).mockResolvedValue([{ ...unit, order: clinicalOrder }]);
+    const granted = {
+      uuid: 'fr12-verified',
+      decision: 'granted' as const,
+      folio: 'FR12-TEST-1',
+      decidedAt: '2026-11-19T12:00:00Z',
+      recordedAt: '2026-11-19T12:01:00Z',
+      signer: 'Paciente de prueba',
+      signerRole: 'self' as const,
+      provider: 'Profesional de prueba',
+    };
+    vi.mocked(listConsent)
+      .mockResolvedValueOnce([granted])
+      .mockResolvedValueOnce([{ ...granted, decision: 'revoked' }]);
+    const dialog = within(await openSheet());
+    expect(await dialog.findByText('FR12-TEST-1')).toBeVisible();
+    fireEvent.change(dialog.getByLabelText('Hora de inicio'), { target: { value: '09:30' } });
+    fireEvent.change(dialog.getByLabelText('Hora 1'), { target: { value: '09:35' } });
+    const save = dialog.getByRole('button', { name: 'Guardar registro' });
+    expect(save).toBeDisabled();
+    fireEvent.click(dialog.getByRole('checkbox', { name: spanish.paperConsent.verify }));
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    expect(await dialog.findByText(spanish.hemovigilance.currentConsentRequired)).toBeVisible();
+    expect(saveHemovigilance).not.toHaveBeenCalled();
   });
 
   it('requires ordered controls and saved start and end times before reporting a reaction', async () => {

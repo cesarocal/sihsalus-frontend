@@ -44,6 +44,7 @@ export interface CollectionRecord {
   id: string;
   revision: number;
   application: SelectionApplication;
+  consentEncounterUuid?: string;
   unitCode: string;
   sampleCode: string;
   completedSteps: CollectionStep[];

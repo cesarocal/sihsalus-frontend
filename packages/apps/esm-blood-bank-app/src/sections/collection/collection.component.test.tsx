@@ -20,6 +20,7 @@ import { calculateReturnDate, today } from '../applicant-selection/selection-rul
 const sessionPerson = vi.hoisted(() => ({ display: 'Rosa Torres García' }));
 
 vi.mock('@openmrs/esm-framework', () => ({
+  useConfig: () => ({ useMockData: true }),
   PageHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
   PageHeaderContent: ({ title }: { title: string }) => <div>{title}</div>,
   useSession: () => ({

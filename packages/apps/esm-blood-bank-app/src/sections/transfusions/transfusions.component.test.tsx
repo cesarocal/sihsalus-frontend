@@ -28,6 +28,7 @@ import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
 
 vi.mock('@openmrs/esm-framework', () => ({
+  useConfig: () => ({}),
   openmrsFetch: vi.fn(),
   restBaseUrl: '/ws/rest/v1',
   userHasAccess: () => true,

@@ -21,6 +21,7 @@ vi.mock('@sihsalus/esm-rbac', () => ({
 }));
 
 vi.mock('@openmrs/esm-framework', () => ({
+  useConfig: () => ({ useMockData: true }),
   PageHeader: ({
     title,
     illustration,

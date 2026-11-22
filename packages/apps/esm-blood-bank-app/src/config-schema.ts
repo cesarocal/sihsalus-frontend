@@ -6,7 +6,18 @@ export interface CollectionLabelConceptConfig {
   anticoagulantSetUuid?: string;
 }
 
+export interface PaperConsentConfig {
+  donorEncounterTypeUuid: string;
+  recipientEncounterTypeUuid: string;
+  documentConceptUuid: string;
+  encounterRoleUuid: string;
+  demoDonorApplicationId?: string;
+  demoDonorPatientUuid?: string;
+  demoDonorVisitUuid?: string;
+}
+
 export interface BloodBankConfig {
+  paperConsent?: PaperConsentConfig;
   transfusionOrders?: {
     orderTypeUuid: string;
     conceptUuid: string;
@@ -32,6 +43,15 @@ export interface BloodBankConfig {
 }
 
 export const configSchema = {
+  paperConsent: {
+    donorEncounterTypeUuid: { _type: Type.String, _default: 'a7fe175d-b5a5-43aa-8729-fc29ea57a15b' },
+    recipientEncounterTypeUuid: { _type: Type.String, _default: '4835195e-8495-4cd5-b289-4031c0d38c73' },
+    documentConceptUuid: { _type: Type.String, _default: '859c470f-bfc5-407b-98f0-cabe3450f4c9' },
+    encounterRoleUuid: { _type: Type.String, _default: 'a0b03050-c99b-11e0-9572-0800200c9a66' },
+    demoDonorApplicationId: { _type: Type.String, _default: '' },
+    demoDonorPatientUuid: { _type: Type.String, _default: '' },
+    demoDonorVisitUuid: { _type: Type.String, _default: '' },
+  },
   transfusionOrders: {
     orderTypeUuid: { _type: Type.String, _default: '', _description: 'UUID del tipo de orden transfusional.' },
     conceptUuid: { _type: Type.String, _default: '', _description: 'UUID del concepto de la solicitud transfusional.' },

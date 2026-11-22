@@ -1,0 +1,3 @@
+Uuid,Void/Retire,Name,Description,View privilege,Edit privilege
+a7fe175d-b5a5-43aa-8729-fc29ea57a15b,,Banco de Sangre - FR05,Decisión de consentimiento en papel para una postulación,Get Encounters,app:home.bancoSangre.seleccionPostulante
+4835195e-8495-4cd5-b289-4031c0d38c73,,Banco de Sangre - FR12,Decisión de consentimiento en papel para una orden FR08,Get Encounters,app:hoja.clinica.ordenes.editar

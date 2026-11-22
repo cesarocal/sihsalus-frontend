@@ -46,6 +46,7 @@ vi.mock('@sihsalus/esm-rbac', () => ({
   }) => (allowed.has(privilege) ? children : hideUnauthorized ? null : (fallback ?? <p>Sin acceso</p>)),
 }));
 vi.mock('@openmrs/esm-framework', () => ({
+  useConfig: () => ({ useMockData: true }),
   useSession: () => ({ sessionLocation: { display: 'Hospital DEMO' } }),
   useDebounce: (value: string) => value,
   formatDatetime: () => '31 oct 2026, 12:00',

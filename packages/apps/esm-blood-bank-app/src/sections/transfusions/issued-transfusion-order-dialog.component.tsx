@@ -9,6 +9,8 @@ import {
 } from '@carbon/react';
 import { useRef, useState } from 'react';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
+import { PaperConsentSummary, usePaperConsent } from '../consents/paper-consent.component';
+import { isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
 import { Fr08Document, PrintFr08 } from './fr08-document.component';
 import type { IssuedTransfusionOrder, TransfusionOrderConfig } from './transfusion-order.resource';
 import styles from './transfusions.scss';
@@ -31,6 +33,8 @@ export function IssuedTransfusionOrderDialog({
   t: ProcessingTranslate;
 }) {
   const [verified, setVerified] = useState(false);
+  const subject = isClinicalUuid(order.id) ? recipientConsentSubject(order) : undefined;
+  const consent = usePaperConsent(subject);
   const receipt = useTransfusionReceipt(attend ? config : undefined, issued);
   const closeGuard = useRef({ saving: receipt.saving, onClose });
   closeGuard.current = { saving: receipt.saving, onClose };
@@ -53,6 +57,7 @@ export function IssuedTransfusionOrderDialog({
         {attend && <h3>{t('txReview')}</h3>}
         {receipt.failed && <InlineNotification kind="error" hideCloseButton title={t('fr08ReceiveFailed')} />}
         <Fr08Document order={order} t={t} />
+        {subject && <PaperConsentSummary query={consent} subject={subject} />}
         {receipt.canReceive && (
           <Checkbox
             id="fr08-verify-receipt"

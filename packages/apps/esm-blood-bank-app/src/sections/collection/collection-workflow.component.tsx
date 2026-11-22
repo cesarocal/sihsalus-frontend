@@ -29,6 +29,7 @@ import {
   DonationCertificateDocument,
 } from './collection-documents.component';
 import { validateCollection, validateCollectionDraft, validVolume } from './collection-rules';
+import { PaperConsentSummary, useDonorConsentSubject, usePaperConsent } from '../consents/paper-consent.component';
 import {
   collectionSteps,
   type CollectionConceptField,
@@ -72,6 +73,10 @@ export function CollectionWorkflow({
   const [dirty, setDirty] = useState(false);
   const stage = collectionSteps[step];
   const finalized = storedRecord.status === 'completed';
+  const consentSubject = useDonorConsentSubject(initial.application);
+  const checkingConsent = !finalized && !storedRecord.completedSteps.includes('volume') ? consentSubject : undefined;
+  const consent = usePaperConsent(checkingConsent);
+  const consentGranted = !checkingConsent || consent.latest?.decision === 'granted';
   const locked = finalized || storedRecord.completedSteps.includes(stage);
   const editingLabel = stage === 'label' && !locked;
   const editingRegistry = stage === 'registry' && !locked;
@@ -109,7 +114,15 @@ export function CollectionWorkflow({
     if (missing.length) return false;
     setSaving(true);
     try {
-      const result = await api.saveCollection(record, advance ? stage : undefined);
+      const latest = advance && checkingConsent ? (await consent.read())[0] : undefined;
+      if (advance && checkingConsent && latest?.decision !== 'granted') {
+        setFailed('collectionConsentRequired');
+        return false;
+      }
+      const result = await api.saveCollection(
+        latest ? { ...record, consentEncounterUuid: latest.uuid } : record,
+        advance ? stage : undefined,
+      );
       setRecord(result);
       setDirty(false);
       if (advance && stage === 'certificate') onSaved();
@@ -134,7 +147,8 @@ export function CollectionWorkflow({
       setSaving(false);
     }
   };
-  const print = (kind: 'unit' | 'sample' | 'certificate') => {
+  const print = async (kind: 'unit' | 'sample' | 'certificate') => {
+    if (kind !== 'certificate' && !consentGranted) return;
     const missing = validateCollection(record, kind === 'certificate' ? 'certificate' : 'label').filter(
       (key) => key !== 'observationsTooLong',
     );
@@ -142,6 +156,20 @@ export function CollectionWorkflow({
     setErrors(missing);
     setFailed('');
     if (missing.length) return;
+    if (checkingConsent && kind !== 'certificate') {
+      setSaving(true);
+      try {
+        if ((await consent.read())[0]?.decision !== 'granted') {
+          setFailed('collectionConsentRequired');
+          return;
+        }
+      } catch {
+        setFailed('collectionConsentRequired');
+        return;
+      } finally {
+        setSaving(false);
+      }
+    }
     try {
       printDocument(
         kind === 'certificate' ? (
@@ -287,10 +315,10 @@ export function CollectionWorkflow({
   const extras =
     step === 0 ? (
       <>
-        <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => print('unit')}>
+        <Button kind="ghost" renderIcon={Printer} disabled={saving || !consentGranted} onClick={() => void print('unit')}>
           {t('printUnit')}
         </Button>
-        <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => print('sample')}>
+        <Button kind="ghost" renderIcon={Printer} disabled={saving || !consentGranted} onClick={() => void print('sample')}>
           {t('printSample')}
         </Button>
       </>
@@ -299,7 +327,7 @@ export function CollectionWorkflow({
         {t('adverseReaction')}
       </Button>
     ) : step === 3 ? (
-      <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => print('certificate')}>
+      <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => void print('certificate')}>
         {t('printCertificate')}
       </Button>
     ) : null;
@@ -329,11 +357,12 @@ export function CollectionWorkflow({
         setFailed('');
       }}
       advanceLabel={t(step === 3 ? 'certificateSave' : 'next')}
-      advanceDisabled={step === 1 && !validVolume(record.extractedVolume)}
+      advanceDisabled={!consentGranted || (step === 1 && !validVolume(record.extractedVolume))}
       extraActions={extras}
       t={t}
     >
       <CollectionIdentity record={record} t={t} />
+      {checkingConsent && <PaperConsentSummary query={consent} subject={checkingConsent} />}
       {step === 0 && (
         <>
           <p>{t('labelHelp')}</p>

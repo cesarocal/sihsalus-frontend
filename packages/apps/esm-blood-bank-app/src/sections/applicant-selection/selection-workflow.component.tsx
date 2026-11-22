@@ -15,6 +15,7 @@ import { showSnackbar } from '@openmrs/esm-framework';
 import { useEffect, useRef, useState } from 'react';
 import type { ApplicantSelectionApi } from '../../api/applicant-selection.api';
 import { printDocument } from '../../shared/print-document';
+import { PaperConsentEditor, useDonorConsentSubject } from '../consents/paper-consent.component';
 import {
   hasActiveExclusion,
   invalidObservationSteps,
@@ -57,6 +58,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
   const [history, setHistory] = useState<ApplicantHistory | null>(null);
   const [lookup, setLookup] = useState<'pending' | 'ready' | 'error'>('pending');
   const [saving, setSaving] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
   const [printFailed, setPrintFailed] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [closeRequested, setCloseRequested] = useState(false);
@@ -71,6 +73,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
   const finalized = isFinal(data);
   const locked = finalized || (step < 3 && data.completedSteps.includes('physical'));
   const stage = selectionSteps[step];
+  const consentSubject = useDonorConsentSubject(data);
   const stoppedAtQualification = stage === 'qualification' && data.stoppedAfterPhysical;
 
   const change = (next: SelectionApplication) => {
@@ -78,7 +81,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
       (key) =>
         next.admission[key as keyof typeof next.admission] !== data.admission[key as keyof typeof data.admission],
     );
-    setData(identityChanged ? { ...next, patientUuid: undefined } : next);
+    setData(identityChanged ? { ...next, patientUuid: undefined, visitUuid: undefined } : next);
     if (identityChanged) {
       setHistory(null);
       setLookup('pending');
@@ -277,7 +280,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
   };
 
   const requestClose = () => {
-    if (saving) return false;
+    if (saving || savingConsent) return false;
     if (finalized) onClose();
     else setCloseRequested(true);
     // Carbon must keep the original dialog open while confirmation is shown.
@@ -405,7 +408,12 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
             </Button>
           )}
           {stage === 'review' ? (
-            <SelectionReport application={data} t={t} />
+            <>
+              <SelectionReport application={data} t={t} />
+              {data.status === 'selected' && consentSubject && (
+                <PaperConsentEditor key={data.id} subject={consentSubject} onSaving={setSavingConsent} />
+              )}
+            </>
           ) : (
             <SelectionStageFields application={data} stage={stage} readOnly={locked || saving} update={change} t={t} />
           )}
@@ -415,7 +423,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
             <Button
               type="button"
               kind="ghost"
-              disabled={step === 0 || saving}
+              disabled={step === 0 || saving || savingConsent}
               onClick={() => setStep(step === 4 && data.stoppedAfterPhysical ? 2 : step - 1)}
             >
               {t('previous')}
@@ -441,7 +449,7 @@ export function SelectionWorkflow({ application, api, onClose, onSaved, t }: Wor
               </Button>
             )}
             {finalized ? (
-              <Button type="button" onClick={onClose}>
+              <Button type="button" disabled={savingConsent} onClick={onClose}>
                 {t('backToList')}
               </Button>
             ) : (
