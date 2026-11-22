@@ -90,7 +90,8 @@
     min-width: 0;
   }
 }
-:global(.cds--modal-scroll-content):has(.picker) {
+:global(.cds--modal-scroll-content):has(.picker),
+.modal :global(.cds--modal-scroll-content):has(.returnSection) {
   mask-image: none;
 }
 .pickerPanel {
@@ -851,4 +852,107 @@
     min-inline-size: 0;
     block-size: auto;
   }
+}
+
+
+.returnSection {
+  display: grid;
+  gap: layout.$spacing-04;
+  margin-block: layout.$spacing-06;
+
+  > h3 {
+    @include type.type-style("heading-03");
+    display: flex;
+    gap: layout.$spacing-03;
+    align-items: center;
+  }
+}
+
+.returnCard {
+  background: var(--cds-layer, #fff);
+  border: 1px solid var(--cds-border-subtle, #e0e0e0);
+  padding: layout.$spacing-05;
+  min-inline-size: 0;
+}
+
+.returnCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: layout.$spacing-03;
+  border-block-end: 1px solid var(--cds-border-subtle, #e0e0e0);
+  padding-block-end: layout.$spacing-04;
+  margin-block-end: layout.$spacing-04;
+
+  p {
+    @include type.type-style("label-01");
+    color: var(--cds-text-secondary, #525252);
+    margin-block-end: layout.$spacing-02;
+  }
+
+  h4 {
+    @include type.type-style("heading-02");
+    overflow-wrap: anywhere;
+  }
+}
+
+.returnFacts,
+.returnFields,
+.returnChecklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: layout.$spacing-04 layout.$spacing-05;
+}
+
+.returnFacts {
+  dt {
+    @include type.type-style("label-01");
+    color: var(--cds-text-secondary, #525252);
+    margin-block-end: layout.$spacing-02;
+  }
+
+  dd {
+    @include type.type-style("body-compact-01");
+    overflow-wrap: anywhere;
+  }
+}
+
+.returnEditor {
+  display: grid;
+  gap: layout.$spacing-04;
+  margin-block-start: layout.$spacing-05;
+  padding: layout.$spacing-05;
+  background: var(--cds-layer-01, #f4f4f4);
+  border: 1px solid var(--cds-border-subtle, #e0e0e0);
+
+  h5 {
+    @include type.type-style("heading-compact-02");
+  }
+
+  fieldset {
+    display: grid;
+    gap: layout.$spacing-04;
+    min-inline-size: 0;
+  }
+
+  :global(.cds--inline-notification) {
+    max-inline-size: none;
+  }
+}
+
+.returnChecklist {
+  background: var(--cds-layer, #fff);
+  padding: layout.$spacing-04;
+}
+
+.returnActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: layout.$spacing-03;
+}
+
+.returnCard > .returnActions {
+  margin-block-start: layout.$spacing-04;
 }

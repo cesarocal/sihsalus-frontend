@@ -1,3 +1,5 @@
+import { usePaperConsent } from '../../consents/paper-consent.component';
+import { closesTransfusion, recipientConsentSubject } from '../../consents/paper-consent.resource';
 import { Button, Checkbox, InlineNotification, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react';
 import { ArrowRight, Checkmark, Close, Printer } from '@carbon/react/icons';
 import { useSession } from '@openmrs/esm-framework';
@@ -74,6 +76,9 @@ export function CompatibilityWorkflow({
   const session = useSession();
   const [operator] = useState(() => transfusionOperatorName(session));
   const inFlight = useRef(false);
+  const consent = usePaperConsent(
+    initial.issuedOrder && !initial.deliveredAt ? recipientConsentSubject(initial.order) : undefined,
+  );
   const { order } = request;
   const afterDispatch = order.priority === 'veryUrgent' && !!request.deliveredAt;
   const communicating = !!initialRound.completedAt;
@@ -104,6 +109,15 @@ export function CompatibilityWorkflow({
     setSaving(true);
     setFailed('');
     try {
+      if (request.issuedOrder && !request.deliveredAt) {
+        const [current] = await consent.read();
+        if (current && closesTransfusion(current.decision)) {
+          await api.cancelIssuedRequest?.(request.id, { ...current, decision: current.decision });
+          onSaved();
+          setFailed(current.decision === 'declined' ? 'txCancelledDeclined' : 'txCancelledRevoked');
+          return false;
+        }
+      }
       const result = communicating
         ? await api.communicateCompatibility(request.id, request.revision, round.id, operator)
         : await api.saveCompatibility(

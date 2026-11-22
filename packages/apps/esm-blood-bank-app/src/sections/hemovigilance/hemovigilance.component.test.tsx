@@ -317,6 +317,60 @@ describe('nursing transfusion monitoring', () => {
     expect(saveHemovigilance).not.toHaveBeenCalled();
   });
 
+  it('records an interruption without replacing the consent originally verified at the start', async () => {
+    const recorded = {
+      ...unit,
+      order: {
+        ...unit.order,
+        id: '11111111-1111-4111-8111-111111111111',
+        patientId: '22222222-2222-4222-8222-222222222222',
+        encounterId: '33333333-3333-4333-8333-333333333333',
+      },
+      sections: {
+        conduction: {
+          ...past.sections.conduction,
+          fields: { ...past.sections.conduction.fields, time0: '12:35', consentEncounterUuid: 'original-fr12' },
+        },
+      },
+    };
+    vi.mocked(listPatientHemovigilance).mockResolvedValue([recorded]);
+    vi.mocked(listConsent).mockResolvedValue([
+      {
+        uuid: 'withdrawal-fr12',
+        decision: 'revoked',
+        folio: 'FR12-2',
+        decidedAt: '2026-11-18T12:40:00Z',
+        recordedAt: '2026-11-18T12:41:00Z',
+        signer: 'Paciente de prueba',
+        signerRole: 'self',
+        provider: 'Médico de prueba',
+      },
+    ]);
+    const dialog = within(await openSheet());
+    expect(await dialog.findByText(spanish.hemovigilance.consentInterruptionRequired)).toBeVisible();
+    fireEvent.change(dialog.getByLabelText('Hora de término'), { target: { value: '12:42' } });
+    fireEvent.change(dialog.getByLabelText(spanish.hemovigilance.consentInterruptedVolume), {
+      target: { value: '22' },
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Guardar registro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y enviar' }));
+    await waitFor(() =>
+      expect(saveHemovigilance).toHaveBeenCalledWith(
+        recorded,
+        'conduction',
+        expect.objectContaining({
+          startTime: '12:30',
+          endTime: '12:42',
+          consentEncounterUuid: 'original-fr12',
+          consentInterruptionUuid: 'withdrawal-fr12',
+          consentInterruptedVolume: '22',
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(await dialog.findByText(spanish.hemovigilance.consentInterruptionSaved)).toBeVisible();
+  });
+
   it('requires ordered controls and saved start and end times before reporting a reaction', async () => {
     const sheet = await openSheet();
     const dialog = within(sheet);

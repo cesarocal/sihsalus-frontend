@@ -12,6 +12,7 @@ import { BloodBankPageIllustration } from '../../shared/blood-bank-page-illustra
 import { formatListDate } from '../../shared/format-list-date';
 import { printDocument } from '../../shared/print-document';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
+import { recipientConsentChanged } from '../consents/paper-consent.resource';
 import { demoMetadata } from '../hemovigilance/hemovigilance';
 import { CompatibilityPage } from '../laboratory/compatibility/compatibility-page.component';
 import { CompatibilityWorkflow } from '../laboratory/compatibility/compatibility-workflow.component';
@@ -27,8 +28,17 @@ import { TransfusionUnitPicker } from './transfusion-unit-picker.component';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import { TransfusionsPage } from './transfusions-page.component';
 
+const consentConfig = vi.hoisted(() => ({
+  enabled: false,
+  metadata: {
+    donorEncounterTypeUuid: 'fr05-type',
+    recipientEncounterTypeUuid: 'fr12-type',
+    documentConceptUuid: 'fr12-document',
+    encounterRoleUuid: 'role',
+  },
+}));
 vi.mock('@openmrs/esm-framework', () => ({
-  useConfig: () => ({}),
+  useConfig: () => (consentConfig.enabled ? { paperConsent: consentConfig.metadata } : {}),
   openmrsFetch: vi.fn(),
   restBaseUrl: '/ws/rest/v1',
   userHasAccess: () => true,
@@ -109,6 +119,7 @@ async function compatible() {
 
 describe('transfusion attention, sample pairing and dispatch UI', () => {
   beforeEach(() => {
+    consentConfig.enabled = false;
     sessionStorage.clear();
     vi.clearAllMocks();
     vi.mocked(openmrsFetch).mockReset();
@@ -347,6 +358,264 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     await waitFor(() => expect(screen.getByRole('row', { name: /ORD-42/ })).toHaveTextContent(t('txReviewed')));
     expect(within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row')).toHaveLength(2);
   });
+  it('keeps a regular FR08 pending until consent and shows a later refusal in the history', async () => {
+    consentConfig.enabled = true;
+    const api = createMockTransfusionsApi();
+    const { order } = (await api.list()).requests[0];
+    const issued = {
+      uuid: '11111111-1111-4111-8111-111111111111',
+      orderNumber: 'ORD-43',
+      dateActivated: order.requestedAt,
+      fulfillerStatus: 'RECEIVED',
+      concept: { uuid: fr08Config.conceptUuid },
+      orderType: { uuid: fr08Config.orderTypeUuid },
+      patient: { uuid: '22222222-2222-4222-8222-222222222222' },
+      encounter: { uuid: '33333333-3333-4333-8333-333333333333' },
+      orderer: { display: order.orderer },
+      instructions: JSON.stringify({ format: 'EG05-FR08/v1', request: order }),
+    };
+    const refused = {
+      uuid: '44444444-4444-4444-8444-444444444444',
+      patient: issued.patient,
+      encounterType: { uuid: consentConfig.metadata.recipientEncounterTypeUuid },
+      encounterDatetime: '2026-10-16T15:01:00.000Z',
+      obs: [
+        {
+          concept: { uuid: consentConfig.metadata.documentConceptUuid },
+          value: JSON.stringify({
+            decision: 'declined',
+            folio: 'FR12-DECLINED',
+            decidedAt: '2026-10-16T15:00:00.000Z',
+            signer: 'Paciente de prueba',
+            signerRole: 'self',
+            reason: 'Negativa escrita',
+            format: 'EG05-FR12/v1',
+            reference: issued.uuid,
+            operation: '55555555-5555-4555-8555-555555555555',
+          }),
+        },
+      ],
+    };
+    let records: unknown[] = [];
+    vi.mocked(openmrsFetch).mockImplementation(async (url) => {
+      const path = String(url);
+      const data = path.includes('/order?')
+        ? { results: [issued] }
+        : path.includes('fr12-type')
+          ? { results: records }
+          : { person: { attributes: [] } };
+      return { data } as FetchResponse<unknown>;
+    });
+    render(<TransfusionsPage api={api} orderConfig={fr08Config} />);
+    const row = await screen.findByRole('row', { name: /ORD-43/ });
+    expect(row).toHaveTextContent(t('txConsentPending'));
+    expect(within(row).getByRole('button', { name: t('txAttend') })).toBeEnabled();
+    records = [refused];
+    window.dispatchEvent(new Event(recipientConsentChanged));
+    const cancelled = await screen.findByRole('row', { name: /ORD-43.*Cancelada por negativa/ });
+    expect(within(cancelled).queryByRole('button', { name: t('txAttend') })).not.toBeInTheDocument();
+    const history = screen.getByRole('button', { name: t('txHistory') });
+    await waitFor(() => expect(history).toBeEnabled());
+    fireEvent.click(history);
+    const dialog = within(await screen.findByRole('dialog', { name: t('txHistory') }));
+    const event = dialog.getByRole('row', { name: /ORD-43/ });
+    expect(event).toHaveTextContent(t('txCancelledDeclined'));
+    fireEvent.click(within(event).getByRole('button', { name: t('txViewDetail') }));
+    expect(await dialog.findByText('FR12-DECLINED')).toBeVisible();
+  });
+
+  it('records receipt and inspection from a cancelled dispatch detail', async () => {
+    consentConfig.enabled = true;
+    const api = createMockTransfusionsApi();
+    if (!api.prepareIssuedRequest) throw new Error('MISSING_ISSUED_WORKFLOW');
+    const { order } = (await api.list()).requests[0];
+    const issued = {
+      uuid: '11111111-1111-4111-8111-111111111111',
+      orderNumber: 'ORD-44',
+      dateActivated: order.requestedAt,
+      fulfillerStatus: 'RECEIVED',
+      concept: { uuid: fr08Config.conceptUuid },
+      orderType: { uuid: fr08Config.orderTypeUuid },
+      patient: { uuid: '22222222-2222-4222-8222-222222222222' },
+      encounter: { uuid: '33333333-3333-4333-8333-333333333333' },
+      orderer: { display: order.orderer },
+      instructions: JSON.stringify({ format: 'EG05-FR08/v1', request: order }),
+    };
+    const initial = await api.prepareIssuedRequest({
+      ...order,
+      id: issued.uuid,
+      number: issued.orderNumber,
+      patientId: issued.patient.uuid,
+      encounterId: issued.encounter.uuid,
+    });
+    const reviewed = await api.review(initial.id, initial.revision, {
+      ...initial.draft,
+      reviewer: 'Atención DEMO',
+      reviewVerified: true,
+      consentVerified: true,
+    });
+    const collectedAt = localDateTime();
+    const sampled = await api.saveSample(reviewed.id, reviewed.revision, {
+      ...reviewed.draft.sample,
+      collectedAt,
+      printRequestedAt: collectedAt,
+      collectedBy: 'Extracción DEMO',
+    });
+    const assigned = await api.assign(sampled.id, sampled.revision, [code(1), code(2), code(11)], true);
+    const round = assigned.rounds[0];
+    const compatible = await api.saveCompatibility(
+      assigned.id,
+      assigned.revision,
+      {
+        ...round,
+        operator: 'Laboratorio DEMO',
+        identityVerified: true,
+        pretransfusionVerified: true,
+        results: Object.fromEntries(Object.keys(round.results).map((id) => [id, 'compatible'])),
+      },
+      true,
+    );
+    await api.deliver(compatible.id, compatible.revision, {
+      ...compatible.draft,
+      releaseVerified: true,
+      deliveredBy: 'Entrega DEMO',
+      collectorName: 'Persona DEMO',
+      collectorDocument: '99999991',
+    });
+    const { bookEntries } = await api.list();
+    const original = bookEntries.find(({ unitCode }) => unitCode === code(1));
+    if (!original) throw new Error('MISSING_DISPATCH');
+    const dispatch = {
+      uuid: 'dispatch-encounter',
+      patient: issued.patient,
+      encounterType: { uuid: demoMetadata.encounters.dispatch },
+      encounterDatetime: original.at,
+      obs: [
+        {
+          concept: { uuid: demoMetadata.text },
+          value: JSON.stringify({
+            version: 1,
+            orderId: issued.uuid,
+            kind: 'dispatch',
+            deliveredUnits: bookEntries.map(({ component, unitCode, at }) => ({
+              component,
+              unitCode,
+              deliveredAt: at,
+            })),
+          }),
+        },
+      ],
+    };
+    const consent = {
+      uuid: '44444444-4444-4444-8444-444444444444',
+      patient: issued.patient,
+      encounterType: { uuid: consentConfig.metadata.recipientEncounterTypeUuid },
+      encounterDatetime: original.at,
+      obs: [
+        {
+          concept: { uuid: consentConfig.metadata.documentConceptUuid },
+          value: JSON.stringify({
+            decision: 'revoked',
+            folio: 'FR12-REVOKED',
+            decidedAt: original.at,
+            signer: 'Paciente DEMO',
+            signerRole: 'self',
+            format: 'EG05-FR12/v1',
+            reference: issued.uuid,
+            operation: '55555555-5555-4555-8555-555555555555',
+          }),
+        },
+      ],
+    };
+    const conduction = {
+      uuid: 'conduction-encounter',
+      patient: issued.patient,
+      encounterType: { uuid: demoMetadata.encounters.conduction },
+      encounterDatetime: original.at,
+      obs: [
+        {
+          concept: { uuid: demoMetadata.text },
+          value: JSON.stringify({
+            version: 1,
+            orderId: issued.uuid,
+            kind: 'conduction',
+            dispatch: { unitCode: code(2) },
+            fields: { startTime: '10:00' },
+            actor: { name: 'Enfermería DEMO' },
+            previous: '',
+          }),
+        },
+      ],
+    };
+    vi.mocked(openmrsFetch).mockImplementation(async (url) => {
+      const path = String(url);
+      const data = path.includes('/order?')
+        ? { results: [issued] }
+        : path.includes('/patient/')
+          ? { person: { attributes: [{ attributeType: { uuid: demoMetadata.testPatient }, value: 'true' }] } }
+          : {
+              results: path.includes('fr12-type')
+                ? [consent]
+                : path.includes(demoMetadata.encounters.dispatch)
+                  ? [dispatch]
+                  : [dispatch, conduction],
+            };
+      return { data } as FetchResponse<unknown>;
+    });
+    render(<TransfusionsPage api={api} orderConfig={fr08Config} />);
+    const history = screen.getByRole('button', { name: t('txHistory') });
+    await waitFor(() => expect(history).toBeEnabled());
+    fireEvent.click(history);
+    const dialog = within(await screen.findByRole('dialog', { name: t('txHistory') }));
+    const closure = dialog.getByRole('row', { name: /ORD-44.*Cancelada por revocación/ });
+    expect(dialog.getByRole('row', { name: /ORD-44.*Atendida/ })).toBeInTheDocument();
+    fireEvent.click(within(closure).getByRole('button', { name: t('txViewDetail') }));
+    const region = within(await dialog.findByRole('region', { name: t('txReturnUnits') }));
+    const card = region.getByRole('heading', { name: code(1) }).closest('article');
+    if (!card) throw new Error('MISSING_RETURN_CARD');
+    const controls = within(card);
+    fireEvent.click(controls.getByRole('button', { name: t('txRegisterReturn') }));
+    expect(controls.getByLabelText(t('txReturnReceivedBy'))).toHaveValue('Rosa Calderón');
+    fireEvent.change(controls.getByLabelText(t('txReturnReturnedBy')), { target: { value: 'Enfermería DEMO' } });
+    fireEvent.change(controls.getByLabelText(t('txReturnAdministration')), { target: { value: 'unused' } });
+    fireEvent.click(controls.getByRole('button', { name: t('txReturnSaveReceipt') }));
+    expect(await controls.findByText(t('txReturnInspection'))).toBeVisible();
+    expect((await api.list()).units.find(({ id }) => id === code(1))?.status).toBe('Devuelta · En evaluación');
+    fireEvent.click(controls.getByRole('button', { name: t('txReturnInspect') }));
+    fireEvent.change(controls.getByLabelText(t('txReturnDecision')), { target: { value: 'approved' } });
+    const approve = controls.getByRole('button', { name: t('txReturnApprove') });
+    expect(approve).toBeDisabled();
+    for (const key of [
+      'txReturnUnusedVerified',
+      'txReturnIntact',
+      'txReturnIdentity',
+      'txReturnSegment',
+      'txReturnConservation',
+    ]) {
+      fireEvent.click(controls.getByRole('checkbox', { name: t(key) }));
+    }
+    fireEvent.change(controls.getByLabelText(t('txReturnTemperatureMin')), { target: { value: '2' } });
+    fireEvent.change(controls.getByLabelText(t('txReturnTemperatureMax')), { target: { value: '7' } });
+    fireEvent.change(controls.getByLabelText(t('txReturnEvidence')), {
+      target: { value: 'Registro de transporte DEMO' },
+    });
+    fireEvent.click(approve);
+    expect(await controls.findByText(t('txReturnApproved'))).toBeVisible();
+    const workspace = await api.list();
+    expect(workspace.units.find(({ id }) => id === code(1))?.status).toBe('APTO');
+    expect(workspace.units.find(({ id }) => id === code(2))).toBeUndefined();
+    expect(workspace.bookEntries).toEqual(bookEntries);
+    const sibling = region.getByRole('heading', { name: code(2) }).closest('article');
+    if (!sibling) throw new Error('MISSING_SECOND_RETURN_CARD');
+    const siblingControls = within(sibling);
+    fireEvent.click(siblingControls.getByRole('button', { name: t('txRegisterReturn') }));
+    fireEvent.change(siblingControls.getByLabelText(t('txReturnReturnedBy')), { target: { value: 'Enfermería DEMO' } });
+    fireEvent.change(siblingControls.getByLabelText(t('txReturnAdministration')), { target: { value: 'unused' } });
+    fireEvent.click(siblingControls.getByRole('button', { name: t('txReturnSaveReceipt') }));
+    expect(await siblingControls.findByText(t('txReturnStartedError'))).toBeVisible();
+    expect((await api.list()).returns).toHaveLength(1);
+  });
+
   it('puts an issued request with a persisted dispatch in history when the tab has no local delivery record', async () => {
     const api = createMockTransfusionsApi();
     const { order } = (await api.list()).requests[0];

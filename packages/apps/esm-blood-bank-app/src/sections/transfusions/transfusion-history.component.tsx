@@ -5,11 +5,19 @@ import { useState } from 'react';
 import { printDocument } from '../../shared/print-document';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../shared/processing-page.component';
 import { componentDefinitions } from '../laboratory/fractionation/fractionation-rules';
+import { PaperConsentHistory, PaperConsentSummary, usePaperConsent } from '../consents/paper-consent.component';
+import { type ConsentRecord, recipientConsentSubject } from '../consents/paper-consent.resource';
 import { Fr08Document } from './fr08-document.component';
 import { TransfusionDetails } from './transfusion-details.component';
 import { CompatibilityReport, compatibilityReportPrintCss } from './transfusion-print.component';
+import { type ReturnActions, TransfusionReturns } from './transfusion-returns.component';
 import styles from './transfusions.scss';
-import type { TransfusionBookEntry, TransfusionOrder, TransfusionRequest } from './transfusions.types';
+import type {
+  TransfusionBookEntry,
+  TransfusionOrder,
+  TransfusionRequest,
+  TransfusionReturnView,
+} from './transfusions.types';
 import {
   compatibilityReportReady,
   priorityKeys,
@@ -17,10 +25,28 @@ import {
   transfusionStatusKeys,
 } from './transfusions-rules';
 
+type ConsentClosure = { order: TransfusionOrder; record: ConsentRecord; dispatched: boolean };
+
+function ConsentClosureDetail({ closure, t }: { closure: ConsentClosure; t: ProcessingTranslate }) {
+  const subject = recipientConsentSubject(closure.order);
+  const query = usePaperConsent(subject);
+  return (
+    <>
+      <PaperConsentSummary query={query} subject={subject} />
+      <PaperConsentHistory records={query.records} />
+      {closure.dispatched && <InlineNotification kind="warning" hideCloseButton title={t('txConsentReturn')} />}
+    </>
+  );
+}
+
 export function TransfusionHistory({
   requests = [],
   bookEntries,
   recordedDeliveries = [],
+  consentClosures = [],
+  returnDispatches = [],
+  returnRecords = [],
+  returnActions,
   onClose,
   t,
   compatibility = false,
@@ -30,14 +56,28 @@ export function TransfusionHistory({
       compatibility?: boolean;
       bookEntries?: never;
       recordedDeliveries?: { order: TransfusionOrder; deliveredAt: string }[];
+      consentClosures?: ConsentClosure[];
+      returnDispatches?: TransfusionBookEntry[];
+      returnRecords?: TransfusionReturnView[];
+      returnActions?: ReturnActions;
     }
-  | { bookEntries: TransfusionBookEntry[]; requests?: never; compatibility?: never; recordedDeliveries?: never }
+  | {
+      bookEntries: TransfusionBookEntry[];
+      requests?: never;
+      compatibility?: never;
+      recordedDeliveries?: never;
+      consentClosures?: never;
+      returnDispatches?: never;
+      returnRecords?: never;
+      returnActions?: never;
+    }
 )) {
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [detail, setDetail] = useState<TransfusionRequest | null>(null);
-  const [recordedDetail, setRecordedDetail] = useState<TransfusionOrder>();
+  const [closureDetail, setClosureDetail] = useState<ConsentClosure>();
+  const [recordedDetail, setRecordedDetail] = useState<{ order: TransfusionOrder; closure?: ConsentClosure }>();
   const reportReady = detail && compatibilityReportReady(detail);
   const [failed, setFailed] = useState(false);
   const title = t(bookEntries ? 'txBook' : compatibility ? 'txCompatibilityHistory' : 'txHistory');
@@ -57,12 +97,19 @@ export function TransfusionHistory({
     compatibility ? item.rounds.some((round) => !!round.completedAt) : item.status === 'delivered',
   );
   const localIds = new Set(localHistory.map((request) => request.order.id));
-  const filtered = [
+  const filtered: {
+    id: string;
+    order: TransfusionOrder;
+    at: string;
+    statusKey: string;
+    request?: TransfusionRequest;
+    closure?: ConsentClosure;
+  }[] = [
     ...localHistory.map((request) => ({
       id: request.id,
       order: request.order,
       at: historyDate(request),
-      status: request.status,
+      statusKey: transfusionStatusKeys[request.status],
       request,
     })),
     ...recordedDeliveries
@@ -71,10 +118,19 @@ export function TransfusionHistory({
         id: order.id,
         order,
         at: deliveredAt,
-        status: 'delivered' as const,
+        statusKey: transfusionStatusKeys.delivered,
         request: undefined,
       })),
-  ]
+    ...consentClosures.map((closure) => ({
+      id: `${closure.order.id}/${closure.record.uuid}`,
+      order: closure.order,
+      at: closure.record.decidedAt,
+      statusKey: closure.record.decision === 'declined' ? 'txCancelledDeclined' : 'txCancelledRevoked',
+      ...(closure.dispatched ? {} : { request: requests.find((request) => request.order.id === closure.order.id) }),
+      closure,
+    })),
+  ];
+  const filteredRows = filtered
     .filter(({ order, at }) => range(at) && matches(`${order.number} ${order.patientName} ${order.historyNumber}`))
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const book = bookEntries
@@ -125,6 +181,7 @@ export function TransfusionHistory({
                 renderIcon={ArrowLeft}
                 onClick={() => {
                   setDetail(null);
+                  setClosureDetail(undefined);
                   setFailed(false);
                 }}
               >
@@ -142,6 +199,7 @@ export function TransfusionHistory({
               </Button>
             </div>
             <TransfusionDetails request={detail} t={t} />
+            {closureDetail && <ConsentClosureDetail closure={closureDetail} t={t} />}
             <CompatibilityReport request={detail} t={t} history />
             <section className={styles.panel}>
               <h4>{t('txStateHistory')}</h4>
@@ -158,7 +216,19 @@ export function TransfusionHistory({
             <Button kind="ghost" size="sm" renderIcon={ArrowLeft} onClick={() => setRecordedDetail(undefined)}>
               {t('txBackHistory')}
             </Button>
-            <Fr08Document order={recordedDetail} t={t} />
+            {!recordedDetail.closure?.dispatched && <Fr08Document order={recordedDetail.order} t={t} />}
+            {recordedDetail.closure && <ConsentClosureDetail closure={recordedDetail.closure} t={t} />}
+            {recordedDetail.closure?.dispatched && (
+              <>
+                <TransfusionReturns
+                  dispatches={returnDispatches.filter((entry) => entry.requestId === recordedDetail.order.id)}
+                  records={returnRecords}
+                  actions={returnActions}
+                  t={t}
+                />
+                <Fr08Document order={recordedDetail.order} t={t} />
+              </>
+            )}
           </>
         ) : (
           <>
@@ -248,25 +318,29 @@ export function TransfusionHistory({
                   'txHistoryNumber',
                   'txPriority',
                   'status',
-                  compatibility ? 'txResultAt' : 'txDeliveredAt',
+                  compatibility ? 'txResultAt' : consentClosures.length ? 'txHistoryEventAt' : 'txDeliveredAt',
                   'actions',
                 ]}
-                rows={filtered.map((item) => ({
+                rows={filteredRows.map((item) => ({
                   id: item.id,
                   cells: [
                     item.order.number,
                     item.order.patientName,
                     item.order.historyNumber,
                     t(item.order.priority === 'veryUrgent' ? 'txVeryUrgentShort' : priorityKeys[item.order.priority]),
-                    t(transfusionStatusKeys[item.status]),
+                    t(item.statusKey),
                     formatDatetime(new Date(item.at), { noToday: true }),
                     <Button
                       key="detail"
                       kind="ghost"
                       size="sm"
                       onClick={() => {
-                        if (item.request) setDetail(item.request);
-                        else setRecordedDetail(item.order);
+                        if (item.request) {
+                          setDetail(item.request);
+                          setClosureDetail(item.closure);
+                        } else {
+                          setRecordedDetail({ order: item.order, closure: item.closure });
+                        }
                       }}
                     >
                       {t('txViewDetail')}

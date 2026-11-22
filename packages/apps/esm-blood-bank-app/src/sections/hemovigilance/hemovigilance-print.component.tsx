@@ -261,6 +261,12 @@ export function ConductionPrint({ unit, history, t }: { unit: UnitCase; history:
             <TimeText value={fields.endTime} showBlank={false} />
           </Field>
         </Line>
+        {fields.consentInterruptionUuid && (
+          <Line>
+            <Field label={t('consentInterruptionSaved')} />
+            <Field label={t('consentInterruptedVolume')}>{fields.consentInterruptedVolume}</Field>
+          </Line>
+        )}
         <table aria-label={t('monitoring')}>
           <colgroup>
             <col className="monitorLabel" />

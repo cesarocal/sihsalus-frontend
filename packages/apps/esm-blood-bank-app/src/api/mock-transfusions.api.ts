@@ -1,7 +1,9 @@
+import { validReturnInspection, validReturnReceipt } from '../sections/transfusions/transfusion-return-rules';
 import { inventoryUnitSealCode } from '../sections/inventory/inventory-rules';
 import { withInventoryFixtures } from '../mocks/inventory.mock';
 import type {
   TransfusionRequest,
+  TransfusionReturn,
   TransfusionStatus,
   TransfusionStore,
 } from '../sections/transfusions/transfusions.types';
@@ -23,6 +25,7 @@ import {
   readProcessingState,
   writeProcessingState,
 } from './mock-processing-store';
+import { inventoryStore } from './mock-inventory-store';
 import { transferUnits } from './mock-transfers.api';
 import { transfusionStore } from './mock-transfusions-store';
 import type { TransfusionsApi } from './transfusions.api';
@@ -76,8 +79,19 @@ export function createMockTransfusionsApi(
   };
   return {
     async list() {
-      const { store, units } = load();
-      return structuredClone({ ...store, units });
+      const { state, store, units } = load();
+      const disposals = inventoryStore(state).operations.filter(
+        (operation) => operation.kind === 'disposal' && operation.stage === 'completed',
+      );
+      const returns = store.returns.map((entry) => {
+        if (entry.inspection?.decision !== 'rejected') return entry;
+        const dispatch = store.bookEntries.find(({ id }) => id === entry.dispatchId);
+        const disposal = disposals.find((operation) => operation.units.some(({ id }) => id === dispatch?.unitCode));
+        return disposal?.completedAt
+          ? { ...entry, disposal: { operationId: disposal.id, at: disposal.completedAt } }
+          : entry;
+      });
+      return structuredClone({ ...store, returns, units });
     },
     async prepareIssuedRequest(order) {
       const { state, store } = load();
@@ -89,6 +103,87 @@ export function createMockTransfusionsApi(
       store.requests.push(request);
       writeProcessingState(getStorage, { ...state, transfusions: store });
       return structuredClone(request);
+    },
+    async cancelIssuedRequest(id, decision) {
+      const { state, store } = load();
+      const existing = store.requests.find((request) => request.id === id);
+      if (
+        !existing?.issuedOrder ||
+        existing.status === 'cancelled' ||
+        existing.status === 'delivered' ||
+        existing.deliveredAt ||
+        store.bookEntries.some((entry) => entry.requestId === id)
+      )
+        return false;
+      const request = structuredClone(existing);
+      const { uuid, decidedAt, decision: outcome, provider } = decision;
+      request.consentClosure = { uuid, decidedAt, decision: outcome, provider };
+      request.requesterStatus = 'CANCELADA';
+      for (const assignment of request.assignments) assignment.active = false;
+      persist(state, store, request, provider, 'cancelled');
+      return true;
+    },
+    async receiveReturnedUnit(dispatchId, consentDecisionUuid, receipt) {
+      const { state, store } = load();
+      const dispatch = store.bookEntries.find(({ id }) => id === dispatchId);
+      const request = store.requests.find(({ id }) => id === dispatch?.requestId);
+      if (
+        !dispatch ||
+        request?.status !== 'delivered' ||
+        !request.issuedOrder ||
+        !request.assignments.some(({ unit, active }) => active && unit.id === dispatch.unitCode) ||
+        !consentDecisionUuid.trim() ||
+        !validReturnReceipt(receipt) ||
+        store.returns.some((entry) => entry.dispatchId === dispatchId)
+      )
+        throw new Error('INVALID_TRANSFUSION_RETURN_RECEIPT');
+      const record: TransfusionReturn = {
+        dispatchId,
+        consentDecisionUuid,
+        receipt: {
+          ...receipt,
+          returnedBy: receipt.returnedBy.trim(),
+          receivedBy: receipt.receivedBy.trim(),
+          reason: receipt.reason.trim(),
+          at: new Date().toISOString(),
+        },
+      };
+      store.returns.push(record);
+      writeProcessingState(getStorage, { ...state, transfusions: store });
+      return record;
+    },
+    async inspectReturnedUnit(dispatchId, inspection) {
+      const { state, store, units } = load();
+      const entry = store.returns.find((value) => value.dispatchId === dispatchId);
+      const dispatch = store.bookEntries.find(({ id }) => id === dispatchId);
+      if (
+        !entry ||
+        entry.inspection ||
+        !dispatch ||
+        !validReturnInspection(inspection, entry.receipt.administration, dispatch.component)
+      )
+        throw new Error('INVALID_TRANSFUSION_RETURN_INSPECTION');
+      if (inspection.decision === 'approved') {
+        const unit = units.find(({ id }) => id === dispatch.unitCode);
+        const request = store.requests.find(({ id }) => id === dispatch.requestId);
+        if (
+          unit?.status !== 'Devuelta · En evaluación' ||
+          !unit.sealId ||
+          inventoryUnitSealCode(unit) !== dispatch.seal ||
+          !request ||
+          !transfusionCandidate({ ...unit, status: 'APTO' }, { ...request, assignments: [] })
+        )
+          throw new Error('TRANSFUSION_RETURN_STOCK_CONFLICT');
+      }
+      entry.inspection = {
+        ...inspection,
+        inspectedBy: inspection.inspectedBy.trim(),
+        evidence: inspection.evidence.trim(),
+        rejectionReason: inspection.rejectionReason.trim(),
+        at: new Date().toISOString(),
+      };
+      writeProcessingState(getStorage, { ...state, transfusions: store });
+      return entry;
     },
     async saveDraft(id, revision, draft) {
       const { state, store } = load();

@@ -24,6 +24,8 @@ const sharedStatusColors = {
   APTO: 'green',
   'En fraccionamiento': 'blue',
   'No apta': 'red',
+  'Devuelta · En evaluación': 'warm-gray',
+  'No apta para reemisión': 'red',
 } as const;
 const workflowStatusColors: Partial<Record<InventoryUnit['status'], TagColor>> = {
   ...sharedStatusColors,

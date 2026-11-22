@@ -1,5 +1,7 @@
-import { userHasAccess, useSession } from '@openmrs/esm-framework';
+import { useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useRef, useState } from 'react';
+import type { BloodBankConfig } from '../../config-schema';
+import { closesTransfusion, listConsent, recipientConsentSubject } from '../consents/paper-consent.resource';
 import { notifySuccess } from '../../shared/notify-success';
 import {
   type IssuedTransfusionOrder,
@@ -12,6 +14,7 @@ import { useTransfusionsTranslation } from './use-transfusions-translation';
 export function useTransfusionReceipt(config?: TransfusionOrderConfig, issued?: IssuedTransfusionOrder) {
   const { authenticated, user } = useSession();
   const t = useTransfusionsTranslation();
+  const { paperConsent } = useConfig<BloodBankConfig>();
   const [state, setState] = useState<'idle' | 'saving' | 'failed' | 'received'>('idle');
   const inFlight = useRef(false);
   const received = state === 'received' || issued?.fulfillerStatus === 'RECEIVED';
@@ -30,6 +33,10 @@ export function useTransfusionReceipt(config?: TransfusionOrderConfig, issued?: 
     inFlight.current = true;
     setState('saving');
     try {
+      if (paperConsent) {
+        const [latest] = await listConsent(paperConsent, recipientConsentSubject(issued.order));
+        if (closesTransfusion(latest?.decision)) throw new Error('CONSENT_REQUEST_CLOSED');
+      }
       await receiveTransfusionOrder(config, issued.order.id);
       setState('received');
       notifySuccess(t('fr08ReceiptRegistered'));

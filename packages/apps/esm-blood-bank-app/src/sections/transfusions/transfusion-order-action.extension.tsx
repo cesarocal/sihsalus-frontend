@@ -25,7 +25,7 @@ import {
   useSession,
   useVisit,
 } from '@openmrs/esm-framework';
-import { type FormEvent, useCallback, useId, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BloodBankConfig } from '../../config-schema';
 import { useProcessingData } from '../../shared/processing-page.component';
@@ -282,6 +282,9 @@ function TransfusionOrderForm({
   const inFlight = useRef(false);
   const submissionId = useRef<string>();
   const modalBody = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editingConsent && issued && modalBody.current) modalBody.current.scrollTop = 0;
+  }, [editingConsent, issued]);
   const formId = useId();
   const provider = session.currentProvider;
   const providerName = session.user?.person?.display;
@@ -350,6 +353,7 @@ function TransfusionOrderForm({
         submissionId.current,
       );
       setIssued(order);
+      setEditingConsent(true);
       window.dispatchEvent(new Event(transfusionOrdersChanged));
     } catch {
       setFailed(true);
@@ -404,7 +408,7 @@ function TransfusionOrderForm({
       }}
     >
       <ModalHeader
-        title={editingConsent ? consentText('openRecipient') : t('fr08Title')}
+        title={editingConsent && issued ? `${consentText('openRecipient')} · ${issued.order.number}` : t('fr08Title')}
         iconDescription={t('close')}
       />
       <ModalBody ref={modalBody} className={styles.fr08ModalBody} aria-label={t('fr08Title')} hasScrollingContent>

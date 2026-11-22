@@ -10,7 +10,7 @@ import {
 import { useRef, useState } from 'react';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { PaperConsentSummary, usePaperConsent } from '../consents/paper-consent.component';
-import { isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
+import { closesTransfusion, isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
 import { Fr08Document, PrintFr08 } from './fr08-document.component';
 import type { IssuedTransfusionOrder, TransfusionOrderConfig } from './transfusion-order.resource';
 import styles from './transfusions.scss';
@@ -35,7 +35,10 @@ export function IssuedTransfusionOrderDialog({
   const [verified, setVerified] = useState(false);
   const subject = isClinicalUuid(order.id) ? recipientConsentSubject(order) : undefined;
   const consent = usePaperConsent(subject);
-  const receipt = useTransfusionReceipt(attend ? config : undefined, issued);
+  const receipt = useTransfusionReceipt(
+    attend && !closesTransfusion(consent.latest?.decision) ? config : undefined,
+    issued,
+  );
   const closeGuard = useRef({ saving: receipt.saving, onClose });
   closeGuard.current = { saving: receipt.saving, onClose };
   const title = attend ? t('txRequestTitle') : t('fr08Title');

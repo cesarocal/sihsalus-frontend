@@ -11,6 +11,7 @@ import {
   Select,
   SelectItem,
   Tag,
+  TextInput,
 } from '@carbon/react';
 import { ArrowLeft, Printer, RainDrop, Report } from '@carbon/react/icons';
 import { ConfigurableLink, useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
@@ -21,7 +22,12 @@ import { moduleName } from '../../constants';
 import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirmation.component';
 import { formatListDate } from '../../shared/format-list-date';
 import { PaperConsentSummary, useConsentTranslation, usePaperConsent } from '../consents/paper-consent.component';
-import { isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
+import {
+  closesTransfusion,
+  isClinicalUuid,
+  permitsAdministration,
+  recipientConsentSubject,
+} from '../consents/paper-consent.resource';
 import { notifySuccess } from '../../shared/notify-success';
 import { printDocument, type PrintPageFit } from '../../shared/print-document';
 import {
@@ -351,11 +357,16 @@ function UnitCaseDialog({
   const conduction = stage === 'conduction';
   const consentText = useConsentTranslation();
   const consentSubject = !bank && isClinicalUuid(unit.order.id) ? recipientConsentSubject(unit.order) : undefined;
-  const consent = usePaperConsent(conduction ? consentSubject : undefined);
+  const savedConduction = unit.sections.conduction?.fields;
+  const inProgress = Boolean(savedConduction?.startTime && !savedConduction.endTime);
+  const consent = usePaperConsent(conduction ? consentSubject : undefined, inProgress);
   const [checkedConsent, setCheckedConsent] = useState<string>();
-  const needsConsent = conduction && !!consentSubject && !unit.sections.conduction?.fields.startTime;
-  const consentVerified =
-    !needsConsent || (consent.latest?.decision === 'granted' && consent.latest.uuid === checkedConsent);
+  const needsConsent = conduction && !!consentSubject && !savedConduction?.startTime;
+  const administrationAllowed = Boolean(consentSubject && permitsAdministration(consentSubject, consent.latest));
+  const consentVerified = !needsConsent || (administrationAllowed && consent.latest?.uuid === checkedConsent);
+  const consentClosed = closesTransfusion(consent.latest?.decision);
+  const mustInterrupt = consentClosed && inProgress;
+  const interrupted = Boolean(savedConduction?.consentInterruptionUuid);
   const physician = session.authenticated && userHasAccess(hemoPrivileges.review, session.user);
   const canPrintConduction = Boolean(unit.sections.conduction?.fields.endTime) && !busy && !changed;
   const finalizing = conduction && Boolean(fields.endTime);
@@ -413,13 +424,27 @@ function UnitCaseDialog({
     setBusy(true);
     setError('');
     try {
-      if (action === 'conduction' && needsConsent) {
+      if (action === 'conduction' && consentSubject) {
         const [current] = await consent.read();
-        if (current?.decision !== 'granted' || current.uuid !== checkedConsent) {
-          setError('currentConsentRequired');
-          return 'failed';
+        if (!savedConduction?.startTime) {
+          if (!current || !permitsAdministration(consentSubject, current) || current.uuid !== checkedConsent) {
+            setError('currentConsentRequired');
+            return 'failed';
+          }
+          const startedAt = Date.parse(`${values.conductionDate}T${values.startTime}`);
+          if (Math.floor(Date.parse(current.decidedAt) / 60_000) > Math.floor(startedAt / 60_000)) {
+            setError('consentBeforeStart');
+            return 'failed';
+          }
+          values = { ...values, consentEncounterUuid: current.uuid };
+        } else if (current && closesTransfusion(current.decision)) {
+          const volume = values.consentInterruptedVolume;
+          if (!values.endTime || !volume?.trim() || !Number.isFinite(Number(volume)) || Number(volume) < 0) {
+            setError('consentInterruptionRequired');
+            return 'failed';
+          }
+          values = { ...values, consentInterruptionUuid: current.uuid };
         }
-        values = { ...values, consentEncounterUuid: current.uuid };
       }
       const record = await saveHemovigilance(unit, action, values, actor);
       setEditor((current) => {
@@ -541,11 +566,40 @@ function UnitCaseDialog({
               {needsConsent && canEdit('conduction') && (
                 <Checkbox
                   id="hemo-verify-fr12"
-                  labelText={consentText('verify')}
+                  labelText={consentText(consent.latest?.decision === 'emergency' ? 'verifyEmergency' : 'verify')}
                   checked={consentVerified}
-                  disabled={busy || consent.latest?.decision !== 'granted'}
+                  disabled={busy || !administrationAllowed}
                   onChange={(_event, { checked }) => setCheckedConsent(checked ? consent.latest?.uuid : undefined)}
                 />
+              )}
+              {consentClosed && needsConsent && (
+                <InlineNotification hideCloseButton kind="warning" title={t('consentStartBlocked')} />
+              )}
+              {(mustInterrupt || interrupted) && (
+                <div>
+                  <InlineNotification
+                    hideCloseButton
+                    kind={mustInterrupt ? 'warning' : 'info'}
+                    title={t(mustInterrupt ? 'consentInterruptionRequired' : 'consentInterruptionSaved')}
+                  />
+                  <TextInput
+                    id="hemo-consent-interruption-volume"
+                    type="number"
+                    min={0}
+                    step="any"
+                    labelText={t('consentInterruptedVolume')}
+                    value={fields.consentInterruptedVolume ?? ''}
+                    readOnly={!mustInterrupt || !canEdit('conduction')}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setEditor((current) => ({
+                        ...current,
+                        changed: true,
+                        fields: { ...current.fields, consentInterruptedVolume: value },
+                      }));
+                    }}
+                  />
+                </div>
               )}
             </div>
           )}

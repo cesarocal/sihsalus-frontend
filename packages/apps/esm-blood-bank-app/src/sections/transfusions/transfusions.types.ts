@@ -9,7 +9,8 @@ export type TransfusionStatus =
   | 'incompatible'
   | 'compatible'
   | 'readyUrgent'
-  | 'delivered';
+  | 'delivered'
+  | 'cancelled';
 export type TransfusionPriority = 'scheduled' | 'urgent' | 'veryUrgent';
 export interface TransfusionOrder {
   id: string;
@@ -109,7 +110,8 @@ export interface TransfusionRequest {
   rounds: CompatibilityRound[];
   events: { id?: string; at: string; status: TransfusionStatus; actor: string }[];
   deliveredAt: string | null;
-  requesterStatus: 'PENDIENTE' | 'ATENDIDA';
+  requesterStatus: 'PENDIENTE' | 'ATENDIDA' | 'CANCELADA';
+  consentClosure?: { uuid: string; decidedAt: string; decision: 'declined' | 'revoked'; provider: string };
 }
 /** FR10 is an issue/dispatch record, not evidence of administration to the patient. */
 export interface TransfusionBookEntry {
@@ -132,10 +134,42 @@ export interface TransfusionBookEntry {
   compatibilityPendingAtDispatch?: true;
   compatibilityAfterDispatch?: { result: 'compatible' | 'incompatible'; at: string };
 }
+export interface TransfusionReturnReceipt {
+  returnedBy: string;
+  receivedBy: string;
+  reason: string;
+  administration: 'unused' | 'started' | 'unknown';
+}
+
+export interface TransfusionReturnInspection {
+  decision: 'approved' | 'rejected';
+  inspectedBy: string;
+  notAdministered: boolean;
+  intact: boolean;
+  segmentAttached: boolean;
+  identityVerified: boolean;
+  conservationVerified: boolean;
+  minimumTemperature: string;
+  maximumTemperature: string;
+  evidence: string;
+  rejectionReason: string;
+}
+
+export interface TransfusionReturn {
+  dispatchId: string;
+  consentDecisionUuid: string;
+  receipt: TransfusionReturnReceipt & { at: string };
+  inspection?: TransfusionReturnInspection & { at: string };
+}
+
 export interface TransfusionStore {
   requests: TransfusionRequest[];
   bookEntries: TransfusionBookEntry[];
+  returns?: TransfusionReturn[];
 }
+export type TransfusionReturnView = TransfusionReturn & { disposal?: { operationId: string; at: string } };
+
 export interface TransfusionWorkspace extends TransfusionStore {
   units: TransferUnit[];
+  returns?: TransfusionReturnView[];
 }

@@ -40,6 +40,8 @@ export interface InventorySummary {
     | 'En fraccionamiento'
     | 'Sello pendiente'
     | 'No apta'
+    | 'Devuelta · En evaluación'
+    | 'No apta para reemisión'
     | 'APTO'
     | 'Por transferir'
     | 'En proceso de eliminación'

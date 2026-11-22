@@ -9,7 +9,7 @@ import { ProcessingModal } from '../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../shared/processing-page.component';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
 import { PaperConsentSummary, usePaperConsent } from '../consents/paper-consent.component';
-import { isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
+import { closesTransfusion, isClinicalUuid, recipientConsentSubject } from '../consents/paper-consent.resource';
 import { FractionationContent } from '../laboratory/fractionation/fractionation-content.component';
 import type { TransferUnit } from '../transfers/transfers.types';
 import { TransfusionDetails } from './transfusion-details.component';
@@ -132,7 +132,7 @@ export function TransfusionWorkflow({
     }
   };
   const saveDraft = async () => {
-    if (!dirty) return 'unchanged' as const;
+    if (!dirty || closesTransfusion(consent.latest?.decision)) return 'unchanged' as const;
     return (await execute(() => api.saveDraft(request.id, request.revision, draft), 'txDraftSaved'))
       ? ('saved' as const)
       : ('failed' as const);
@@ -150,22 +150,26 @@ export function TransfusionWorkflow({
       sampleValid({ ...sample, urgentPairVerified: true }, request.order));
   const sampleReady = !!request.sample || (samplePrinted && sampleValid(sample, request.order));
   const selectedUnits = units.filter((unit) => draft.selectedUnitIds.includes(unit.id));
+  const closed = closesTransfusion(consent.latest?.decision);
+  const urgentAuthorizationVerified = Boolean(draft.urgentAuthorizationVerified || request.urgentAuthorization);
   const consentVerified = consentSubject
     ? !!consent.records &&
-      (consent.latest
-        ? consent.latest.decision === 'granted' &&
+      !closed &&
+      ((veryUrgent && urgentAuthorizationVerified) ||
+        (consent.latest?.decision === 'granted' &&
           draft.consentVerified &&
-          consent.latest.uuid === draft.consentEncounterUuid
-        : veryUrgent && !!(draft.urgentAuthorizationVerified || request.urgentAuthorization))
+          consent.latest.uuid === draft.consentEncounterUuid))
     : draft.consentVerified;
   const verifyCurrentConsent = async () => {
     if (!consentSubject) return;
     const [current] = await consent.read();
-    if (
-      current
-        ? current.decision !== 'granted' || !draft.consentVerified || current.uuid !== draft.consentEncounterUuid
-        : !veryUrgent || !(draft.urgentAuthorizationVerified || request.urgentAuthorization)
-    )
+    if (current && closesTransfusion(current.decision)) {
+      await api.cancelIssuedRequest?.(request.id, { ...current, decision: current.decision });
+      onSaved();
+      throw new Error('CONSENT_NOT_VERIFIED');
+    }
+    if (veryUrgent && urgentAuthorizationVerified) return;
+    if (current?.decision !== 'granted' || !draft.consentVerified || current.uuid !== draft.consentEncounterUuid)
       throw new Error('CONSENT_NOT_VERIFIED');
   };
   const assignmentEffects = veryUrgent
@@ -175,6 +179,7 @@ export function TransfusionWorkflow({
         selectedUnits.some((unit) => !needsCrossmatch(unit.componentType)) && t('txAssignReserveEffect'),
       ].filter((item): item is string => typeof item === 'string');
   const advance = async () => {
+    if (closed) return;
     if (delivery) {
       if (step === 0) setStep(1);
       else if (
@@ -316,7 +321,7 @@ export function TransfusionWorkflow({
         extraActions={
           reviewStep ? (
             <div className={styles.receiptActions}>
-              {receipt.canReceive && (
+              {receipt.canReceive && !closed && (
                 <Button
                   kind="tertiary"
                   size="sm"
@@ -392,7 +397,7 @@ export function TransfusionWorkflow({
                   <Checkbox
                     id="tx-current-consent-check"
                     labelText={t('txVerifyCurrentConsent')}
-                    checked={consentVerified}
+                    checked={draft.consentVerified && consent.latest.uuid === draft.consentEncounterUuid}
                     disabled={saving || receipt.saving}
                     onChange={(_event, { checked }) =>
                       change({
@@ -566,10 +571,10 @@ export function TransfusionWorkflow({
             void (async () => {
               const result = await execute(
                 async () => {
+                  if (confirm === 'deliver' && request.issuedOrder) await beforeDelivery?.(request.order);
                   await verifyCurrentConsent();
                   if (confirm === 'assign')
                     return api.assign(request.id, request.revision, draft.selectedUnitIds, draft.selectionVerified);
-                  if (request.issuedOrder) await beforeDelivery?.(request.order);
                   const delivered = await api.deliver(request.id, request.revision, {
                     ...draft,
                     deliveredBy: operator,

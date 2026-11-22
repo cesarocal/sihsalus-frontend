@@ -192,6 +192,8 @@ export function inventoryWorkspace(state: ProcessingState): InventoryWorkspace {
       const transfer = transferUnitState(state, unit.id);
       if (transfusion === 'testing') status = 'En pruebas de compatibilidad';
       else if (transfusion === 'reserved') status = 'Reservados para transfusión';
+      else if (transfusion === 'returnInspection') status = 'Devuelta · En evaluación';
+      else if (transfusion === 'returnRejected') status = 'No apta para reemisión';
       else if (transfer === 'prepared') status = 'Por transferir';
       const disposalOperationId = disposing.get(unit.id);
       return {

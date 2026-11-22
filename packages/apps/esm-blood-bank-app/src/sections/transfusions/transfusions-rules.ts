@@ -22,6 +22,7 @@ export const transfusionStatusKeys = {
   compatible: 'txCompatible',
   readyUrgent: 'txReadyUrgent',
   delivered: 'txDelivered',
+  cancelled: 'fr08Cancelled',
 } as const;
 export const priorityKeys = { scheduled: 'txScheduled', urgent: 'txUrgent', veryUrgent: 'txVeryUrgent' } as const;
 /** Match native date filters to the local calendar day displayed by the UI. */
@@ -45,7 +46,9 @@ export const lockedAssignments = (request: TransfusionRequest) =>
   request.assignments.filter((item) => item.active && item.result !== 'pending');
 export const readyForDelivery = (status: TransfusionStatus) => status === 'compatible' || status === 'readyUrgent';
 export const compatibilityPending = (request: TransfusionRequest, round: CompatibilityRound) =>
-  !round.completedAt && (request.order.priority !== 'veryUrgent' || !!request.deliveredAt);
+  request.status !== 'cancelled' &&
+  !round.completedAt &&
+  (request.order.priority !== 'veryUrgent' || !!request.deliveredAt);
 export const compatibilityNeedsCommunication = (request: TransfusionRequest, round: CompatibilityRound) =>
   request.order.priority === 'veryUrgent' && !!request.deliveredAt && !!round.completedAt && !round.communicated;
 export const urgentSerumSampleCode = (sample: RecipientSample) => `${sample.code}-S`;

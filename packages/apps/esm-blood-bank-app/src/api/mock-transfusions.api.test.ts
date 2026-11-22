@@ -3,7 +3,11 @@ import { withInventoryFixtures } from '../mocks/inventory.mock';
 import { disposalOperation } from '../sections/inventory/inventory-test-fixtures';
 import type { ComponentType } from '../sections/laboratory/fractionation/fractionation.types';
 import { localDateTime } from '../sections/laboratory/screening/screening-rules';
-import type { TransfusionRequest } from '../sections/transfusions/transfusions.types';
+import type {
+  TransfusionRequest,
+  TransfusionReturnInspection,
+  TransfusionReturnReceipt,
+} from '../sections/transfusions/transfusions.types';
 import {
   comparePriority,
   compatibilityNeedsCommunication,
@@ -26,7 +30,9 @@ async function readyStock() {
   expect(units.every((unit) => unit.status === 'APTO' && !!unit.sealId)).toBe(true);
 }
 async function sampled(number = 1, api = createMockTransfusionsApi()) {
-  const request = (await api.list()).requests[number - 1];
+  return reviewAndSample((await api.list()).requests[number - 1], api);
+}
+async function reviewAndSample(request: TransfusionRequest, api: ReturnType<typeof createMockTransfusionsApi>) {
   const reviewed = await api.review(request.id, request.revision, {
     ...request.draft,
     reviewer: 'Responsable DEMO',
@@ -78,6 +84,46 @@ const pickup = (request: TransfusionRequest) => ({
   releaseVerified: true,
 });
 
+const receipt: TransfusionReturnReceipt = {
+  returnedBy: 'Profesional que devuelve DEMO',
+  receivedBy: 'Profesional que recibe DEMO',
+  reason: 'Revocación del FR12',
+  administration: 'unused',
+};
+const inspection: TransfusionReturnInspection = {
+  decision: 'approved',
+  inspectedBy: 'Profesional que inspecciona DEMO',
+  notAdministered: true,
+  intact: true,
+  segmentAttached: true,
+  identityVerified: true,
+  conservationVerified: true,
+  minimumTemperature: '1',
+  maximumTemperature: '10',
+  evidence: 'Registro validado de transporte DEMO',
+  rejectionReason: '',
+};
+async function issuedDelivery() {
+  const api = createMockTransfusionsApi();
+  if (!api.prepareIssuedRequest || !api.receiveReturnedUnit || !api.inspectReturnedUnit) {
+    throw new Error('MISSING_RETURN_FIXTURE_SUPPORT');
+  }
+  const { order } = (await api.list()).requests[0];
+  const issued = await api.prepareIssuedRequest({ ...order, id: 'issued-with-return' });
+  const sample = await reviewAndSample(issued, api);
+  const assigned = await api.assign(sample.id, sample.revision, [unitCode(1), unitCode(2), unitCode(11)], true);
+  const verified = await results(assigned, false, api);
+  const delivered = await api.deliver(verified.id, verified.revision, pickup(verified));
+  const dispatches = (await api.list()).bookEntries;
+  return {
+    api,
+    delivered,
+    dispatches,
+    receive: api.receiveReturnedUnit,
+    inspect: api.inspectReturnedUnit,
+  };
+}
+
 describe('regular transfusion attention and compatibility shared stock', () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -122,6 +168,113 @@ describe('regular transfusion attention and compatibility shared stock', () => {
     ]);
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
   });
+  it('releases only pre-dispatch allocations for a closed FR08 and preserves the recorded rounds', async () => {
+    const api = createMockTransfusionsApi();
+    const { order } = (await api.list()).requests[0];
+    if (!api.prepareIssuedRequest || !api.cancelIssuedRequest) throw new Error('MISSING_ISSUED_WORKFLOW');
+    const issued = await api.prepareIssuedRequest({ ...order, id: 'issued-order' });
+    const reviewed = await api.review(issued.id, issued.revision, {
+      ...issued.draft,
+      reviewer: 'Responsable DEMO',
+      reviewVerified: true,
+      consentVerified: true,
+    });
+    const collectedAt = localDateTime();
+    const sample = await api.saveSample(reviewed.id, reviewed.revision, {
+      ...reviewed.draft.sample,
+      collectedAt,
+      collectedBy: 'Extracción DEMO',
+      printRequestedAt: collectedAt,
+    });
+    const request = await api.assign(sample.id, sample.revision, [unitCode(1), unitCode(2), unitCode(11)], true);
+    const closure = {
+      uuid: 'revocation',
+      decision: 'revoked' as const,
+      decidedAt: new Date().toISOString(),
+      provider: 'Médico DEMO',
+    };
+    expect((await api.list()).units.find(({ id }) => id === unitCode(1))?.status).toBe('En pruebas de compatibilidad');
+    expect(await api.cancelIssuedRequest(request.id, closure)).toBe(true);
+    expect(await api.cancelIssuedRequest(request.id, closure)).toBe(false);
+    const { requests, units, bookEntries } = await api.list();
+    const closed = requests.find(({ id }) => id === issued.id);
+    expect(closed).toMatchObject({ status: 'cancelled', consentClosure: closure, rounds: request.rounds });
+    expect(closed?.assignments).toHaveLength(request.assignments.length);
+    expect(closed?.assignments.every(({ active }) => !active)).toBe(true);
+    expect(units.find(({ id }) => id === unitCode(1))?.status).toBe('APTO');
+    expect(bookEntries).toHaveLength(0);
+    await expect(api.saveCompatibility(request.id, request.revision, request.rounds[0], false)).rejects.toThrow(
+      'TRANSFUSION_CONFLICT',
+    );
+  });
+
+  it('holds a returned unit until approval and keeps the original delivery through a new assignment', async () => {
+    const { api, delivered, dispatches, receive, inspect } = await issuedDelivery();
+    const inventory = createMockInventoryApi();
+    const [dispatch] = dispatches;
+    expect((await inventory.list()).units.some(({ id }) => id === dispatch.unitCode)).toBe(false);
+    const returned = await receive(dispatch.id, 'fr12-revoked', receipt);
+    expect(returned).toMatchObject({ dispatchId: dispatch.id, consentDecisionUuid: 'fr12-revoked', receipt });
+    await expect(receive(dispatch.id, 'fr12-revoked', receipt)).rejects.toThrow('INVALID_TRANSFUSION_RETURN_RECEIPT');
+    const received = (await api.list()).units.find(({ id }) => id === dispatch.unitCode);
+    expect(received).toMatchObject({ status: 'Devuelta · En evaluación', canDispose: false });
+    if (!received) throw new Error('MISSING_RETURN_UNIT');
+    expect(transfusionCandidate(received, delivered)).toBe(false);
+    await expect(inspect(dispatch.id, { ...inspection, maximumTemperature: '10.1' })).rejects.toThrow(
+      'INVALID_TRANSFUSION_RETURN_INSPECTION',
+    );
+    await expect(inspect(dispatch.id, { ...inspection, segmentAttached: false })).rejects.toThrow(
+      'INVALID_TRANSFUSION_RETURN_INSPECTION',
+    );
+    expect((await inventory.list()).units.find(({ id }) => id === dispatch.unitCode)?.status).toBe(
+      'Devuelta · En evaluación',
+    );
+    const accepted = await inspect(dispatch.id, inspection);
+    expect(accepted.inspection?.decision).toBe('approved');
+    expect((await inventory.list()).units.find(({ id }) => id === dispatch.unitCode)).toMatchObject({
+      id: dispatch.unitCode,
+      status: 'APTO',
+      expiresAt: received.expiresAt,
+      sealId: received.sealId,
+    });
+    expect((await inventory.list()).units.some(({ id }) => id === dispatches[1].unitCode)).toBe(false);
+    if (!api.prepareIssuedRequest) throw new Error('MISSING_SECOND_REQUEST_SUPPORT');
+    const nextOrder = await api.prepareIssuedRequest({
+      ...delivered.order,
+      id: 'second-issued-order',
+      items: [{ component: dispatch.component, quantity: 1 }],
+    });
+    const nextSample = await reviewAndSample(nextOrder, api);
+    await api.assign(nextSample.id, nextSample.revision, [dispatch.unitCode], true);
+    const next = await api.list();
+    expect(next.units.find(({ id }) => id === dispatch.unitCode)?.status).toBe('En pruebas de compatibilidad');
+    expect(next.requests.find(({ id }) => id === delivered.id)).toEqual(delivered);
+    expect(next.bookEntries).toEqual(dispatches);
+  });
+
+  it('blocks reissue of a used return and keeps its disposal linked from the return history', async () => {
+    const { api, dispatches, receive, inspect } = await issuedDelivery();
+    const inventory = createMockInventoryApi();
+    const [dispatch] = dispatches;
+    await receive(dispatch.id, 'fr12-revoked', { ...receipt, administration: 'started' });
+    await expect(inspect(dispatch.id, inspection)).rejects.toThrow('INVALID_TRANSFUSION_RETURN_INSPECTION');
+    await inspect(dispatch.id, { ...inspection, decision: 'rejected', rejectionReason: 'Bolsa utilizada' });
+    const unit = (await inventory.list()).units.find(({ id }) => id === dispatch.unitCode);
+    expect(unit).toMatchObject({ status: 'No apta para reemisión', canDispose: true });
+    if (!unit) throw new Error('MISSING_RETURN_UNIT');
+    const operation = disposalOperation([unit]);
+    const selected = await inventory.saveDisposalSelection(operation);
+    const review = await inventory.saveDisposalDetails(selected);
+    const completed = await inventory.dispose(review);
+    expect((await inventory.list()).units.some(({ id }) => id === dispatch.unitCode)).toBe(false);
+    const history = await api.list();
+    expect(history.returns?.[0]).toMatchObject({
+      disposal: { operationId: completed.id },
+      inspection: { decision: 'rejected' },
+    });
+    expect(history.bookEntries).toEqual(dispatches);
+  });
+
   it('adds the new fixtures to saved sessions and keeps their existing requests and progress', async () => {
     const api = createMockTransfusionsApi();
     const registered = await sampled(1, api);

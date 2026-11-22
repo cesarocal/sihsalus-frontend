@@ -31,13 +31,32 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   el FR05 de una postulación seleccionada vinculada a un paciente y una visita
   de OpenMRS. **Extracción** requiere una decisión otorgada antes de etiquetar
   y de guardar el volumen. Las extracciones históricas siguen consultables.
-- En **Órdenes**, el médico abre **Consentimiento FR12** después de emitir el
-  FR08. Para una orden ya emitida, abre el mismo diálogo con la flecha de la
-  tarjeta de transfusión y elige la solicitud. Banco de Sangre verifica el
-  folio y el estado vigente durante la atención. Enfermería los comprueba
-  antes del primer guardado de la conducción y conserva el UUID del encuentro
-  verificado. El despacho PC13 conserva su autorización FR08 independiente.
-  El arranque de una administración por excepción legal requiere su propio flujo.
+- Al emitir el FR08 en **Órdenes**, el sistema abre el FR12. Para consultar
+  o actualizar la decisión de una solicitud existente se usa la flecha de la
+  tarjeta de transfusión. En el flujo regular, Banco de Sangre puede registrar
+  la recepción y requiere un FR12 otorgado para continuar la atención.
+- En PC13, la autorización del FR08 habilita el despacho muy urgente antes de
+  las pruebas de compatibilidad. Enfermería verifica el FR12 vigente o una
+  excepción por emergencia previamente documentada por el médico en la historia
+  clínica. La Hoja de conducción conserva el encuentro verificado.
+- La negativa o revocación cierra el FR08 en el módulo y conserva el historial de
+  decisiones. Antes del despacho libera las reservas del inventario de prueba.
+  Después del despacho se mantiene su trazabilidad y la devolución de unidades
+  sin administrar se gestiona por el procedimiento del hospital. Si ya se
+  inició la transfusión, Enfermería registra el término por interrupción y el
+  volumen administrado en la Hoja de conducción.
+- En **Transfusiones → Historial de solicitudes → Ver detalle** de una
+  cancelación con despacho, Banco de Sangre registra la recepción física por
+  unidad y su inspección. La devolución se vincula con la decisión FR12 y el
+  egreso original. Mientras está en evaluación, la unidad se excluye del stock
+  disponible. La aprobación conserva código, sello y vencimiento, y el rechazo
+  deja la unidad elegible para el flujo de eliminación. Este circuito opera en
+  localhost con el inventario de prueba de la pestaña que conserva el egreso.
+  Requiere acceso a Transfusiones, edición de órdenes y lectura de los registros
+  de consentimiento y conducción. El adaptador clínico de stock sigue pendiente.
+- La impresión del FR12 usa la distribución del formato de PRONAHEBAS y deja
+  espacio para documentar la información clínica, la decisión y las firmas en
+  papel. El folio y el número de FR08 permiten vincular el original al registro.
 - Importar los CSV de [openmrs-config](openmrs-config) con Initializer en la
   distribución de OpenMRS. Los UUID por defecto están en `paperConsent` y se
   pueden configurar por entorno. Los autores necesitan un proveedor asociado,

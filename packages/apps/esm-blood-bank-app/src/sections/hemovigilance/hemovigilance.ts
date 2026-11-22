@@ -233,7 +233,8 @@ export function currentStage(unit: UnitCase) {
 
 export function transfusionProgress(unit: UnitCase) {
   const { conduction, report } = unit.sections;
-  if (conduction?.fields.stopTime || report?.fields.stopTime) return 'transfusionInterrupted';
+  if (conduction?.fields.stopTime || conduction?.fields.consentInterruptionUuid || report?.fields.stopTime)
+    return 'transfusionInterrupted';
   if (!conduction?.fields.startTime) return undefined;
   return conduction.fields.endTime ? 'transfusionCompleted' : 'transfusionInProgress';
 }

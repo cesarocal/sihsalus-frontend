@@ -15,17 +15,30 @@ export type ConsentSubject = {
   contextId: string;
   name: string;
   identification: string;
+  age?: string;
+  sex?: TransfusionOrder['sex'];
   service?: string;
   bed?: string;
+  priority?: TransfusionOrder['priority'];
   demo?: boolean;
 };
-export type Decision = 'granted' | 'declined' | 'revoked';
+export type Decision = 'granted' | 'declined' | 'revoked' | 'emergency';
+export const recipientConsentChanged = 'blood-bank-recipient-consent-changed';
+
+export function closesTransfusion(decision?: Decision): decision is 'declined' | 'revoked' {
+  return decision === 'declined' || decision === 'revoked';
+}
+
+export function permitsAdministration(subject: ConsentSubject, record?: ConsentRecord) {
+  return record?.decision === 'granted' || (subject.priority === 'veryUrgent' && record?.decision === 'emergency');
+}
 export type ConsentInput = {
   decision: Decision;
   folio: string;
   decidedAt: string;
   signer: string;
-  signerRole: 'self' | 'representative';
+  signerRole: 'self' | 'representative' | 'physician';
+  reason?: string;
 };
 export type ConsentRecord = ConsentInput & { uuid: string; recordedAt: string; provider: string };
 type Document = ConsentInput & { format: string; reference: string; operation: string };
@@ -77,8 +90,11 @@ export function recipientConsentSubject(order: TransfusionOrder): ConsentSubject
     contextId: order.encounterId,
     name: order.patientName,
     identification: order.historyNumber,
+    age: order.age,
+    sex: order.sex,
     service: order.service,
     bed: order.bed,
+    priority: order.priority,
   };
 }
 
@@ -87,6 +103,16 @@ function hasSubject(subject: ConsentSubject) {
 }
 
 export function validConsentInput(input: ConsentInput) {
+  if (input.reason !== undefined && (typeof input.reason !== 'string' || input.reason.length > 500)) return false;
+  if (input.decision === 'emergency') {
+    return (
+      input.signerRole === 'physician' &&
+      input.signer === '' &&
+      input.folio === '' &&
+      Boolean(input.reason?.trim()) &&
+      Number.isFinite(Date.parse(input.decidedAt))
+    );
+  }
   return (
     ['granted', 'declined', 'revoked'].includes(input.decision) &&
     typeof input.folio === 'string' &&
@@ -100,16 +126,14 @@ export function validConsentInput(input: ConsentInput) {
   );
 }
 
-async function consentEncounters(metadata: PaperConsentConfig, subject: ConsentSubject) {
-  if (!hasSubject(subject)) throw new Error('CONSENT_MISSING_CONTEXT');
-  if (subject.demo && !(await isHemovigilanceTestPatient(subject.patientId)))
-    throw new Error('CONSENT_TEST_PATIENT_REQUIRED');
-  const type = encounterType(metadata, subject.kind);
-  const entries: { record: ConsentRecord; operation: string }[] = [];
+type ConsentEntry = { record: ConsentRecord; operation: string };
+
+async function readConsentEncounters(patientId: string, type: string) {
+  const rows: Encounter[] = [];
   for (let startIndex = 0; ; ) {
     const { data } = await openmrsFetch<EncounterPage>(
       endpoint('encounter', {
-        patient: subject.patientId,
+        patient: patientId,
         encounterType: type,
         limit: '100',
         startIndex: String(startIndex),
@@ -117,54 +141,89 @@ async function consentEncounters(metadata: PaperConsentConfig, subject: ConsentS
       }),
       requestOptions,
     );
-    for (const row of data.results) {
-      if (
-        row.voided ||
-        row.patient.uuid !== subject.patientId ||
-        row.encounterType.uuid !== type ||
-        (subject.kind === 'donor' && row.visit?.uuid !== subject.contextId)
-      )
-        continue;
-      const values = (row.obs ?? []).filter(
-        ({ concept, voided }) => concept.uuid === metadata.documentConceptUuid && !voided,
-      );
-      if (values.length !== 1 || typeof values[0].value !== 'string') throw new Error('CONSENT_INVALID_RECORD');
-      const document = JSON.parse(values[0].value) as Document | null;
-      if (!document?.reference) throw new Error('CONSENT_INVALID_RECORD');
-      if (document.reference !== subject.id) continue;
-      if (
-        document.format !== `${consentFormat(subject.kind)}/v1` ||
-        !validConsentInput(document) ||
-        !isClinicalUuid(document.operation) ||
-        !Number.isFinite(Date.parse(row.encounterDatetime))
-      )
-        throw new Error('CONSENT_INVALID_RECORD');
-      const { operation, format: _format, reference: _reference, ...fields } = document;
-      entries.push({
-        operation,
-        record: {
-          ...fields,
-          uuid: row.uuid,
-          recordedAt: row.encounterDatetime,
-          provider: row.encounterProviders?.[0]?.provider.display ?? '',
-        },
-      });
-    }
-    if (!data.links?.some(({ rel }) => rel === 'next')) break;
+    rows.push(
+      ...data.results.filter((row) => !row.voided && row.patient.uuid === patientId && row.encounterType.uuid === type),
+    );
+    if (!data.links?.some(({ rel }) => rel === 'next')) return rows;
     if (!data.results.length) throw new Error('CONSENT_INVALID_PAGE');
     startIndex += data.results.length;
+  }
+}
+
+function consentEntries(metadata: PaperConsentConfig, subject: ConsentSubject, rows: Encounter[]) {
+  const entries: ConsentEntry[] = [];
+  for (const row of rows) {
+    if (subject.kind === 'donor' && row.visit?.uuid !== subject.contextId) continue;
+    const values = (row.obs ?? []).filter(
+      ({ concept, voided }) => concept.uuid === metadata.documentConceptUuid && !voided,
+    );
+    if (values.length !== 1 || typeof values[0].value !== 'string') throw new Error('CONSENT_INVALID_RECORD');
+    const document = JSON.parse(values[0].value) as Document | null;
+    if (!document?.reference) throw new Error('CONSENT_INVALID_RECORD');
+    if (document.reference !== subject.id) continue;
+    if (
+      document.format !== `${consentFormat(subject.kind)}/v1` ||
+      !validConsentInput(document) ||
+      (document.decision === 'emergency' && (subject.kind !== 'recipient' || subject.priority !== 'veryUrgent')) ||
+      !isClinicalUuid(document.operation) ||
+      !Number.isFinite(Date.parse(row.encounterDatetime))
+    )
+      throw new Error('CONSENT_INVALID_RECORD');
+    const { operation, format: _format, reference: _reference, ...fields } = document;
+    entries.push({
+      operation,
+      record: {
+        ...fields,
+        uuid: row.uuid,
+        recordedAt: row.encounterDatetime,
+        provider: row.encounterProviders?.[0]?.provider.display ?? '',
+      },
+    });
   }
   return entries.sort((a, b) => {
     const decisionOrder = Date.parse(b.record.decidedAt) - Date.parse(a.record.decidedAt);
     const recordedOrder = Date.parse(b.record.recordedAt) - Date.parse(a.record.recordedAt);
-    // In ambiguous simultaneous decisions, do not treat a grant as authoritative over a refusal.
-    const safetyOrder = Number(a.record.decision === 'granted') - Number(b.record.decision === 'granted');
-    return decisionOrder || safetyOrder || recordedOrder || b.record.uuid.localeCompare(a.record.uuid);
+    const closureOrder = Number(closesTransfusion(b.record.decision)) - Number(closesTransfusion(a.record.decision));
+    const signedOrder = Number(a.record.decision === 'emergency') - Number(b.record.decision === 'emergency');
+    // A signed refusal or withdrawal closes the referred FR08 even if another session records a grant concurrently.
+    return (
+      (subject.kind === 'recipient' ? closureOrder : 0) ||
+      decisionOrder ||
+      closureOrder ||
+      signedOrder ||
+      recordedOrder ||
+      b.record.uuid.localeCompare(a.record.uuid)
+    );
   });
+}
+
+async function consentEncounters(metadata: PaperConsentConfig, subject: ConsentSubject) {
+  if (!hasSubject(subject)) throw new Error('CONSENT_MISSING_CONTEXT');
+  if (subject.demo && !(await isHemovigilanceTestPatient(subject.patientId)))
+    throw new Error('CONSENT_TEST_PATIENT_REQUIRED');
+  const rows = await readConsentEncounters(subject.patientId, encounterType(metadata, subject.kind));
+  return consentEntries(metadata, subject, rows);
 }
 
 export async function listConsent(metadata: PaperConsentConfig, subject: ConsentSubject) {
   return (await consentEncounters(metadata, subject)).map(({ record }) => record);
+}
+
+/** Reuse the encounter query for multiple FR08 orders for the same patient. Missing keys mean a read failure. */
+export async function listLatestRecipientConsents(metadata: PaperConsentConfig, orders: TransfusionOrder[]) {
+  const byPatient = new Map<string, Promise<Encounter[]>>();
+  const results = await Promise.allSettled(
+    orders.map(async (order) => {
+      const subject = recipientConsentSubject(order);
+      if (!hasSubject(subject)) throw new Error('CONSENT_MISSING_CONTEXT');
+      if (!byPatient.has(subject.patientId)) {
+        byPatient.set(subject.patientId, readConsentEncounters(subject.patientId, metadata.recipientEncounterTypeUuid));
+      }
+      const rows = await byPatient.get(subject.patientId);
+      return [order.id, consentEntries(metadata, subject, rows ?? [])[0]?.record] as const;
+    }),
+  );
+  return new Map(results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])));
 }
 
 async function readVisit(subject: ConsentSubject) {
@@ -204,7 +263,13 @@ export async function saveConsent(
   operation: string,
   previous?: string,
 ) {
-  if (!validConsentInput(input) || !isClinicalUuid(providerUuid) || !isClinicalUuid(operation))
+  if (
+    !validConsentInput(input) ||
+    !isClinicalUuid(providerUuid) ||
+    !isClinicalUuid(operation) ||
+    (input.decision === 'emergency' && (subject.kind !== 'recipient' || subject.priority !== 'veryUrgent')) ||
+    (subject.kind === 'recipient' && closesTransfusion(input.decision) && !input.reason?.trim())
+  )
     throw new Error('CONSENT_INVALID_INPUT');
   const entries = await consentEncounters(metadata, subject);
   const alreadySaved = entries.find((entry) => entry.operation === operation);
@@ -213,7 +278,9 @@ export async function saveConsent(
   if (
     latest?.uuid !== previous ||
     (latest && Date.parse(input.decidedAt) < Date.parse(latest.decidedAt)) ||
-    (input.decision === 'revoked' && latest?.decision !== 'granted')
+    (input.decision === 'revoked' && latest?.decision !== 'granted') ||
+    (subject.kind === 'recipient' && closesTransfusion(latest?.decision)) ||
+    (input.decision === 'emergency' && Boolean(latest))
   )
     throw new Error('CONSENT_CONFLICT');
   const visit = await readVisit(subject);
@@ -225,6 +292,7 @@ export async function saveConsent(
     ...input,
     folio: input.folio.trim(),
     signer: input.signer.trim(),
+    ...(input.reason ? { reason: input.reason.trim() } : {}),
     format: `${consentFormat(subject.kind)}/v1`,
     reference: subject.id,
     operation,

@@ -1,7 +1,13 @@
 import { openmrsFetch } from '@openmrs/esm-framework';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaperConsentConfig } from '../../config-schema';
-import { type ConsentInput, type ConsentSubject, listConsent, saveConsent } from './paper-consent.resource';
+import {
+  type ConsentInput,
+  type ConsentSubject,
+  listConsent,
+  permitsAdministration,
+  saveConsent,
+} from './paper-consent.resource';
 
 vi.mock('@openmrs/esm-framework', () => ({ restBaseUrl: '/ws/rest/v1', openmrsFetch: vi.fn() }));
 
@@ -82,6 +88,47 @@ describe('paper consent encounters', () => {
       [uuid(10), 'granted'],
     ]);
     expect(fetch.mock.calls[0][0]).toContain(`patient=${patient.uuid}`);
+  });
+
+  it('does not reopen a closed FR08, even if a grant is recorded concurrently', async () => {
+    const declined = { ...granted, decision: 'declined' as const, reason: 'Negativa escrita' };
+    const laterGrant = { ...granted, decidedAt: '2026-11-21T15:16:00.000Z' };
+    fetch.mockResolvedValue(response({ results: [row(10, recipient, declined), row(11, recipient, laterGrant)] }));
+    expect((await listConsent(metadata, recipient)).map(({ decision }) => decision)).toEqual(['declined', 'granted']);
+    await expect(saveConsent(metadata, recipient, laterGrant, provider.uuid, uuid(102), uuid(10))).rejects.toThrow(
+      'CONSENT_CONFLICT',
+    );
+    expect(fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+  });
+
+  it('records a documented emergency separately from the signed FR12 for a very urgent order', async () => {
+    const emergency: ConsentInput = {
+      decision: 'emergency',
+      folio: '',
+      decidedAt: granted.decidedAt,
+      signer: '',
+      signerRole: 'physician',
+      reason: 'Emergencia documentada en la historia clínica',
+    };
+    const veryUrgent = { ...recipient, priority: 'veryUrgent' as const };
+    await expect(saveConsent(metadata, recipient, emergency, provider.uuid, uuid(102))).rejects.toThrow(
+      'CONSENT_INVALID_INPUT',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockResolvedValueOnce(response({ results: [] }));
+    fetch.mockResolvedValueOnce(response({ patient, location, visit }));
+    fetch.mockResolvedValueOnce(response({ patient, location }));
+    fetch.mockResolvedValueOnce(response({ uuid: uuid(10) }));
+    fetch.mockResolvedValueOnce(response({ results: [row(10, veryUrgent, emergency, uuid(102))] }));
+    const record = await saveConsent(metadata, veryUrgent, emergency, provider.uuid, uuid(102));
+    expect(record).toMatchObject({
+      decision: 'emergency',
+      provider: provider.display,
+      folio: '',
+      reason: emergency.reason,
+    });
+    expect(permitsAdministration(veryUrgent, record)).toBe(true);
+    expect(permitsAdministration(recipient, record)).toBe(false);
   });
 
   it('writes a signed FR05 to the donor visit and recovers an ambiguous response without duplicating it', async () => {

@@ -1,9 +1,10 @@
 import { Button, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { Book, RecentlyViewed, Report } from '@carbon/react/icons';
-import { userHasAccess, useSession } from '@openmrs/esm-framework';
+import { useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { bloodBankPrivileges } from '../../access/blood-bank-privileges';
 import type { TransfusionsApi } from '../../api/transfusions.api';
+import type { BloodBankConfig } from '../../config-schema';
 import { formatListDate } from '../../shared/format-list-date';
 import {
   normalizeSearch,
@@ -12,16 +13,26 @@ import {
   useProcessingData,
 } from '../../shared/processing-page.component';
 import shared from '../applicant-selection/selection.scss';
+import {
+  closesTransfusion,
+  isClinicalUuid,
+  listConsent,
+  listLatestRecipientConsents,
+  recipientConsentChanged,
+  recipientConsentSubject,
+} from '../consents/paper-consent.resource';
 import { hemoPrivileges } from '../hemovigilance/hemovigilance';
 import { BankHemovigilance } from '../hemovigilance/hemovigilance.component';
 import {
   isLocalHemovigilance,
+  listHemovigilance,
   listRecordedDeliveries,
   recordDemoDispatch,
 } from '../hemovigilance/hemovigilance.resource';
 import { IssuedTransfusionOrderDialog } from './issued-transfusion-order-dialog.component';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionHistory } from './transfusion-history.component';
+import type { ReturnActions } from './transfusion-returns.component';
 import {
   configuredTransfusionOrders,
   type IssuedTransfusionOrder,
@@ -33,8 +44,14 @@ import {
 } from './transfusion-order.resource';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import styles from './transfusions.scss';
-import type { TransfusionOrder, TransfusionRequest } from './transfusions.types';
-import { comparePriority, priorityKeys, readyForDelivery, transfusionStatusKeys } from './transfusions-rules';
+import type { TransfusionBookEntry, TransfusionOrder, TransfusionRequest } from './transfusions.types';
+import {
+  comparePriority,
+  priorityKeys,
+  readyForDelivery,
+  transfusionOperatorName,
+  transfusionStatusKeys,
+} from './transfusions-rules';
 import { useTransfusionsTranslation } from './use-transfusions-translation';
 
 const bankOrderRead = [bloodBankPrivileges.module, bloodBankPrivileges.transfusions, 'Get Orders'];
@@ -42,7 +59,15 @@ const statusCards = [
   {
     filter: 'txPendingCount',
     label: 'txPendingCount',
-    statuses: new Set(['txPending', 'txReviewed', 'txSampleReady', 'fr08Sent', 'fr08Received', 'fr08InProgress']),
+    statuses: new Set([
+      'txPending',
+      'txReviewed',
+      'txSampleReady',
+      'fr08Sent',
+      'fr08Received',
+      'fr08InProgress',
+      'txConsentPending',
+    ]),
   },
   { filter: 'txTesting', label: 'txTesting', statuses: new Set(['txTesting']) },
   { filter: 'txCompatible', label: 'txReadyCount', statuses: new Set(['txCompatible', 'txReadyUrgent']) },
@@ -67,7 +92,9 @@ export function TransfusionsPage({
   useMockData?: boolean;
 }) {
   const t = useTransfusionsTranslation();
-  const { authenticated, user } = useSession();
+  const session = useSession();
+  const { authenticated, user } = session;
+  const { paperConsent } = useConfig<BloodBankConfig>();
   const configured = configuredTransfusionOrders(orderConfig) ? orderConfig : undefined;
   const readableConfig = authenticated && configured && userHasAccess(bankOrderRead, user) ? configured : undefined;
   const loadWorkspace = useMockData || !configured;
@@ -76,11 +103,24 @@ export function TransfusionsPage({
   const workspace = useProcessingData(load, loadWorkspace);
   const loadIssued = useCallback(async () => {
     const issued = readableConfig ? await listIssuedTransfusionOrders(readableConfig) : [];
-    const delivered = verifyDelivery
-      ? await listRecordedDeliveries(issued.map(({ order }) => order))
-      : new Map<string, string>();
-    return { issued, delivered };
-  }, [readableConfig, verifyDelivery]);
+    const [delivered, consents] = await Promise.all([
+      verifyDelivery ? listRecordedDeliveries(issued.map(({ order }) => order)) : new Map<string, string>(),
+      paperConsent
+        ? listLatestRecipientConsents(
+            paperConsent,
+            issued.map(({ order }) => order),
+          )
+        : undefined,
+    ]);
+    const reconciliations = await Promise.allSettled(
+      Array.from(consents ?? [], async ([id, record]) => {
+        if (!loadWorkspace || !record || !closesTransfusion(record.decision) || delivered.has(id)) return false;
+        return api.cancelIssuedRequest?.(id, { ...record, decision: record.decision });
+      }),
+    );
+    const reconciled = reconciliations.some((result) => result.status === 'fulfilled' && result.value);
+    return { issued, delivered, consents, reconciled };
+  }, [api, loadWorkspace, paperConsent, readableConfig, verifyDelivery]);
   const orders = useProcessingData(loadIssued, Boolean(readableConfig));
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -96,19 +136,26 @@ export function TransfusionsPage({
   useEffect(() => {
     if (!readableConfig) return;
     window.addEventListener(transfusionOrdersChanged, reloadOrders);
+    window.addEventListener(recipientConsentChanged, reloadOrders);
     window.addEventListener('focus', reloadOrders);
     return () => {
       window.removeEventListener(transfusionOrdersChanged, reloadOrders);
+      window.removeEventListener(recipientConsentChanged, reloadOrders);
       window.removeEventListener('focus', reloadOrders);
     };
   }, [readableConfig, reloadOrders]);
+
+  const reloadWorkspace = workspace.reload;
+  useEffect(() => {
+    if (orders.data?.reconciled) reloadWorkspace();
+  }, [orders.data, reloadWorkspace]);
 
   const workspaceFailed = loadWorkspace && workspace.failed;
   const ordersFailed = Boolean(readableConfig && orders.failed);
   const loading = (loadWorkspace && workspace.loading) || Boolean(readableConfig && orders.loading);
   const failed =
     (workspaceFailed || ordersFailed) && !(loadWorkspace && !workspaceFailed) && !(readableConfig && !ordersFailed);
-  const archiveUnavailable = loading || !loadWorkspace || workspaceFailed;
+  const archiveUnavailable = loading || (!readableConfig && (!loadWorkspace || workspaceFailed));
   const issued = readableConfig && !ordersFailed ? (orders.data?.issued ?? []) : [];
   const canInvestigate = Boolean(
     readableConfig && isLocalHemovigilance(useMockData) && userHasAccess(hemoPrivileges.bank, user),
@@ -121,7 +168,58 @@ export function TransfusionsPage({
     const deliveredAt = orders.data?.delivered.get(order.id);
     return deliveredAt ? [{ order, deliveredAt }] : [];
   });
+  const consentClosures = issued.flatMap(({ order }) => {
+    const record = orders.data?.consents?.get(order.id);
+    return record && closesTransfusion(record.decision)
+      ? [
+          {
+            order,
+            record,
+            dispatched: orders.data?.delivered.has(order.id) || Boolean(requestById.get(order.id)?.deliveredAt),
+          },
+        ]
+      : [];
+  });
   const canEditOrders = Boolean(readableConfig && userHasAccess('Edit Orders', user));
+  const returnOperator = transfusionOperatorName(session);
+  const verifyReturn = async (dispatch: TransfusionBookEntry, mustBeUnused: boolean) => {
+    const order = issuedById.get(dispatch.requestId)?.order;
+    if (!order || !paperConsent || !verifyDelivery || !canEditOrders) throw new Error('TRANSFUSION_RETURN_CONTEXT');
+    const [[latest], cases] = await Promise.all([
+      listConsent(paperConsent, recipientConsentSubject(order)),
+      listHemovigilance([order]),
+    ]);
+    const unit = cases.find(
+      ({ dispatch: delivered }) =>
+        delivered.unitCode === dispatch.unitCode &&
+        delivered.component === dispatch.component &&
+        Date.parse(delivered.deliveredAt) === Date.parse(dispatch.at),
+    );
+    if (!unit || !latest || !closesTransfusion(latest.decision)) throw new Error('TRANSFUSION_RETURN_CONTEXT');
+    if (mustBeUnused && (unit.sections.conduction?.fields.startTime || unit.sections.report))
+      throw new Error('TRANSFUSION_RETURN_STARTED');
+    return latest;
+  };
+  const receiveReturnedUnit = api.receiveReturnedUnit;
+  const inspectReturnedUnit = api.inspectReturnedUnit;
+  const returnActions: ReturnActions | undefined =
+    canEditOrders && verifyDelivery && paperConsent && returnOperator && receiveReturnedUnit && inspectReturnedUnit
+      ? {
+          operator: returnOperator,
+          async receive(dispatch, receipt) {
+            const latest = await verifyReturn(dispatch, receipt.administration === 'unused');
+            const saved = await receiveReturnedUnit(dispatch.id, latest.uuid, receipt);
+            workspace.reload();
+            return saved;
+          },
+          async inspect(dispatch, inspection) {
+            await verifyReturn(dispatch, inspection.decision === 'approved');
+            const saved = await inspectReturnedUnit(dispatch.id, inspection);
+            workspace.reload();
+            return saved;
+          },
+        }
+      : undefined;
   const rows: InboxRow[] = [
     ...requests
       .filter((request) => !request.issuedOrder)
@@ -130,9 +228,21 @@ export function TransfusionsPage({
       .filter((item) => !orders.data?.delivered.has(item.order.id))
       .map((item) => {
         const existing = requestById.get(item.order.id);
-        const canReceive = canEditOrders && !item.stopped && !item.fulfillerStatus;
+        const currentConsent = orders.data?.consents?.get(item.order.id);
+        const closed = closesTransfusion(currentConsent?.decision);
+        const pendingConsent =
+          orders.data?.consents?.has(item.order.id) &&
+          !currentConsent &&
+          item.order.priority !== 'veryUrgent' &&
+          !item.stopped &&
+          (!item.fulfillerStatus || item.fulfillerStatus === 'RECEIVED');
+        const canCheckConsent =
+          !paperConsent || !isClinicalUuid(item.order.id) || Boolean(orders.data?.consents?.has(item.order.id));
+        const canReceive = canEditOrders && canCheckConsent && !closed && !item.stopped && !item.fulfillerStatus;
         const canPrepare = Boolean(
           useMockData &&
+            canCheckConsent &&
+            !closed &&
             !workspaceFailed &&
             api.prepareIssuedRequest &&
             !item.order.otherComponent &&
@@ -148,12 +258,17 @@ export function TransfusionsPage({
           issued: item,
           canPrepare,
           canReceive,
-          statusKey:
-            request && request.status !== 'pending'
-              ? transfusionStatusKeys[request.status]
-              : canPrepare && !item.fulfillerStatus
-                ? transfusionStatusKeys.pending
-                : issuedOrderStatus(item),
+          statusKey: closed
+            ? currentConsent?.decision === 'declined'
+              ? 'txCancelledDeclined'
+              : 'txCancelledRevoked'
+            : pendingConsent
+              ? 'txConsentPending'
+              : request && request.status !== 'pending'
+                ? transfusionStatusKeys[request.status]
+                : canPrepare && !item.fulfillerStatus
+                  ? transfusionStatusKeys.pending
+                  : issuedOrderStatus(item),
         };
       }),
   ];
@@ -162,7 +277,16 @@ export function TransfusionsPage({
     ...(loadWorkspace ? Object.values(transfusionStatusKeys).filter((key) => key !== 'txDelivered') : []),
     'txTesting',
     'txCompatible',
-    ...(readableConfig ? ['fr08Sent', ...Object.values(issuedOrderStatusKeys), 'fr08Cancelled'] : []),
+    ...(readableConfig
+      ? [
+          'fr08Sent',
+          ...Object.values(issuedOrderStatusKeys),
+          'fr08Cancelled',
+          'txConsentPending',
+          'txCancelledDeclined',
+          'txCancelledRevoked',
+        ]
+      : []),
   ]);
   const activeCard = statusCards.find((card) => card.filter === status);
   const inbox = rows.filter((item) => item.request?.status !== 'delivered');
@@ -195,6 +319,14 @@ export function TransfusionsPage({
         setPrepareFailed('txAlreadyDelivered');
         reloadOrders();
         return;
+      }
+      if (item.issued && paperConsent && isClinicalUuid(item.order.id)) {
+        const [record] = await listConsent(paperConsent, recipientConsentSubject(item.order));
+        if (record && closesTransfusion(record.decision)) {
+          reloadOrders();
+          setSelected({ order: item.order, issued: true, attend: false });
+          return;
+        }
       }
       if (item.request) setActive(item.request);
       else if (api.prepareIssuedRequest) setActive(await api.prepareIssuedRequest(item.order));
@@ -246,7 +378,12 @@ export function TransfusionsPage({
               {t('txReactionQueue')}
             </Button>
           )}
-          <Button kind="tertiary" renderIcon={Book} disabled={archiveUnavailable} onClick={() => setArchive('book')}>
+          <Button
+            kind="tertiary"
+            renderIcon={Book}
+            disabled={loading || !loadWorkspace || workspaceFailed}
+            onClick={() => setArchive('book')}
+          >
             {t('txBook')}
           </Button>
           <Button
@@ -380,6 +517,10 @@ export function TransfusionsPage({
         <TransfusionHistory
           requests={shownRequests}
           recordedDeliveries={recordedDeliveries}
+          consentClosures={consentClosures}
+          returnDispatches={workspace.data?.bookEntries}
+          returnRecords={workspace.data?.returns}
+          returnActions={returnActions}
           onClose={() => setArchive(null)}
           t={t}
         />

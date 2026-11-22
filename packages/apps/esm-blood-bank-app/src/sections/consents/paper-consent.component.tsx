@@ -1,4 +1,13 @@
-import { Button, Checkbox, InlineLoading, InlineNotification, Select, SelectItem, TextInput } from '@carbon/react';
+import {
+  Button,
+  Checkbox,
+  InlineLoading,
+  InlineNotification,
+  Select,
+  SelectItem,
+  TextArea,
+  TextInput,
+} from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
 import { useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -16,14 +25,17 @@ import {
   type ConsentInput,
   type ConsentRecord,
   type ConsentSubject,
+  closesTransfusion,
   consentFormat,
   donorConsentSubject,
   isClinicalUuid,
   listConsent,
+  recipientConsentChanged,
   saveConsent,
   validConsentInput,
 } from './paper-consent.resource';
 import styles from './paper-consent.scss';
+import { RecipientConsentDocument, recipientConsentPrintCss } from './recipient-consent-document.component';
 
 export function useConsentTranslation() {
   const { t } = useTranslation(moduleName);
@@ -37,7 +49,7 @@ export function useDonorConsentSubject(application: SelectionApplication) {
   return subject.demo || isClinicalUuid(application.patientUuid) || useMockData === false ? subject : undefined;
 }
 
-export function usePaperConsent(subject?: ConsentSubject) {
+export function usePaperConsent(subject?: ConsentSubject, monitor = false) {
   const { paperConsent: metadata } = useConfig<BloodBankConfig>();
   const subjectRef = useRef(subject);
   subjectRef.current = subject;
@@ -68,6 +80,18 @@ export function usePaperConsent(subject?: ConsentSubject) {
       request.current++;
     };
   }, [key, metadata, missingContext, reload]);
+  useEffect(() => {
+    if (!key.startsWith('recipient:') || !metadata || missingContext) return;
+    const refresh = () => void read().catch(() => {});
+    window.addEventListener(recipientConsentChanged, refresh);
+    window.addEventListener('focus', refresh);
+    const monitorId = monitor ? window.setInterval(refresh, 30_000) : undefined;
+    return () => {
+      if (monitorId !== undefined) window.clearInterval(monitorId);
+      window.removeEventListener(recipientConsentChanged, refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [key, metadata, missingContext, monitor, read]);
   const records = snapshot?.key === key ? snapshot.records : undefined;
   return {
     metadata,
@@ -108,10 +132,18 @@ export function PaperConsentSummary({ query, subject }: { query: ConsentQuery; s
           </div>
           {latest && (
             <>
-              <div>
-                <dt>{t('folio')}</dt>
-                <dd>{latest.folio}</dd>
-              </div>
+              {latest.folio && (
+                <div>
+                  <dt>{t('folio')}</dt>
+                  <dd>{latest.folio}</dd>
+                </div>
+              )}
+              {latest.reason && (
+                <div>
+                  <dt>{t('reason')}</dt>
+                  <dd>{latest.reason}</dd>
+                </div>
+              )}
               <div>
                 <dt>{t('decisionDate')}</dt>
                 <dd>{formatListDate(latest.decidedAt)}</dd>
@@ -157,6 +189,10 @@ export function PaperConsentEditor({
   const [decision, setDecision] = useState<ConsentInput['decision'] | ''>('');
   const [role, setRole] = useState<ConsentInput['signerRole']>('self');
   const [representative, setRepresentative] = useState('');
+  const [reason, setReason] = useState('');
+  const emergency = decision === 'emergency';
+  const closing = subject.kind === 'recipient' && closesTransfusion(decision || undefined);
+  const closed = subject.kind === 'recipient' && closesTransfusion(query.latest?.decision);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<'saveFailed' | 'printFailed' | 'conflict'>();
   const saving = useRef(false);
@@ -175,16 +211,18 @@ export function PaperConsentEditor({
       !query.records ||
       saving.current ||
       !confirmed ||
+      closed ||
       !decision
     )
       return;
     const timestamp = Date.parse(date);
     if (!Number.isFinite(timestamp) || timestamp > Date.now()) return;
     const input: ConsentInput = {
-      folio,
+      folio: emergency ? '' : folio,
       decision,
-      signer: role === 'self' ? subject.name : representative,
-      signerRole: role,
+      signer: emergency ? '' : role === 'self' ? subject.name : representative,
+      signerRole: emergency ? 'physician' : role,
+      ...(emergency || closing ? { reason } : {}),
       decidedAt: new Date(timestamp).toISOString(),
     };
     if (!validConsentInput(input)) return;
@@ -195,12 +233,14 @@ export function PaperConsentEditor({
     try {
       operation.current ||= crypto.randomUUID();
       await saveConsent(query.metadata, subject, input, provider, operation.current, query.latest?.uuid);
+      if (subject.kind === 'recipient') window.dispatchEvent(new Event(recipientConsentChanged));
       await query.read();
       setFolio('');
       setDecision('');
       setDate(localDateTime());
       setRole('self');
       setRepresentative('');
+      setReason('');
       resetConfirmation();
       notifySuccess(t('saved'));
     } catch (failure) {
@@ -220,9 +260,12 @@ export function PaperConsentEditor({
   const print = () => {
     setError(undefined);
     try {
-      printDocument(<PaperConsentDocument subject={subject} title={title} t={t} />, title, () =>
-        setError('printFailed'),
-      );
+      const onError = () => setError('printFailed');
+      if (subject.kind === 'recipient') {
+        printDocument(<RecipientConsentDocument subject={subject} t={t} />, title, onError, recipientConsentPrintCss);
+      } else {
+        printDocument(<DonorConsentDocument subject={subject} title={title} t={t} />, title, onError);
+      }
     } catch {
       setError('printFailed');
     }
@@ -245,114 +288,147 @@ export function PaperConsentEditor({
               {t('print')} {consentFormat(subject.kind)}
             </Button>
           </div>
-          {!provider && <InlineNotification hideCloseButton kind="warning" title={t('providerRequired')} />}
-          <fieldset className={styles.fields} disabled={disabled || busy || !query.records || !provider}>
-            <Select
-              id={`${prefix}-decision`}
-              labelText={t('decision')}
-              value={decision}
-              onChange={(event) => {
-                resetConfirmation();
-                setDecision(event.target.value as typeof decision);
-              }}
-            >
-              <SelectItem value="" text={t('selectDecision')} disabled />
-              <SelectItem value="granted" text={t('granted')} />
-              <SelectItem value="declined" text={t('declined')} />
-              {query.latest?.decision === 'granted' && <SelectItem value="revoked" text={t('revoked')} />}
-            </Select>
-            <TextInput
-              id={`${prefix}-folio`}
-              labelText={t('folio')}
-              maxLength={80}
-              value={folio}
-              onChange={(event) => {
-                resetConfirmation();
-                setFolio(event.target.value);
-              }}
-            />
-            <TextInput
-              id={`${prefix}-date`}
-              type="datetime-local"
-              labelText={t('decisionDate')}
-              max={localDateTime()}
-              value={date}
-              onChange={(event) => {
-                resetConfirmation();
-                setDate(event.target.value);
-              }}
-            />
-            {subject.kind === 'recipient' && (
+          {closed && <InlineNotification hideCloseButton kind="info" title={t('closedRequest')} />}
+          {!closed && !provider && <InlineNotification hideCloseButton kind="warning" title={t('providerRequired')} />}
+          {!closed && (
+            <fieldset className={styles.fields} disabled={disabled || busy || !query.records || !provider}>
               <Select
-                id={`${prefix}-role`}
-                labelText={t('signerRole')}
-                value={role}
+                id={`${prefix}-decision`}
+                labelText={t('decision')}
+                value={decision}
                 onChange={(event) => {
                   resetConfirmation();
-                  setRole(event.target.value === 'representative' ? 'representative' : 'self');
+                  setDecision(event.target.value as typeof decision);
                 }}
               >
-                <SelectItem value="self" text={t('patient')} />
-                <SelectItem value="representative" text={t('representative')} />
+                <SelectItem value="" text={t('selectDecision')} disabled />
+                <SelectItem value="granted" text={t('granted')} />
+                {(subject.kind === 'donor' || query.latest?.decision !== 'granted') && (
+                  <SelectItem value="declined" text={t('declined')} />
+                )}
+                {subject.kind === 'recipient' && subject.priority === 'veryUrgent' && !query.latest && (
+                  <SelectItem value="emergency" text={t('emergency')} />
+                )}
+                {query.latest?.decision === 'granted' && <SelectItem value="revoked" text={t('revoked')} />}
               </Select>
-            )}
-            <TextInput
-              id={`${prefix}-name`}
-              labelText={t('signer')}
-              value={role === 'self' ? subject.name : representative}
-              maxLength={200}
-              readOnly={role === 'self'}
-              onChange={(event) => {
-                resetConfirmation();
-                setRepresentative(event.target.value);
-              }}
-            />
-            <div className={styles.actions}>
-              <Checkbox
-                id={`${prefix}-confirmed`}
-                labelText={t('confirmPaper')}
-                checked={confirmed}
-                onChange={(_event, { checked }) => setConfirmed(checked)}
+              {!emergency && (
+                <TextInput
+                  id={`${prefix}-folio`}
+                  labelText={t('folio')}
+                  maxLength={80}
+                  value={folio}
+                  onChange={(event) => {
+                    resetConfirmation();
+                    setFolio(event.target.value);
+                  }}
+                />
+              )}
+              <TextInput
+                id={`${prefix}-date`}
+                type="datetime-local"
+                labelText={t('decisionDate')}
+                max={localDateTime()}
+                value={date}
+                onChange={(event) => {
+                  resetConfirmation();
+                  setDate(event.target.value);
+                }}
               />
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void save()}
-                disabled={
-                  !confirmed ||
-                  !decision ||
-                  !folio.trim() ||
-                  (role === 'representative' && !representative.trim()) ||
-                  !date ||
-                  Date.parse(date) > Date.now() ||
-                  (decision === 'revoked' && query.latest?.decision !== 'granted')
-                }
-              >
-                {t('save')}
-              </Button>
-            </div>
-          </fieldset>
+              {subject.kind === 'recipient' && !emergency && (
+                <Select
+                  id={`${prefix}-role`}
+                  labelText={t('signerRole')}
+                  value={role}
+                  onChange={(event) => {
+                    resetConfirmation();
+                    setRole(event.target.value === 'representative' ? 'representative' : 'self');
+                  }}
+                >
+                  <SelectItem value="self" text={t('patient')} />
+                  <SelectItem value="representative" text={t('representative')} />
+                </Select>
+              )}
+              {!emergency && (
+                <TextInput
+                  id={`${prefix}-name`}
+                  labelText={t('signer')}
+                  value={role === 'self' ? subject.name : representative}
+                  maxLength={200}
+                  readOnly={role === 'self'}
+                  onChange={(event) => {
+                    resetConfirmation();
+                    setRepresentative(event.target.value);
+                  }}
+                />
+              )}
+              {(emergency || closing) && (
+                <TextArea
+                  id={`${prefix}-reason`}
+                  labelText={t(emergency ? 'emergencyReason' : 'closingReason')}
+                  rows={3}
+                  maxLength={500}
+                  value={reason}
+                  onChange={(event) => {
+                    resetConfirmation();
+                    setReason(event.target.value);
+                  }}
+                />
+              )}
+              <div className={styles.actions}>
+                <Checkbox
+                  id={`${prefix}-confirmed`}
+                  labelText={t(emergency ? 'confirmEmergency' : closing ? 'confirmClosing' : 'confirmPaper')}
+                  checked={confirmed}
+                  onChange={(_event, { checked }) => setConfirmed(checked)}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void save()}
+                  disabled={
+                    !confirmed ||
+                    !decision ||
+                    (!emergency && (!folio.trim() || (role === 'representative' && !representative.trim()))) ||
+                    ((emergency || closing) && !reason.trim()) ||
+                    !date ||
+                    Date.parse(date) > Date.now() ||
+                    (decision === 'revoked' && query.latest?.decision !== 'granted')
+                  }
+                >
+                  {t('save')}
+                </Button>
+              </div>
+            </fieldset>
+          )}
         </>
       )}
-      {Boolean(query.records?.length) && (
-        <details className={styles.history}>
-          <summary>{t('history')}</summary>
-          <ul>
-            {query.records?.map((record) => (
-              <li key={record.uuid}>
-                <strong>{t(record.decision)}</strong> · {record.folio} · {formatListDate(record.decidedAt)} ·{' '}
-                {record.signer}
-                {record.provider && <> · {record.provider}</>}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <PaperConsentHistory records={query.records} />
     </div>
   );
 }
 
-function PaperConsentDocument({
+export function PaperConsentHistory({ records }: { records?: ConsentRecord[] }) {
+  const t = useConsentTranslation();
+  if (!records?.length) return null;
+  return (
+    <details className={styles.history}>
+      <summary>{t('history')}</summary>
+      <ul>
+        {records.map((record) => (
+          <li key={record.uuid}>
+            <strong>{t(record.decision)}</strong> · {formatListDate(record.decidedAt)}
+            {record.folio && <> · {record.folio}</>}
+            {record.signer && <> · {record.signer}</>}
+            {record.provider && <> · {record.provider}</>}
+            {record.reason && <> · {record.reason}</>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function DonorConsentDocument({
   subject,
   title,
   t,
@@ -361,7 +437,6 @@ function PaperConsentDocument({
   title: string;
   t: ReturnType<typeof useConsentTranslation>;
 }) {
-  const donor = subject.kind === 'donor';
   return (
     <article style={{ lineHeight: 1.55 }}>
       <h2>{title}</h2>
@@ -371,35 +446,23 @@ function PaperConsentDocument({
           <dd>{subject.name}</dd>
         </div>
         <div>
-          <dt>{t(donor ? 'identification' : 'historyNumber')}</dt>
+          <dt>{t('identification')}</dt>
           <dd>{subject.identification}</dd>
         </div>
         <div>
-          <dt>{t(donor ? 'applicationNumber' : 'requestNumber')}</dt>
+          <dt>{t('applicationNumber')}</dt>
           <dd>{subject.number}</dd>
         </div>
         <div>
           <dt>{t('folio')}</dt>
           <dd>________________________________</dd>
         </div>
-        {!donor && (
-          <>
-            <div>
-              <dt>{t('service')}</dt>
-              <dd>{subject.service || '________________'}</dd>
-            </div>
-            <div>
-              <dt>{t('bed')}</dt>
-              <dd>{subject.bed || '________________'}</dd>
-            </div>
-          </>
-        )}
         <div>
           <dt>{t('decisionDate')}</dt>
           <dd>____ / ____ / ________ &nbsp;&nbsp; ____ : ____</dd>
         </div>
       </dl>
-      <p>{t(donor ? 'donorDeclaration' : 'recipientDeclaration')}</p>
+      <p>{t('donorDeclaration')}</p>
       <p>
         {t('clinicalExplanation')}
         <br />
@@ -410,13 +473,9 @@ function PaperConsentDocument({
       <p>{t('freeDecision')}</p>
       <p>
         ☐ {t('granted')} &nbsp;&nbsp;&nbsp; ☐ {t('declined')}
-        {!donor && <> &nbsp;&nbsp;&nbsp; ☐ {t('revoked')}</>}
       </p>
-      {!donor && <p>{t('representativeDetails')} &nbsp; ________________________________________</p>}
       <div style={{ marginTop: '36pt', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12pt' }}>
-        <div style={{ borderTop: '1px solid', paddingTop: '4pt' }}>
-          {t(donor ? 'donorSignature' : 'recipientSignature')}
-        </div>
+        <div style={{ borderTop: '1px solid', paddingTop: '4pt' }}>{t('donorSignature')}</div>
         <div style={{ borderTop: '1px solid', paddingTop: '4pt' }}>{t('providerSignature')}</div>
       </div>
     </article>

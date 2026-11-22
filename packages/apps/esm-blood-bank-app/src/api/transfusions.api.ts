@@ -4,6 +4,9 @@ import type {
   TransfusionDraft,
   TransfusionOrder,
   TransfusionRequest,
+  TransfusionReturn,
+  TransfusionReturnInspection,
+  TransfusionReturnReceipt,
   TransfusionWorkspace,
 } from '../sections/transfusions/transfusions.types';
 
@@ -11,6 +14,13 @@ export interface TransfusionsApi {
   list(): Promise<TransfusionWorkspace>;
   /** Starts the local stock workflow for an OpenMRS order in mock mode. */
   prepareIssuedRequest?(order: TransfusionOrder): Promise<TransfusionRequest>;
+  cancelIssuedRequest?(id: string, decision: NonNullable<TransfusionRequest['consentClosure']>): Promise<boolean>;
+  receiveReturnedUnit?(
+    dispatchId: string,
+    consentDecisionUuid: string,
+    receipt: TransfusionReturnReceipt,
+  ): Promise<TransfusionReturn>;
+  inspectReturnedUnit?(dispatchId: string, inspection: TransfusionReturnInspection): Promise<TransfusionReturn>;
   saveDraft(id: string, revision: number, draft: TransfusionDraft): Promise<TransfusionRequest>;
   review(id: string, revision: number, draft: TransfusionDraft): Promise<TransfusionRequest>;
   saveSample(id: string, revision: number, sample: RecipientSample): Promise<TransfusionRequest>;
