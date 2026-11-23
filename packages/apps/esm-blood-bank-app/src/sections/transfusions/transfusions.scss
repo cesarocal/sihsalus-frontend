@@ -510,6 +510,7 @@
   align-items: center;
   justify-content: space-between;
   min-inline-size: 0;
+  padding-inline-end: layout.$spacing-07;
 }
 
 .fr08OrderIdentity {
@@ -528,11 +529,11 @@
 .fr08OrderHeading {
   @include type.type-style("heading-compact-02");
   color: $text-02;
+  white-space: pre-line;
 }
 
 .fr08OrderAction:global(.cds--btn) {
   flex-shrink: 0;
-  padding-inline: layout.$spacing-04 layout.$spacing-08;
 
   svg {
     fill: currentColor;
@@ -541,6 +542,7 @@
 
 .fr08ConsentAction:global(.cds--btn) {
   align-items: center;
+  justify-content: flex-start;
   gap: layout.$spacing-03;
   inline-size: 100%;
   max-inline-size: none;
@@ -556,10 +558,6 @@
     flex-shrink: 0;
     fill: currentColor;
   }
-}
-
-.fr08ConsentArrow {
-  margin-inline-start: auto;
 }
 
 .fr08Modal:global(.cds--modal) {

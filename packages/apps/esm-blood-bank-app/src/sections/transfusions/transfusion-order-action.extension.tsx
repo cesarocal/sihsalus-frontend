@@ -14,7 +14,7 @@ import {
   TextInput,
   Tile,
 } from '@carbon/react';
-import { Add, ArrowRight, Close, DocumentSigned, RainDrop } from '@carbon/react/icons';
+import { Add, Close, DocumentSigned, RainDrop } from '@carbon/react/icons';
 import {
   AddIcon,
   getConfig,
@@ -151,7 +151,6 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
         >
           <DocumentSigned size={16} aria-hidden="true" />
           {consentText('openRecipient')}
-          <ArrowRight size={16} className={styles.fr08ConsentArrow} aria-hidden="true" />
         </Button>
       </Tile>
       {canCreateOrders &&

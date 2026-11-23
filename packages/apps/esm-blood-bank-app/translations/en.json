@@ -360,7 +360,7 @@
     "fr08InvalidUnits": "Enter a whole number from 1 to 99.",
     "fr08IncrementUnits": "Increase units",
     "fr08DecrementUnits": "Decrease units",
-    "fr08OrderType": "Transfusion orders",
+    "fr08OrderType": "Transfusion\norders",
     "fr08Add": "Add",
     "fr08AddOrder": "Add transfusion order",
     "fr08ExpandOrders": "Expand transfusion orders",

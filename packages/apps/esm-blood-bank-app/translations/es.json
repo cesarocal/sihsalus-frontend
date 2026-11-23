@@ -360,7 +360,7 @@
     "fr08InvalidUnits": "Ingrese un número entero de 1 a 99.",
     "fr08IncrementUnits": "Aumentar unidades",
     "fr08DecrementUnits": "Disminuir unidades",
-    "fr08OrderType": "Órdenes de transfusión",
+    "fr08OrderType": "Órdenes de\ntransfusión",
     "fr08Add": "Agregar",
     "fr08AddOrder": "Agregar orden de transfusión",
     "fr08ExpandOrders": "Expandir órdenes de transfusión",
