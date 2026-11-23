@@ -59,11 +59,11 @@ const returnTag = (record?: TransfusionReturnView) =>
           : 'blue';
 
 function returnError(error: unknown) {
-  if (error instanceof Error) {
-    if (error.message === 'TRANSFUSION_RETURN_STARTED') return 'txReturnStartedError';
-    if (error.message === 'TRANSFUSION_RETURN_STOCK_CONFLICT') return 'txReturnStockConflict';
-    if (error.message === 'TRANSFUSION_RETURN_CONTEXT') return 'txReturnContextError';
-  }
+  const body = error && typeof error === 'object' && 'responseBody' in error ? error.responseBody : undefined;
+  const code = body && typeof body === 'object' && 'error' in body ? body.error : error instanceof Error && error.message;
+  if (code === 'TRANSFUSION_RETURN_STARTED') return 'txReturnStartedError';
+  if (code === 'TRANSFUSION_RETURN_STOCK_CONFLICT') return 'txReturnStockConflict';
+  if (code === 'TRANSFUSION_RETURN_CONTEXT') return 'txReturnContextError';
   return 'txReturnSaveFailed';
 }
 

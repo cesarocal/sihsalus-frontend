@@ -11,6 +11,7 @@ import {
 } from '@carbon/react';
 import { ArrowLeft, Printer } from '@carbon/react/icons';
 import { useState } from 'react';
+import type { FractionationApi } from '../../../api/fractionation.api';
 import { normalizeSearch, ProcessingTable, type ProcessingTranslate } from '../../../shared/processing-page.component';
 import { printDocument } from '../../../shared/print-document';
 import { FractionationLabels, FractionationReview } from './fractionation-documents.component';
@@ -23,6 +24,7 @@ import styles from './fractionation.scss';
 
 export function FractionationHistory({
   batches,
+  recordPrint,
   loading,
   failed,
   reload,
@@ -30,6 +32,7 @@ export function FractionationHistory({
   t,
 }: {
   batches: FractionationBatch[];
+  recordPrint?: FractionationApi['recordPrint'];
   loading: boolean;
   failed: boolean;
   reload: () => void;
@@ -146,11 +149,17 @@ export function FractionationHistory({
                 kind="tertiary"
                 renderIcon={Printer}
                 onClick={() => {
+                  setPrintFailed(false);
                   try {
-                    printDocument(<FractionationLabels batch={detail} print t={t} />, t('fractionationPrint'), () =>
-                      setPrintFailed(true),
+                    const savePrint = detail.canonical ? recordPrint : undefined;
+                    const operation = savePrint ? crypto.randomUUID() : '';
+                    printDocument(
+                      <FractionationLabels batch={detail} print showDemoMark={!detail.canonical} t={t} />,
+                      t('fractionationPrint'),
+                      () => setPrintFailed(true),
+                      undefined,
+                      savePrint ? () => void savePrint(detail, operation).catch(() => setPrintFailed(true)) : undefined,
                     );
-                    setPrintFailed(false);
                   } catch {
                     setPrintFailed(true);
                   }

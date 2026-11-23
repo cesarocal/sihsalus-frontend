@@ -59,6 +59,8 @@ export const isClinicalUuid = (value?: string) => Boolean(value && uuidPattern.t
 export const consentFormat = (kind: ConsentKind) => (kind === 'donor' ? 'EG05-FR05' : 'EG05-FR12');
 const encounterType = (metadata: PaperConsentConfig, kind: ConsentKind) =>
   kind === 'donor' ? metadata.donorEncounterTypeUuid : metadata.recipientEncounterTypeUuid;
+const documentConcept = (metadata: PaperConsentConfig, kind: ConsentKind) =>
+  kind === 'donor' ? metadata.donorDocumentConceptUuid || metadata.documentConceptUuid : metadata.documentConceptUuid;
 const endpoint = (path: string, params: Record<string, string>) =>
   `${restBaseUrl}/${path}?${new URLSearchParams(params)}`;
 const requestOptions = { cache: 'no-store', rejectOnAuthFailure: true } as const;
@@ -155,7 +157,7 @@ function consentEntries(metadata: PaperConsentConfig, subject: ConsentSubject, r
   for (const row of rows) {
     if (subject.kind === 'donor' && row.visit?.uuid !== subject.contextId) continue;
     const values = (row.obs ?? []).filter(
-      ({ concept, voided }) => concept.uuid === metadata.documentConceptUuid && !voided,
+      ({ concept, voided }) => concept.uuid === documentConcept(metadata, subject.kind) && !voided,
     );
     if (values.length !== 1 || typeof values[0].value !== 'string') throw new Error('CONSENT_INVALID_RECORD');
     const document = JSON.parse(values[0].value) as Document | null;
@@ -310,7 +312,7 @@ export async function saveConsent(
         encounterType: encounterType(metadata, subject.kind),
         encounterDatetime: at,
         encounterProviders: [{ provider: providerUuid, encounterRole: metadata.encounterRoleUuid }],
-        obs: [{ concept: metadata.documentConceptUuid, value: JSON.stringify(document) }],
+        obs: [{ concept: documentConcept(metadata, subject.kind), value: JSON.stringify(document) }],
       }),
     });
     if (!data.uuid) throw new Error('CONSENT_UNCONFIRMED_WRITE');

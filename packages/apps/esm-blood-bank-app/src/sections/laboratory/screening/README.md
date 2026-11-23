@@ -1,7 +1,7 @@
 # Tamizaje: colas e informes por origen
 
-Prototipo navegable con datos sintéticos y persistencia por pestaña. No es un
-registro clínico ni una calificación biológica de producción.
+El flujo de Tamizaje de donantes usa muestras y órdenes de laboratorio en OpenMRS
+en modo real. El modo de demostración conserva sus datos sintéticos por pestaña.
 
 ## Pantalla y flujo
 
@@ -24,9 +24,9 @@ registro clínico ni una calificación biológica de producción.
 - El registro conserva el avance de asociación; al reabrirlo vuelve a la revisión.
   La X utiliza la confirmación compartida **Seguir editando / Salir**, con guardado
   opcional del avance. Un fallo no muestra éxito ni descarta la selección.
-- Recepción, siete pruebas con trazabilidad del reactivo y validación reutilizan
-  el flujo existente. Validar retira la muestra de la cola y la incorpora al
-  historial de su origen, sin liberar una unidad ni diagnosticar una infección.
+- Recepción, siete pruebas y validación reutilizan el flujo existente. Validar
+  mueve el informe al historial de su origen. La liberación de una unidad se
+  controla desde su propio flujo de inventario y calidad.
 - Resultados y repetición muestran un reloj de solo lectura. Al guardar los
   resultados se fija la fecha y hora de la prueba. Para muestras de extracción,
   los resultados reactivos iniciales pasan a repetición junto con los
@@ -48,8 +48,8 @@ el formulario al refrescar la cola. Se conserva el guard de Tamizaje.
 - `screening-workflow.component.tsx` y `screening-report.component.tsx`: recepción,
   pruebas, validación y documento de resultados existentes.
 - `screening.types.ts` y `screening-rules.ts`: procedencia y clasificación.
-- `../../../api/blood-bank-processing.api.ts`: contratos de `ScreeningApi` y rutas
-  propuestas para el OMOD. **No hay endpoints implementados** en este cambio.
+- `../../../api/blood-bank-processing.api.ts`: contrato `ScreeningApi` y rutas
+  del OMOD para recepción, resultados, validación, repetición y preaféresis.
 - `../../../api/mock-blood-bank-processing.api.ts`: implementación sintética;
   `../../../api/mock-processing-store.ts`: almacenamiento atómico por pestaña.
 
@@ -80,7 +80,27 @@ de storage. Una repetición de la confirmación devuelve la misma muestra. Por a
 se admite una muestra de aféresis por postulación; rechazos, reemplazos y múltiples
 tubos requieren un contrato posterior.
 
-## Datos de demostración y backend pendiente
+## Persistencia en OpenMRS
+
+Con `useMockData=false`, el OMOD vincula la muestra real a una orden nativa
+de Tamizaje en la visita del postulante. El registro de preaféresis se vincula
+directamente al postulante. El resultado final conserva las observaciones
+codificadas por ensayo, la información sanguínea y las recomendaciones de
+evaluación. Los borradores versionados permiten completar el trabajo antes de
+validarlo. Cada repetición validada conserva su propia orden y resultados, y
+la unidad usa el resultado consolidado junto con los controles de inventario.
+
+Las propiedades del OMOD `bloodbank.screening.encounterTypeUuid` y
+`bloodbank.screening.encounterRoleUuid` deben apuntar a metadatos activos del
+entorno. `bloodbank.screening.panelConceptUuid` y `bloodbank.screening.careSettingUuid`
+permiten configurar el panel y el ámbito asistencial. El OMOD instala el
+concepto de CMV IgG que consulta el frontend. Al validar, cada resultado de
+CMV IgG queda guardado como una observación codificada del propio ensayo y
+enlazada a la ronda de la muestra.
+El usuario requiere acceso al laboratorio, perfil de proveedor y permisos de
+OpenMRS para las escrituras clínicas de su etapa.
+
+## Datos de demostración
 
 En una sesión mock nueva hay:
 
@@ -98,17 +118,10 @@ La fecha de toma, tipo/recipiente y códigos de la nueva muestra son demostrativ
 La impresión usa el servicio existente, escapa el texto y marca el documento DEMO;
 no implementa etiquetas clínicas, códigos de barras normalizados ni archivo PDF.
 
-Antes de habilitar datos reales, el OMOD debe definir persistencia, identificadores,
-fecha real de toma, trazabilidad/auditoría, unicidad e idempotencia transaccionales,
-borradores por usuario, autorización de lectura/escritura/validación y asociación
-al seguimiento o postulación. Debe servir la proyección de laboratorio sin ampliar
-la lectura de datos clínicos sensibles. Las rutas propuestas de aféresis están en
-`processingEndpoints`; `useMockData=false` continúa fallando de forma segura.
-
 Se conservan la ruta `/blood-bank/laboratory/screening`, el privilegio de entrada
 del módulo y `app:home.bancoSangre.laboratorio.tamizaje`; ambas pestañas usan ese
-guard existente. No se modifican roles, login, navbar global, visitas, encuentros,
-FHIR, tablas ni migraciones. Estos mocks no reemplazan autorización del servidor.
+guard existente. El OMOD vuelve a comprobar el privilegio y la vinculación clínica
+antes de guardar.
 
 Riesgo local **medio** por los cambios de asociación, borrador y presentación de
 resultados; no hay escrituras clínicas. Para revertir el código, recupere el diff
@@ -150,7 +163,8 @@ al umbral recomendado de 244 KiB. **No se verificó que fueran preexistentes**;
 optimizar esos bundles queda pendiente. No se redujeron gates ni se ampliaron
 timeouts para obtener estos resultados.
 
-El gate E2E integrado queda **BLOCKED**: todavía no existe el OMOD de estas APIs,
-ni generación real de muestras desde Seguimientos. Se requiere entorno coordinado
-no productivo, usuarios autorizados/denegados, datos sintéticos y limpieza antes
-de habilitar el flujo clínico.
+La prueba de navegador con datos sintéticos contra el OMOD requiere registrar una
+muestra desde Extracción o preaféresis, confirmar la recepción, validar el panel,
+y verificar el resultado tanto en el historial como en las observaciones de la
+orden nativa. Un caso con un ensayo indeterminado permite comprobar la orden de
+repetición y el vínculo entre ambos informes.

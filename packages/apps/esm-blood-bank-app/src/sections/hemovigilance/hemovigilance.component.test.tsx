@@ -1,16 +1,17 @@
-import { showSnackbar } from '@openmrs/esm-framework';
+import { openmrsFetch, showSnackbar } from '@openmrs/esm-framework';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import spanish from '../../../translations/es.json';
 import { transfusionRequestsMock } from '../../mocks/transfusions.mock';
 import { printDocument } from '../../shared/print-document';
 import { listConsent } from '../consents/paper-consent.resource';
 import { localDateTime } from '../laboratory/screening/screening-rules';
-import type { UnitCase } from './hemovigilance';
-import { HemovigilanceChart } from './hemovigilance.component';
+import { readLinkedFr08 } from '../transfusions/transfusion-order.resource';
+import type { Fields, Stage, UnitCase } from './hemovigilance';
+import { BankHemovigilance, HemovigilanceChart } from './hemovigilance.component';
 import { listPatientHemovigilance, saveHemovigilance, searchPremedications } from './hemovigilance.resource';
 
-const session = vi.hoisted(() => ({ physician: false }));
+const session = vi.hoisted(() => ({ physician: false, useMockData: true }));
 const consentMetadata = vi.hoisted(() => ({
   donorEncounterTypeUuid: 'fr05',
   recipientEncounterTypeUuid: 'fr12',
@@ -18,7 +19,7 @@ const consentMetadata = vi.hoisted(() => ({
   encounterRoleUuid: 'role',
 }));
 vi.mock('@openmrs/esm-framework', () => ({
-  useConfig: () => ({ useMockData: true, paperConsent: consentMetadata }),
+  useConfig: () => ({ useMockData: session.useMockData, paperConsent: consentMetadata }),
   useSession: () => ({
     authenticated: true,
     user: {
@@ -32,6 +33,8 @@ vi.mock('@openmrs/esm-framework', () => ({
   userHasAccess: (access: string | string[]) =>
     Array.isArray(access) || (session.physician ? access.endsWith('.revisar') : !access.endsWith('.revisar')),
   showSnackbar: vi.fn(),
+  openmrsFetch: vi.fn(),
+  restBaseUrl: '/ws/rest/v1',
 }));
 
 vi.mock(import('../consents/paper-consent.resource'), async (load) => ({
@@ -39,7 +42,13 @@ vi.mock(import('../consents/paper-consent.resource'), async (load) => ({
   listConsent: vi.fn(),
 }));
 
-vi.mock('./hemovigilance.resource', () => ({
+vi.mock(import('../transfusions/transfusion-order.resource'), async (load) => ({
+  ...(await load()),
+  readLinkedFr08: vi.fn(),
+}));
+
+vi.mock(import('./hemovigilance.resource'), async (load) => ({
+  ...(await load()),
   isLocalHemovigilance: () => true,
   listPatientHemovigilance: vi.fn(),
   saveHemovigilance: vi.fn(),
@@ -100,6 +109,125 @@ async function openSheet() {
   await act(async () => fireEvent.click(within(row).getByRole('button', { name: 'Hoja de conducción' })));
   return screen.getByRole('dialog', { name: 'Hoja de conducción de la unidad UNIT-20' });
 }
+
+it('saves conduction, reporting, review and investigation through the OMOD without using demo encounters', async () => {
+  onTestFinished(() => {
+    session.useMockData = true;
+    session.physician = false;
+    vi.mocked(openmrsFetch).mockReset();
+    vi.mocked(listConsent).mockReset();
+    vi.mocked(readLinkedFr08).mockReset();
+  });
+  vi.clearAllMocks();
+  session.useMockData = false;
+  session.physician = false;
+  const order = {
+    ...unit.order,
+    id: '11111111-1111-4111-8111-111111111111',
+    patientId: '22222222-2222-4222-8222-222222222222',
+    encounterId: '33333333-3333-4333-8333-333333333333',
+  };
+  const dispatch = unit.dispatch;
+  const sections: UnitCase['sections'] = {};
+  const grant = {
+    uuid: 'fr12-granted',
+    decision: 'granted' as const,
+    decidedAt: '2026-11-19T01:00:00Z',
+    recordedAt: '2026-11-19T01:01:00Z',
+    signer: 'Paciente de prueba',
+    signerRole: 'self' as const,
+    provider: 'Profesional de prueba',
+  };
+  const base = '/ws/rest/v1/bloodbank/hemovigilance';
+  const caseUrl = `${base}/${order.id}/units/${dispatch.unitCode}`;
+  const patientUrl = `${base}?patientUuid=${order.patientId}`;
+  const queueUrl = `${base}?scope=queue`;
+  const payloads: Partial<Record<Stage, { previous: string; fields: Fields }>> = {};
+  vi.mocked(listConsent).mockResolvedValue([grant]);
+  vi.mocked(readLinkedFr08).mockResolvedValue(order);
+  vi.mocked(openmrsFetch).mockImplementation(async (url, init) => {
+    if (url === patientUrl || url === queueUrl) {
+      const row = { orderId: order.id, patientUuid: order.patientId, dispatch, sections: { ...sections } };
+      return { data: [row] } as Awaited<ReturnType<typeof openmrsFetch>>;
+    }
+    if (!url.startsWith(caseUrl + '/') || init?.method !== 'PUT') throw new Error(`Unexpected request ${url}`);
+    const stage = url.slice(caseUrl.length + 1) as Stage;
+    const payload = JSON.parse(String(init.body)) as { previous: string; fields: Fields };
+    payloads[stage] = payload;
+    const saved = {
+      uuid: `saved-${stage}`,
+      at: '2026-11-19T15:00:00Z',
+      actor: { name: 'Profesional en OMOD', personUuid: 'server-person', license: '1234' },
+      fields: payload.fields,
+    };
+    sections[stage] = saved;
+    return { data: saved } as Awaited<ReturnType<typeof openmrsFetch>>;
+  });
+
+  const chart = render(<HemovigilanceChart patientUuid={order.patientId} />);
+  const openUnit = async () => {
+    const row = within(await screen.findByRole('row', { name: /UNIT-20/ }));
+    fireEvent.click(row.getByRole('button', { name: 'Hoja de conducción' }));
+    return within(await screen.findByRole('dialog', { name: 'Hoja de conducción de la unidad UNIT-20' }));
+  };
+  const sheet = await openUnit();
+  expect(await sheet.findByText(spanish.paperConsent.granted)).toBeVisible();
+  fireEvent.change(sheet.getByLabelText('Hora de inicio'), { target: { value: '09:30' } });
+  fireEvent.change(sheet.getByLabelText('Hora 1'), { target: { value: '09:35' } });
+  fireEvent.change(sheet.getByLabelText('Hora de término'), { target: { value: '10:10' } });
+  fireEvent.click(sheet.getByRole('checkbox', { name: spanish.paperConsent.verify }));
+  fireEvent.click(sheet.getByRole('button', { name: 'Guardar registro' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar y enviar' }));
+  await waitFor(() =>
+    expect(payloads.conduction).toEqual({
+      previous: '',
+      fields: expect.objectContaining({
+        startTime: '09:30',
+        endTime: '10:10',
+        time0: '09:35',
+        consentEncounterUuid: grant.uuid,
+      }),
+    }),
+  );
+  fireEvent.click(await sheet.findByRole('button', { name: 'Reportar reacción adversa' }));
+  const report = within(await screen.findByRole('dialog', { name: 'Reporte de reacción FR02: UNIT-20' }));
+  fireEvent.change(report.getByLabelText('Cantidad transfundida (mL)'), { target: { value: '100' } });
+  fireEvent.click(report.getByRole('checkbox', { name: 'Cefalea' }));
+  fireEvent.click(report.getByRole('button', { name: 'Guardar registro' }));
+  expect(await screen.findByRole('row', { name: /UNIT-20.*Reportada/ })).toBeVisible();
+  expect(payloads.report).toEqual({
+    previous: '',
+    fields: expect.objectContaining({ transfused: '100', headache: 'yes' }),
+  });
+
+  session.physician = true;
+  chart.rerender(<HemovigilanceChart patientUuid={order.patientId} />);
+  const reviewedSheet = await openUnit();
+  fireEvent.click(reviewedSheet.getByRole('button', { name: 'Ver reporte de reacción adversa' }));
+  const reviewedReport = within(await screen.findByRole('dialog', { name: 'Reporte de reacción FR02: UNIT-20' }));
+  fireEvent.click(await reviewedReport.findByRole('button', { name: 'Registrar revisión' }));
+  const confirmation = within(screen.getByRole('dialog', { name: 'Confirmar revisión del FR02' }));
+  fireEvent.click(confirmation.getByRole('button', { name: 'Registrar revisión' }));
+  await waitFor(() => expect(payloads.review).toEqual({ previous: '', fields: {} }));
+  chart.unmount();
+
+  session.physician = false;
+  render(<BankHemovigilance orders={[]} onClose={vi.fn()} />);
+  const reviewed = within(await screen.findByRole('row', { name: /UNIT-20.*Revisada/ }));
+  fireEvent.click(reviewed.getByRole('button', { name: 'Abrir FR02' }));
+  const investigation = await screen.findByRole('textbox', { name: 'Reporte y recomendaciones' });
+  fireEvent.change(investigation, { target: { value: 'Recomendación de prueba' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar registro' }));
+  expect(await screen.findByRole('row', { name: /UNIT-20.*Cerrada/ })).toBeVisible();
+  expect(payloads.investigation).toEqual({
+    previous: '',
+    fields: { recommendations: 'Recomendación de prueba' },
+  });
+  expect(openmrsFetch).toHaveBeenCalledWith(patientUrl, expect.objectContaining({ cache: 'no-store' }));
+  expect(openmrsFetch).toHaveBeenCalledWith(queueUrl, expect.objectContaining({ cache: 'no-store' }));
+  expect(listPatientHemovigilance).not.toHaveBeenCalled();
+  expect(saveHemovigilance).not.toHaveBeenCalled();
+});
 
 describe('nursing transfusion monitoring', () => {
   beforeEach(() => {

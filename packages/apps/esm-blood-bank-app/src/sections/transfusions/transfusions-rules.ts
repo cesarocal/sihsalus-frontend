@@ -11,6 +11,7 @@ import type {
   TransfusionPriority,
   TransfusionRequest,
   TransfusionStatus,
+  TransfusionStockUnit,
 } from './transfusions.types';
 
 export const transfusionStatusKeys = {
@@ -47,6 +48,7 @@ export const lockedAssignments = (request: TransfusionRequest) =>
 export const readyForDelivery = (status: TransfusionStatus) => status === 'compatible' || status === 'readyUrgent';
 export const compatibilityPending = (request: TransfusionRequest, round: CompatibilityRound) =>
   request.status !== 'cancelled' &&
+  !round.readOnly &&
   !round.completedAt &&
   (request.order.priority !== 'veryUrgent' || !!request.deliveredAt);
 export const compatibilityNeedsCommunication = (request: TransfusionRequest, round: CompatibilityRound) =>
@@ -159,12 +161,13 @@ function componentGroupCompatible(component: ComponentType | null, donor: string
   }
 }
 
-export function transfusionCandidate(unit: TransferUnit, request: TransfusionRequest): boolean {
+export function transfusionCandidate(unit: TransfusionStockUnit, request: TransfusionRequest): boolean {
   const today = localDateTime().slice(0, 10);
   const expiry = inventoryExpiry(unit.expiresAt);
   const collected = inventoryExpiry(unit.collectedOn);
   return (
     unit.status === 'APTO' &&
+    (!unit.autologousRecipientUuid || unit.autologousRecipientUuid === request.order.patientId) &&
     !!unit.sealId &&
     !unit.qualityIssues.length &&
     unit.screeningResult === 'nonReactive' &&

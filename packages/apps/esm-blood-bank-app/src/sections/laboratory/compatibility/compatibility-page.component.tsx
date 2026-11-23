@@ -1,9 +1,8 @@
-import { formatListDate } from '../../../shared/format-list-date';
-import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import { Button, InlineNotification, Search } from '@carbon/react';
 import { RecentlyViewed } from '@carbon/react/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TransfusionsApi } from '../../../api/transfusions.api';
+import { listCompatibilityRequests, type TransfusionsApi } from '../../../api/transfusions.api';
+import { formatListDate } from '../../../shared/format-list-date';
 import {
   normalizeSearch,
   ProcessingPage,
@@ -11,6 +10,7 @@ import {
   useProcessingData,
 } from '../../../shared/processing-page.component';
 import shared from '../../applicant-selection/selection.scss';
+import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import { TransfusionHistory } from '../../transfusions/transfusion-history.component';
 import styles from '../../transfusions/transfusions.scss';
 import type { CompatibilityRound, TransfusionRequest } from '../../transfusions/transfusions.types';
@@ -26,7 +26,7 @@ import { CompatibilityWorkflow } from './compatibility-workflow.component';
 
 export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; shortcut?: DashboardShortcut }) {
   const t = useTransfusionsTranslation();
-  const load = useCallback(() => api.list(), [api]);
+  const load = useCallback(() => listCompatibilityRequests(api), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
   const [search, setSearch] = useState('');
   const [history, setHistory] = useState(false);
@@ -42,19 +42,22 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
     }
     if (loading || failed || !data || active || history || handledRound.current === id) return;
     handledRound.current = id;
-    const item = data.requests
+    const item = data
       .flatMap((request) => request.rounds.map((round) => ({ request, round })))
       .find(
         ({ request, round }) =>
-          round.id === id && (compatibilityPending(request, round) || compatibilityNeedsCommunication(request, round)),
+          round.id === id &&
+          !round.readOnly &&
+          (compatibilityPending(request, round) || compatibilityNeedsCommunication(request, round)),
       );
     setShortcutUnavailable(!item);
     if (item) setActive(item);
   }, [shortcut?.round, data, loading, failed, active, history]);
-  const all = (data?.requests ?? []).flatMap((request) => request.rounds.map((round) => ({ request, round })));
+  const all = (data ?? []).flatMap((request) => request.rounds.map((round) => ({ request, round })));
   const queue = all
     .filter(
       (item) =>
+        !item.round.readOnly &&
         (compatibilityPending(item.request, item.round) || compatibilityNeedsCommunication(item.request, item.round)) &&
         normalizeSearch(
           `${item.request.order.number} ${item.request.order.patientName} ${item.round.sample.code}`,
@@ -124,7 +127,7 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
               request.order.number,
               t(priorityKeys[request.order.priority]),
               request.order.patientName,
-              request.order.priority === 'veryUrgent'
+              !api.compatibility && request.order.priority === 'veryUrgent'
                 ? `${round.sample.code} · ${urgentSerumSampleCode(round.sample)}`
                 : round.sample.code,
               formatListDate(round.createdAt),
@@ -163,7 +166,7 @@ export function CompatibilityPage({ api, shortcut }: { api: TransfusionsApi; sho
         />
       )}
       {history && (
-        <TransfusionHistory requests={data?.requests ?? []} compatibility onClose={() => setHistory(false)} t={t} />
+        <TransfusionHistory requests={data ?? []} compatibility onClose={() => setHistory(false)} t={t} />
       )}
     </ProcessingPage>
   );

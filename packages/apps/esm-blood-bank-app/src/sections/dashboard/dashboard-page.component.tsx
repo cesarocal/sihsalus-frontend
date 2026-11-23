@@ -17,6 +17,7 @@ import { bloodBankPrivileges as p } from '../../access/blood-bank-privileges';
 import { ProtectedSection } from '../../access/protected-section.component';
 import { RequireAnyPrivilege } from '../../access/require-any-privilege.component';
 import type { BloodBankApi } from '../../api';
+import { listCompatibilityRequests } from '../../api/transfusions.api';
 import { moduleName } from '../../constants';
 import { ProcessingPage, useProcessingData } from '../../shared/processing-page.component';
 import type { InventoryUnit } from '../inventory/inventory.types';
@@ -258,6 +259,7 @@ function InventoryAlerts({ source, days, t }: { source: InventorySource | null; 
 }
 export function DashboardPage({ api, expiryWarningDays }: { api: BloodBankApi; expiryWarningDays?: number }) {
   const { t: translate } = useTranslation(moduleName);
+  const loadCompatibility = useCallback(() => listCompatibilityRequests(api.transfusions), [api.transfusions]);
   const t = (key: string) =>
     String(translate(`dashboard.${key}`, (spanish.dashboard as Record<string, string>)[key] ?? key));
   const [version, setVersion] = useState(0);
@@ -396,8 +398,8 @@ export function DashboardPage({ api, expiryWarningDays }: { api: BloodBankApi; e
                               </Source>
                             </ProtectedSection>
                             <ProtectedSection privilege={p.compatibility} hideUnauthorized>
-                              <Source load={api.transfusions.list} t={t}>
-                                {({ requests }) => (
+                              <Source load={loadCompatibility} t={t}>
+                                {(requests) => (
                                   <Card
                                     label={t('compatibility')}
                                     description={t('compatibilityHelp')}

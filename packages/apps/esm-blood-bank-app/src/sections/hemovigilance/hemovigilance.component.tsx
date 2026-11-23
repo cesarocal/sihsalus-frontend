@@ -21,15 +21,8 @@ import type { BloodBankConfig } from '../../config-schema';
 import { moduleName } from '../../constants';
 import { ExitConfirmation, type ExitSaveResult } from '../../shared/exit-confirmation.component';
 import { formatListDate } from '../../shared/format-list-date';
-import { PaperConsentSummary, useConsentTranslation, usePaperConsent } from '../consents/paper-consent.component';
-import {
-  closesTransfusion,
-  isClinicalUuid,
-  permitsAdministration,
-  recipientConsentSubject,
-} from '../consents/paper-consent.resource';
 import { notifySuccess } from '../../shared/notify-success';
-import { printDocument, type PrintPageFit } from '../../shared/print-document';
+import { type PrintPageFit, printDocument } from '../../shared/print-document';
 import {
   normalizeSearch,
   ProcessingTable,
@@ -37,6 +30,13 @@ import {
   useProcessingData,
 } from '../../shared/processing-page.component';
 import { WarningConfirmation } from '../../shared/warning-confirmation.component';
+import { PaperConsentSummary, useConsentTranslation, usePaperConsent } from '../consents/paper-consent.component';
+import {
+  closesTransfusion,
+  isClinicalUuid,
+  permitsAdministration,
+  recipientConsentSubject,
+} from '../consents/paper-consent.resource';
 import { componentDefinitions, componentTypes } from '../laboratory/fractionation/fractionation-rules';
 import type { TransfusionOrder } from '../transfusions/transfusions.types';
 import { transfusionOperatorName } from '../transfusions/transfusions-rules';
@@ -63,8 +63,11 @@ import {
   actorLicense,
   hemovigilanceSaveError,
   isLocalHemovigilance,
+  listClinicalHemovigilanceQueue,
+  listClinicalPatientHemovigilance,
   listHemovigilance,
   listPatientHemovigilance,
+  saveClinicalHemovigilance,
   saveHemovigilance,
 } from './hemovigilance.resource';
 import styles from './hemovigilance.scss';
@@ -101,7 +104,7 @@ export function HemovigilanceLink({ basePath }: { basePath: string }) {
   const t = useHemoTranslation();
   const { useMockData } = useConfig<BloodBankConfig>();
   const path = `${basePath}/${chartName}`;
-  if (!isLocalHemovigilance(useMockData)) return null;
+  if (useMockData && !isLocalHemovigilance(useMockData)) return null;
   const active = decodeURIComponent(location.pathname) === path;
   return (
     <ConfigurableLink
@@ -118,38 +121,45 @@ export function HemovigilanceLink({ basePath }: { basePath: string }) {
 }
 
 export function HemovigilanceChart({ patientUuid }: { patientUuid: string }) {
-  const config = useConfig<BloodBankConfig>();
+  const { useMockData } = useConfig<BloodBankConfig>();
   const { user, authenticated } = useSession();
   const t = useHemoTranslation();
   const enabled = Boolean(
     patientUuid &&
       authenticated &&
       userHasAccess([hemoPrivileges.chart, 'Get Orders'], user) &&
-      isLocalHemovigilance(config.useMockData),
+      (!useMockData || isLocalHemovigilance(useMockData)),
   );
-  const load = useCallback(() => listPatientHemovigilance(patientUuid), [patientUuid]);
+  const load = useCallback(
+    () => (useMockData ? listPatientHemovigilance(patientUuid) : listClinicalPatientHemovigilance(patientUuid)),
+    [patientUuid, useMockData],
+  );
   if (!enabled) return null;
-  return <HemovigilanceList key={patientUuid} load={load} t={t} />;
+  return <HemovigilanceList key={patientUuid} load={load} t={t} useMockData={useMockData} />;
 }
 
 export function BankHemovigilance({ orders, onClose }: { orders: TransfusionOrder[]; onClose: () => void }) {
   const t = useHemoTranslation();
-  const load = useCallback(
-    async () => (await listHemovigilance(orders)).filter((entry) => entry.sections.report),
-    [orders],
-  );
+  const { useMockData } = useConfig<BloodBankConfig>();
+  const load = useCallback(async () => {
+    const units = useMockData ? await listHemovigilance(orders) : await listClinicalHemovigilanceQueue();
+    return units.filter((entry) => entry.sections.report);
+  }, [orders, useMockData]);
   const { user, authenticated } = useSession();
   if (!authenticated || !userHasAccess(hemoPrivileges.bank, user)) return null;
-  return <HemovigilanceList load={load} t={t} onClose={onClose} />;
+  if (useMockData && !isLocalHemovigilance(useMockData)) return null;
+  return <HemovigilanceList load={load} t={t} useMockData={useMockData} onClose={onClose} />;
 }
 
 function HemovigilanceList({
   load,
   t,
+  useMockData,
   onClose,
 }: {
   load: () => Promise<UnitCase[]>;
   t: ProcessingTranslate;
+  useMockData: boolean;
   onClose?: () => void;
 }) {
   const data = useProcessingData(load);
@@ -170,6 +180,7 @@ function HemovigilanceList({
         unit={current}
         cases={units}
         bank={Boolean(onClose)}
+        useMockData={useMockData}
         onClose={() => {
           setSelected(undefined);
           data.reload();
@@ -316,12 +327,14 @@ function UnitCaseDialog({
   unit: initialUnit,
   cases,
   bank,
+  useMockData,
   onClose,
   t,
 }: {
   unit: UnitCase;
   cases: UnitCase[];
   bank: boolean;
+  useMockData: boolean;
   onClose: () => void;
   t: ProcessingTranslate;
 }) {
@@ -446,7 +459,9 @@ function UnitCaseDialog({
           values = { ...values, consentInterruptionUuid: current.uuid };
         }
       }
-      const record = await saveHemovigilance(unit, action, values, actor);
+      const record = useMockData
+        ? await saveHemovigilance(unit, action, values, actor)
+        : await saveClinicalHemovigilance(unit, action, values);
       setEditor((current) => {
         const unit = { ...current.unit, sections: { ...current.unit.sections, [action]: record } };
         return { ...current, unit, fields: fieldsForStage(unit, current.stage), changed: false };

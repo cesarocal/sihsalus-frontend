@@ -1,7 +1,7 @@
 import { openmrsFollowUpApi } from './follow-up.api';
 import { openmrsFetch } from '@openmrs/esm-framework';
 
-import type { DashboardData, DonorSummary, InventorySummary } from '../types/blood-bank.types';
+import type { DashboardData, DonorSummary } from '../types/blood-bank.types';
 import { openmrsApplicantSelectionApi } from './applicant-selection.api';
 import type { BloodBankApi } from './blood-bank.api';
 import { openmrsCollectionApi, openmrsScreeningApi } from './blood-bank-processing.api';
@@ -32,7 +32,6 @@ export const openmrsBloodBankApi: BloodBankApi = {
     return response.data;
   },
   async getInventory() {
-    const response = await openmrsFetch<InventorySummary[]>(`${apiBase}/inventory`);
-    return response.data;
+    return (await openmrsInventoryApi.list()).units;
   },
 };

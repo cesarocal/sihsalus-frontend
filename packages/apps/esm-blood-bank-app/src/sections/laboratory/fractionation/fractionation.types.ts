@@ -73,6 +73,7 @@ export interface FractionationNode {
 
 export interface FractionationBatch {
   id: string;
+  canonical?: boolean;
   revision: number;
   sources: FractionationUnit[];
   nodes: FractionationNode[];

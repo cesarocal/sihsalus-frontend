@@ -71,7 +71,7 @@ un aviso y permite quitar los filtros. El guard existente sigue siendo necesario
 - `fractionation-format.ts`: formato de fecha/hora compartido de OpenMRS para
   datos de consulta; no cambia los controles nativos de ingreso de fechas.
 - `fractionation.types.ts` / `fractionation-rules.ts`: contratos y restricciones.
-- `../../../api/fractionation.api.ts`: interfaz y endpoints propuestos para OMOD.
+- `../../../api/fractionation.api.ts`: adaptador de Fraccionamiento para el OMOD.
 - `../../../api/mock-fractionation.api.ts`: adaptador sintético, concurrencia
   por revisión y actualización atómica del inventario.
 
@@ -128,14 +128,35 @@ CMV, anticuerpos, riesgos biológicos, remuneración, reducciones de leucocitos 
 sellos a partir de un tamizaje pendiente. Casos especiales sin información
 verificada, pools, componentes industriales, descartes,
 cancelación formal, distribución y liberación necesitan flujos posteriores.
-Las etiquetas llevan marca de datos ficticios y no implementan códigos ISBT 128,
-impresoras validadas, archivo PDF ni recuento/auditoría real de impresión.
+En el modo de demostración, las etiquetas llevan una marca de datos ficticios.
+El formato de impresión actual utiliza la plantilla del navegador.
 
-## Backend pendiente
+## Persistencia en OpenMRS
 
-`useMockData=false` falla de forma segura: el adaptador no emite solicitudes
-de fraccionamiento hasta implementar y validar su capacidad. Endpoints en
-`fractionation.api.ts` son propuestas, no contratos desplegados.
+`useMockData=false` conecta la bandeja con las unidades de `banco_unidad`
+vinculadas a la extracción. El OMOD exige el privilegio de Fraccionamiento,
+`bloodbank.experimentalPersistenceEnabled=true`, un proveedor activo asociado
+a la cuenta y una ubicación activa. Al iniciar un lote, registra el proceso,
+sus orígenes y la transición a En laboratorio en una sola transacción.
+
+Finalizar guarda las unidades hijas, su filiación, sus datos de etiqueta,
+los volúmenes y la transición de cada origen. Los resultados conservan la
+extracción y el grupo ABO/Rh del origen. Las unidades resultantes quedan en
+Cuarentena y los nodos intermedios consumidos quedan Fraccionados. El remanente
+pediátrico conserva el código y el estado inicial de su unidad de origen.
+
+El avance editable se conserva con control de revisión. El historial anterior
+permanece disponible para consulta. La bandeja clínica toma las identidades
+y estados actuales de las tablas del módulo.
+
+Cada solicitud de impresión desde el navegador se registra por unidad y
+operación. Al finalizar se consolida en la etiqueta de tipo FINAL; una
+reimpresión agrega una solicitud a su contador. Verificar las etiquetas sigue
+siendo una acción explícita del operador.
+
+Las etiquetas clínicas leen el resultado de CMV IgG de la última prueba
+validada de su origen. Si cambia durante un fraccionamiento, se solicita
+verificar otra vez las etiquetas antes de finalizar.
 
 La lectura de catálogos usa REST de OpenMRS, con la sesión autenticada, incluso
 cuando el flujo guarda por pestaña. Configurar en `@sihsalus/esm-blood-bank-app`:
@@ -144,26 +165,28 @@ cuando el flujo guarda por pestaña. Configurar en `@sihsalus/esm-blood-bank-app
 - `laboratoryCatalogs.storageTemperatureSetUuid`: conjunto de temperaturas.
 - `laboratoryCatalogs.irregularAntibodySetUuid`: conjunto de especificidades.
 - `laboratoryCatalogs.modifierLocationUuid`: localidad del servicio modificador.
-- `laboratoryCatalogs.cmvIgGConceptUuid`: concepto de CMV IgG. Con el UUID vacío
-  se busca el nombre exacto «Anticuerpos IgG contra citomegalovirus (CMV)».
+- `laboratoryCatalogs.cmvIgGConceptUuid`: UUID del ensayo de CMV IgG instalado
+  por el OMOD. Fraccionamiento presenta su resultado de la última ronda validada.
 
-Los conjuntos se consultan mediante `GET /ws/rest/v1/concept/{uuid}` y solo se
-muestran miembros activos. La ubicación configurada usa
+El adaptador real usa los conceptos del catálogo consolidado cuando el campo
+no tiene configuración propia. Los conjuntos se consultan mediante
+`GET /ws/rest/v1/concept/{uuid}` y solo se muestran opciones activas. La ubicación configurada usa
 `GET /ws/rest/v1/location/{uuid}`. Un catálogo ausente o una sesión sin acceso
 muestran un aviso en el campo y permiten reintentar la lectura.
 
-Mapeo propuesto de `DDL_Banco_Sangre.sql` / `DDL_Banco_y_Nucleo.sql`:
+Tablas del proceso:
 
 - `banco_unidad`: identidad, componente, volumen, caducidad y unidad padre.
 - `banco_unidad_proceso`: procedimiento de fraccionamiento y su responsable.
 - `banco_unidad_proceso_detalle`: orígenes y resultados asociados al proceso.
 - `banco_unidad_estado_historial`: cambios de estado y ubicación auditables.
-- `banco_unidad_etiqueta`: etiquetas finales y registro de impresiones.
+- `banco_fraccionamiento_impresion` y `banco_unidad_etiqueta`: solicitudes de
+  impresión y su consolidación por unidad final.
 
-El OMOD deberá resolver conceptos mediante configuración, aplicar RBAC
-autoritativo y transacciones sobre todo el lote, controlar revisiones,
-idempotencia, inventario/ubicación, calidad y trazabilidad. No hay migraciones
-SQL, nuevas tablas ni modificaciones al backend en este cambio.
+Las migraciones del módulo agregan el sistema de fraccionamiento y la
+auditoría de solicitudes de impresión. Inventario utiliza los estados
+clínicos que deja el proceso y verifica sus propios requisitos para el
+sello de calidad.
 
 ## Validación mínima
 
@@ -175,10 +198,9 @@ acceso permitido y denegado sin lecturas de API.
 
 Prueba visual con datos sintéticos: cola → selección → árbol → etiquetas →
 volúmenes → revisión → cancelar/aceptar → inventario/historial, también en
-pantalla estrecha. Una prueba local con mocks no reemplaza el gate E2E contra
-OMOD/content y entorno DEV/QLTY coordinado; ese gate sigue pendiente hasta
-disponer del backend y cuentas de prueba autorizadas. Cerrar la pestaña/contexto
-aislado elimina los datos sintéticos; no borrar almacenamiento de otros flujos.
+pantalla estrecha. La prueba con OMOD usa una extracción sintética ya
+confirmada y comprueba la persistencia de la unidad original, sus productos
+y las etiquetas después de recargar.
 
 ### Evidencia local — 2026-10-05, antes de permitir PRP final
 

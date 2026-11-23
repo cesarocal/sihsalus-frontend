@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockBloodBankApi } from './mock-blood-bank.api';
 import { createMockFractionationApi, fractionationInventory, fractionationStore } from './mock-fractionation.api';
 import { suggestFractionationExpirations } from '../sections/laboratory/fractionation/fractionation-expiration';
-import { openmrsFractionationApi } from './fractionation.api';
 import { processingStorageKey, readProcessingState, writeProcessingState } from './mock-processing-store';
 import {
   finalNodes,
@@ -286,12 +285,6 @@ describe('atomic synthetic fractionation and inventory', () => {
     batch = await instance.save(batch, 'fractionationVolumes');
     batch.finalChecks = true;
     expect((await instance.finalize(batch)).status).toBe('completed');
-  });
-  it('fails closed without backend capability and without issuing network requests', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch');
-    await expect(openmrsFractionationApi.list()).rejects.toThrow('BACKEND_NOT_IMPLEMENTED');
-    await expect(openmrsFractionationApi.start(['PFC'])).rejects.toThrow('BACKEND_NOT_IMPLEMENTED');
-    expect(fetch).not.toHaveBeenCalled();
   });
 });
 
