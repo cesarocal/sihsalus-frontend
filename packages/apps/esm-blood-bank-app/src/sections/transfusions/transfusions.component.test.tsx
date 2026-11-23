@@ -358,7 +358,10 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     await waitFor(() => expect(screen.getByRole('row', { name: /ORD-42/ })).toHaveTextContent(t('txReviewed')));
     expect(within(screen.getByRole('table', { name: t('txInbox') })).getAllByRole('row')).toHaveLength(2);
   });
-  it('keeps a regular FR08 pending until consent and shows a later refusal in the history', async () => {
+  it.each([
+    { decision: 'declined', status: 'txCancelledDeclined', reason: 'Negativa escrita' },
+    { decision: 'revoked', status: 'txCancelledRevoked', reason: 'Revocación escrita' },
+  ] as const)('shows an FR08 with consent $decision in the history', async ({ decision, status, reason }) => {
     consentConfig.enabled = true;
     const api = createMockTransfusionsApi();
     const { order } = (await api.list()).requests[0];
@@ -374,7 +377,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
       orderer: { display: order.orderer },
       instructions: JSON.stringify({ format: 'EG05-FR08/v1', request: order }),
     };
-    const refused = {
+    const cancelledConsent = {
       uuid: '44444444-4444-4444-8444-444444444444',
       patient: issued.patient,
       encounterType: { uuid: consentConfig.metadata.recipientEncounterTypeUuid },
@@ -383,12 +386,12 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
         {
           concept: { uuid: consentConfig.metadata.documentConceptUuid },
           value: JSON.stringify({
-            decision: 'declined',
-            folio: 'FR12-DECLINED',
+            decision,
+            folio: 'FR12-TEST',
             decidedAt: '2026-10-16T15:00:00.000Z',
             signer: 'Paciente de prueba',
             signerRole: 'self',
-            reason: 'Negativa escrita',
+            reason,
             format: 'EG05-FR12/v1',
             reference: issued.uuid,
             operation: '55555555-5555-4555-8555-555555555555',
@@ -410,19 +413,26 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const row = await screen.findByRole('row', { name: /ORD-43/ });
     expect(row).toHaveTextContent(t('txConsentPending'));
     expect(within(row).getByRole('button', { name: t('txAttend') })).toBeEnabled();
-    records = [refused];
+    records = [cancelledConsent];
     window.dispatchEvent(new Event(recipientConsentChanged));
-    const cancelled = await screen.findByRole('row', { name: /ORD-43.*Cancelada por negativa/ });
-    expect(within(cancelled).queryByRole('button', { name: t('txAttend') })).not.toBeInTheDocument();
     const history = screen.getByRole('button', { name: t('txHistory') });
     await waitFor(() => expect(history).toBeEnabled());
     fireEvent.click(history);
     const dialog = within(await screen.findByRole('dialog', { name: t('txHistory') }));
     const event = dialog.getByRole('row', { name: /ORD-43/ });
-    expect(event).toHaveTextContent(t('txCancelledDeclined'));
+    expect(event).toHaveTextContent(t(status));
+    const inbox = within(screen.getByRole('table', { name: t('txInbox') }));
+    if (decision === 'revoked') {
+      expect(inbox.queryByRole('row', { name: /ORD-43/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: t(status) })).not.toBeInTheDocument();
+    } else {
+      const refusal = inbox.getByRole('row', { name: /ORD-43/ });
+      expect(refusal).toHaveTextContent(t(status));
+      expect(within(refusal).queryByRole('button', { name: t('txAttend') })).not.toBeInTheDocument();
+    }
     fireEvent.click(within(event).getByRole('button', { name: t('txViewDetail') }));
-    expect(await dialog.findByText('Negativa escrita')).toBeVisible();
-    expect(dialog.queryByText('FR12-DECLINED')).not.toBeInTheDocument();
+    expect(await dialog.findByText(reason)).toBeVisible();
+    expect(dialog.queryByText('FR12-TEST')).not.toBeInTheDocument();
   });
 
   it('records receipt and inspection from a cancelled dispatch detail', async () => {

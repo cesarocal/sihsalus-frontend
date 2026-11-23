@@ -284,12 +284,11 @@ export function TransfusionsPage({
           'fr08Cancelled',
           'txConsentPending',
           'txCancelledDeclined',
-          'txCancelledRevoked',
         ]
       : []),
   ]);
   const activeCard = statusCards.find((card) => card.filter === status);
-  const inbox = rows.filter((item) => item.request?.status !== 'delivered');
+  const inbox = rows.filter((item) => item.request?.status !== 'delivered' && item.statusKey !== 'txCancelledRevoked');
   const queue = inbox
     .filter(
       (item) =>
