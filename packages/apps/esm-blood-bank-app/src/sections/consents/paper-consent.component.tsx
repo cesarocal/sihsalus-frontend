@@ -106,13 +106,21 @@ export function usePaperConsent(subject?: ConsentSubject, monitor = false) {
 }
 type ConsentQuery = ReturnType<typeof usePaperConsent>;
 
-export function PaperConsentSummary({ query, subject }: { query: ConsentQuery; subject: ConsentSubject }) {
+export function PaperConsentSummary({
+  query,
+  subject,
+  showHeading = true,
+}: {
+  query: ConsentQuery;
+  subject: ConsentSubject;
+  showHeading?: boolean;
+}) {
   const t = useConsentTranslation();
   const { latest } = query;
   const recipient = subject.kind === 'recipient';
   return (
     <section className={styles.summary} aria-label={consentFormat(subject.kind)}>
-      <h4>{recipient ? t('fr12Heading') : `${consentFormat(subject.kind)} · ${t('title')}`}</h4>
+      {showHeading && <h4>{recipient ? t('fr12Heading') : `${consentFormat(subject.kind)} · ${t('title')}`}</h4>}
       {!query.metadata || query.missingContext ? (
         <InlineNotification hideCloseButton kind="warning" title={t('missingContext')} />
       ) : query.failed ? (
@@ -334,13 +342,21 @@ export function PaperConsentEditor({
   );
 
   return (
-    <div className={styles.editor}>
-      <PaperConsentSummary query={query} subject={subject} />
+    <div className={recipient ? `${styles.editor} ${styles.recipientEditor}` : styles.editor}>
+      <PaperConsentSummary query={query} subject={subject} showHeading={!recipient} />
       {error && <InlineNotification hideCloseButton kind="error" title={t(error)} />}
       {canEdit && !query.missingContext && (
         <>
           {!recipient && <div className={styles.actions}>{printButton}</div>}
-          {closed && <InlineNotification hideCloseButton kind="info" title={t('closedRequest')} />}
+          {closed && (
+            <InlineNotification
+              className={styles.closedNotice}
+              hideCloseButton
+              kind="info"
+              title={t('closedRequest')}
+              subtitle={t('closedRequestHelp')}
+            />
+          )}
           {!closed && !provider && <InlineNotification hideCloseButton kind="warning" title={t('providerRequired')} />}
           {!closed && (
             <fieldset
@@ -457,11 +473,14 @@ export function PaperConsentHistory({
 }) {
   const t = useConsentTranslation();
   if (!records?.length) return null;
+  const chronological = [...records].sort(
+    (a, b) => Date.parse(a.decidedAt) - Date.parse(b.decidedAt) || Date.parse(a.recordedAt) - Date.parse(b.recordedAt),
+  );
   return (
     <details className={styles.history}>
       <summary>{t('history')}</summary>
       <ul>
-        {records.map((record) => (
+        {chronological.map((record) => (
           <li key={record.uuid}>
             <strong>{t(record.decision)}</strong> · {formatListDate(record.decidedAt)}
             {showFolio && record.folio && <> · {record.folio}</>}

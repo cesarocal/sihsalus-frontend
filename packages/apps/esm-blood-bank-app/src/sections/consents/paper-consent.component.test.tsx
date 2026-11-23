@@ -125,3 +125,26 @@ it('enables printing only after the FR12 decision is verified and saved', async 
   fireEvent.change(formDecision, { target: { value: 'revoked' } });
   expect(print).toBeDisabled();
 });
+
+it('shows the cancellation notice and lists signed FR12 decisions from oldest to newest', async () => {
+  vi.mocked(listConsent).mockResolvedValue([
+    {
+      ...savedConsent,
+      uuid: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      decision: 'revoked',
+      decidedAt: new Date(2026, 10, 21, 15, 30).toISOString(),
+      reason: 'Revocación de prueba',
+    },
+    savedConsent,
+  ]);
+  render(<PaperConsentEditor subject={recipient} />);
+
+  expect(await screen.findByText('Solicitud cancelada')).toBeInTheDocument();
+  expect(screen.getByText('El FR08 y las decisiones del FR12 se conservan en el historial.')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'EG05 - FR12: Consentimiento informado del receptor' })).toBeNull();
+  fireEvent.click(screen.getByText('Historial de decisiones'));
+  expect(screen.getAllByRole('listitem').map((row) => row.querySelector('strong')?.textContent)).toEqual([
+    'Otorgado',
+    'Revocado',
+  ]);
+});

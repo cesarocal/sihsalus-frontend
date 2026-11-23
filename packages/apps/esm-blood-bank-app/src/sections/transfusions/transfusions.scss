@@ -495,9 +495,7 @@
   @include type.type-style("heading-compact-01");
 }
 .fr08OrderTile:global(.cds--tile) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   min-block-size: 0;
   padding: 0;
   border-block-start: 1px solid $ui-03;
@@ -505,6 +503,13 @@
   border-inline-start: layout.$spacing-02 solid colors.$cyan-70;
   background-color: $ui-02;
   text-align: start;
+}
+
+.fr08OrderPrimary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-inline-size: 0;
 }
 
 .fr08OrderIdentity {
@@ -525,16 +530,36 @@
   color: $text-02;
 }
 
-.fr08OrderActions {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
-
 .fr08OrderAction:global(.cds--btn) {
+  flex-shrink: 0;
+  padding-inline: layout.$spacing-04 layout.$spacing-08;
+
   svg {
     fill: currentColor;
   }
+}
+
+.fr08ConsentAction:global(.cds--btn) {
+  align-items: center;
+  gap: layout.$spacing-03;
+  inline-size: 100%;
+  max-inline-size: none;
+  border-block-start-color: $ui-03;
+  padding-inline: layout.$spacing-04;
+  background-color: $ui-01;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01, #{colors.$gray-20});
+  }
+
+  svg {
+    flex-shrink: 0;
+    fill: currentColor;
+  }
+}
+
+.fr08ConsentArrow {
+  margin-inline-start: auto;
 }
 
 .fr08Modal:global(.cds--modal) {
@@ -681,6 +706,33 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: layout.$spacing-04;
   margin-block-start: layout.$spacing-04;
+}
+
+.fr12OrderPicker {
+  display: grid;
+  gap: layout.$spacing-04;
+  min-inline-size: 0;
+}
+
+.fr12SelectedOrder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: layout.$spacing-04;
+  margin-block-end: layout.$spacing-05;
+  padding: layout.$spacing-04 layout.$spacing-05;
+  border: 1px solid $ui-03;
+
+  > div {
+    display: grid;
+    gap: layout.$spacing-02;
+  }
+
+  span {
+    color: $text-02;
+    font-size: .875rem;
+  }
 }
 
 .fr12Footer:global(.cds--modal-footer) {

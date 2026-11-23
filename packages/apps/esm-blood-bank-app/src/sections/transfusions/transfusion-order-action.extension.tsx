@@ -8,15 +8,15 @@ import {
   NumberInput,
   RadioButton,
   RadioButtonGroup,
+  Search,
   Select,
   SelectItem,
   TextInput,
   Tile,
 } from '@carbon/react';
-import { Add, Close, RainDrop } from '@carbon/react/icons';
+import { Add, ArrowRight, Close, DocumentSigned, RainDrop } from '@carbon/react/icons';
 import {
   AddIcon,
-  ChevronDownIcon,
   getConfig,
   showSnackbar,
   useConfig,
@@ -28,7 +28,8 @@ import {
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BloodBankConfig } from '../../config-schema';
-import { useProcessingData } from '../../shared/processing-page.component';
+import { formatListDate } from '../../shared/format-list-date';
+import { normalizeSearch, ProcessingTable, useProcessingData } from '../../shared/processing-page.component';
 import { PaperConsentEditor, useConsentTranslation } from '../consents/paper-consent.component';
 import { recipientConsentSubject } from '../consents/paper-consent.resource';
 import type { ComponentType } from '../laboratory/fractionation/fractionation.types';
@@ -107,6 +108,7 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
   const [requestPatientUuid, setRequestPatientUuid] = useState<string>();
   const [consentPatientUuid, setConsentPatientUuid] = useState<string>();
   const addButton = useRef<HTMLButtonElement>(null);
+  const consentButton = useRef<HTMLButtonElement>(null);
   const t = useTransfusionsTranslation();
   const consentText = useConsentTranslation();
   if (
@@ -122,11 +124,11 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
     <>
       {/* FR08 is issued in the form itself, so there are no transfusion drafts in the basket. */}
       <Tile className={styles.fr08OrderTile}>
-        <div className={styles.fr08OrderIdentity}>
-          <RainDrop size={24} aria-hidden="true" />
-          <h4 className={styles.fr08OrderHeading}>{t('fr08OrderType')} (0)</h4>
-        </div>
-        <div className={styles.fr08OrderActions}>
+        <div className={styles.fr08OrderPrimary}>
+          <div className={styles.fr08OrderIdentity}>
+            <RainDrop size={24} aria-hidden="true" />
+            <h4 className={styles.fr08OrderHeading}>{t('fr08OrderType')} (0)</h4>
+          </div>
           <Button
             ref={addButton}
             className={styles.fr08OrderAction}
@@ -139,15 +141,18 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
           >
             {t('fr08Add')}
           </Button>
-          <Button
-            className={styles.fr08OrderAction}
-            hasIconOnly
-            kind="ghost"
-            renderIcon={(props) => <ChevronDownIcon size={16} {...props} />}
-            iconDescription={consentText('openRecipient')}
-            onClick={() => setConsentPatientUuid(patientUuid)}
-          />
         </div>
+        <Button
+          ref={consentButton}
+          className={styles.fr08ConsentAction}
+          kind="ghost"
+          size="md"
+          onClick={() => setConsentPatientUuid(patientUuid)}
+        >
+          <DocumentSigned size={16} aria-hidden="true" />
+          {consentText('openRecipient')}
+          <ArrowRight size={16} className={styles.fr08ConsentArrow} aria-hidden="true" />
+        </Button>
       </Tile>
       {canCreateOrders &&
         requestPatientUuid === patientUuid &&
@@ -169,7 +174,10 @@ export default function TransfusionOrderAction({ canCreateOrders }: { canCreateO
             key={patientUuid}
             config={transfusionOrders}
             patientUuid={patientUuid}
-            onClose={() => setConsentPatientUuid(undefined)}
+            onClose={() => {
+              setConsentPatientUuid(undefined);
+              requestAnimationFrame(() => consentButton.current?.focus());
+            }}
           />,
           document.body,
         )}
@@ -187,53 +195,84 @@ function ExistingOrderConsent({
   onClose: () => void;
 }) {
   const t = useConsentTranslation();
+  const tx = useTransfusionsTranslation();
   const load = useCallback(() => listIssuedTransfusionOrders(config, patientUuid), [config, patientUuid]);
   const { data, loading, failed, reload } = useProcessingData(load);
   const [id, setId] = useState('');
+  const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [consentFooter, setConsentFooter] = useState<HTMLElement | null>(null);
   const inFlight = useRef(false);
-  const order = data?.find((entry) => !entry.stopped && entry.order.id === id)?.order;
+  const orders = (data ?? []).filter((entry) => !entry.stopped).map((entry) => entry.order);
+  const order = orders.find((entry) => entry.id === id);
+  const query = normalizeSearch(search.trim());
+  const matchingOrders = orders.filter((entry) => normalizeSearch(entry.number).includes(query));
   return (
     <ComposedModal
       open
       size="lg"
-      aria-label={t('title')}
+      aria-label={t('fr12Heading')}
       className={styles.fr08Modal}
+      containerClassName={styles.fr08ModalContainer}
       preventCloseOnClickOutside
       onClose={() => {
         if (inFlight.current) return false;
         onClose();
       }}
     >
-      <ModalHeader title={t('title')} iconDescription={t('close')} />
-      <ModalBody className={styles.fr08ModalBody}>
-        {failed ? (
-          <>
-            <InlineNotification hideCloseButton kind="error" title={t('readFailed')} />
-            <Button kind="ghost" size="sm" onClick={reload}>
-              {t('retry')}
+      <ModalHeader title={t('fr12Heading')} iconDescription={t('close')} />
+      <ModalBody className={styles.fr08ModalBody} hasScrollingContent>
+        {order && !failed ? (
+          <div className={styles.fr12SelectedOrder}>
+            <div>
+              <strong>{order.number}</strong>
+              <span>
+                {formatListDate(order.requestedAt)} · {order.service}
+              </span>
+            </div>
+            <Button type="button" kind="ghost" size="sm" disabled={saving} onClick={() => setId('')}>
+              {t('changeRequest')}
             </Button>
-          </>
+          </div>
         ) : (
-          <Select
-            id="fr12-order"
-            labelText={t('requestNumber')}
-            value={id}
-            disabled={saving || loading}
-            onChange={(event) => setId(event.target.value)}
-          >
-            <SelectItem
-              value=""
-              text={t(loading ? 'loading' : data?.some((entry) => !entry.stopped) ? 'selectRequest' : 'noRequest')}
-              disabled
+          <div className={styles.fr12OrderPicker}>
+            <Search
+              id="fr12-order-search"
+              labelText={t('searchRequest')}
+              placeholder={t('searchRequest')}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              closeButtonLabelText={tx('clearSearch')}
             />
-            {data
-              ?.filter((entry) => !entry.stopped)
-              .map(({ order }) => (
-                <SelectItem key={order.id} value={order.id} text={order.number} />
-              ))}
-          </Select>
+            <ProcessingTable
+              title={t('requestNumber')}
+              columns={['txNumber', 'txRequestedAt', 'txService', 'actions']}
+              rows={matchingOrders.map((entry) => ({
+                id: entry.id,
+                cells: [
+                  entry.number,
+                  formatListDate(entry.requestedAt),
+                  entry.service,
+                  <Button
+                    key={entry.id}
+                    type="button"
+                    size="sm"
+                    kind="ghost"
+                    aria-label={`${t('selectOrder')} ${entry.number}`}
+                    onClick={() => setId(entry.id)}
+                  >
+                    {t('selectOrder')}
+                  </Button>,
+                ],
+              }))}
+              loading={loading}
+              failed={failed}
+              reload={reload}
+              filterKey={query}
+              emptyHelp={t(orders.length ? 'requestNoMatch' : 'noRequest')}
+              t={tx}
+            />
+          </div>
         )}
         {order && !failed && (
           <PaperConsentEditor
@@ -400,7 +439,7 @@ function TransfusionOrderForm({
   );
   const ready = Boolean(recipient && visit?.location?.uuid && provider?.uuid);
   const showConsent = Boolean(issued && editingConsent);
-  const modalTitle = showConsent ? consentText('title') : t('fr08Title');
+  const modalTitle = showConsent ? consentText('fr12Heading') : t('fr08Title');
   return (
     <ComposedModal
       open
@@ -730,7 +769,7 @@ function TransfusionOrderForm({
           {issued && (
             <>
               <PrintFr08 order={issued.order} t={t} />
-              <Button type="button" kind="tertiary" onClick={openConsent}>
+              <Button type="button" kind="tertiary" renderIcon={DocumentSigned} onClick={openConsent}>
                 {consentText('openRecipient')}
               </Button>
             </>
