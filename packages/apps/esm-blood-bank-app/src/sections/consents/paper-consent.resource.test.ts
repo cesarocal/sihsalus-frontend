@@ -146,8 +146,29 @@ describe('paper consent encounters', () => {
       location: location.uuid,
       encounterType: 'fr05',
       encounterProviders: [{ provider: provider.uuid, encounterRole: metadata.encounterRoleUuid }],
-      obs: [{ concept: 'document', value: expect.stringContaining(granted.folio) }],
+      obs: [{ concept: 'document', value: expect.stringContaining('TEST-01') }],
     });
+  });
+
+  it('saves a new FR12 using the FR08 reference without a paper folio', async () => {
+    const operation = uuid(102);
+    const signed: ConsentInput = {
+      decision: 'granted',
+      signer: recipient.name,
+      signerRole: 'self',
+      decidedAt: granted.decidedAt,
+    };
+    fetch.mockResolvedValueOnce(response({ results: [] }));
+    fetch.mockResolvedValueOnce(response({ patient, location, visit }));
+    fetch.mockResolvedValueOnce(response({ patient, location }));
+    fetch.mockResolvedValueOnce(response({ uuid: uuid(10) }));
+    fetch.mockResolvedValueOnce(response({ results: [row(10, recipient, signed, operation)] }));
+    const record = await saveConsent(metadata, recipient, signed, provider.uuid, operation);
+    expect(record.decision).toBe('granted');
+    const body = JSON.parse(String(fetch.mock.calls[3][1]?.body));
+    const document = JSON.parse(body.obs[0].value);
+    expect(document).toMatchObject({ format: 'EG05-FR12/v1', reference: recipient.id, ...signed });
+    expect(document).not.toHaveProperty('folio');
   });
 
   it('rejects a stale grant and checks patient ownership before writing a new recipient decision', async () => {

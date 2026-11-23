@@ -305,7 +305,8 @@ describe('nursing transfusion monitoring', () => {
       .mockResolvedValueOnce([granted])
       .mockResolvedValueOnce([{ ...granted, decision: 'revoked' }]);
     const dialog = within(await openSheet());
-    expect(await dialog.findByText('FR12-TEST-1')).toBeVisible();
+    expect(await dialog.findByText('Otorgado')).toBeVisible();
+    expect(dialog.queryByText('FR12-TEST-1')).not.toBeInTheDocument();
     fireEvent.change(dialog.getByLabelText('Hora de inicio'), { target: { value: '09:30' } });
     fireEvent.change(dialog.getByLabelText('Hora 1'), { target: { value: '09:35' } });
     const save = dialog.getByRole('button', { name: 'Guardar registro' });

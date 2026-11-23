@@ -34,7 +34,7 @@ export function permitsAdministration(subject: ConsentSubject, record?: ConsentR
 }
 export type ConsentInput = {
   decision: Decision;
-  folio: string;
+  folio?: string;
   decidedAt: string;
   signer: string;
   signerRole: 'self' | 'representative' | 'physician';
@@ -102,22 +102,22 @@ function hasSubject(subject: ConsentSubject) {
   return subject.id && isClinicalUuid(subject.patientId) && isClinicalUuid(subject.contextId);
 }
 
-export function validConsentInput(input: ConsentInput) {
+export function validConsentInput(input: ConsentInput, kind: ConsentKind) {
   if (input.reason !== undefined && (typeof input.reason !== 'string' || input.reason.length > 500)) return false;
   if (input.decision === 'emergency') {
     return (
       input.signerRole === 'physician' &&
       input.signer === '' &&
-      input.folio === '' &&
+      kind === 'recipient' &&
+      (input.folio === undefined || input.folio === '') &&
       Boolean(input.reason?.trim()) &&
       Number.isFinite(Date.parse(input.decidedAt))
     );
   }
   return (
     ['granted', 'declined', 'revoked'].includes(input.decision) &&
-    typeof input.folio === 'string' &&
-    Boolean(input.folio.trim()) &&
-    input.folio.length <= 80 &&
+    (input.folio === undefined || (typeof input.folio === 'string' && input.folio.length <= 80)) &&
+    (kind === 'recipient' || Boolean(input.folio?.trim())) &&
     typeof input.signer === 'string' &&
     Boolean(input.signer.trim()) &&
     input.signer.length <= 200 &&
@@ -163,7 +163,7 @@ function consentEntries(metadata: PaperConsentConfig, subject: ConsentSubject, r
     if (document.reference !== subject.id) continue;
     if (
       document.format !== `${consentFormat(subject.kind)}/v1` ||
-      !validConsentInput(document) ||
+      !validConsentInput(document, subject.kind) ||
       (document.decision === 'emergency' && (subject.kind !== 'recipient' || subject.priority !== 'veryUrgent')) ||
       !isClinicalUuid(document.operation) ||
       !Number.isFinite(Date.parse(row.encounterDatetime))
@@ -264,7 +264,7 @@ export async function saveConsent(
   previous?: string,
 ) {
   if (
-    !validConsentInput(input) ||
+    !validConsentInput(input, subject.kind) ||
     !isClinicalUuid(providerUuid) ||
     !isClinicalUuid(operation) ||
     (input.decision === 'emergency' && (subject.kind !== 'recipient' || subject.priority !== 'veryUrgent')) ||
@@ -288,9 +288,10 @@ export async function saveConsent(
   const at = new Date(Math.min(visit.time - 1000, Number.isFinite(visit.endTime) ? visit.endTime : visit.time))
     .toISOString()
     .replace('Z', '+00:00');
+  const { folio, ...decision } = input;
   const document: Document = {
-    ...input,
-    folio: input.folio.trim(),
+    ...decision,
+    ...(subject.kind === 'donor' ? { folio: folio?.trim() } : {}),
     signer: input.signer.trim(),
     ...(input.reason ? { reason: input.reason.trim() } : {}),
     format: `${consentFormat(subject.kind)}/v1`,

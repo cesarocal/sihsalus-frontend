@@ -11,6 +11,7 @@ import {
 import { Printer } from '@carbon/react/icons';
 import { useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import spanish from '../../../translations/es.json';
 import { bloodBankPrivileges } from '../../access/blood-bank-privileges';
@@ -108,11 +109,10 @@ type ConsentQuery = ReturnType<typeof usePaperConsent>;
 export function PaperConsentSummary({ query, subject }: { query: ConsentQuery; subject: ConsentSubject }) {
   const t = useConsentTranslation();
   const { latest } = query;
+  const recipient = subject.kind === 'recipient';
   return (
     <section className={styles.summary} aria-label={consentFormat(subject.kind)}>
-      <h4>
-        {consentFormat(subject.kind)} · {t('title')}
-      </h4>
+      <h4>{recipient ? t('fr12Heading') : `${consentFormat(subject.kind)} · ${t('title')}`}</h4>
       {!query.metadata || query.missingContext ? (
         <InlineNotification hideCloseButton kind="warning" title={t('missingContext')} />
       ) : query.failed ? (
@@ -132,7 +132,7 @@ export function PaperConsentSummary({ query, subject }: { query: ConsentQuery; s
           </div>
           {latest && (
             <>
-              {latest.folio && (
+              {!recipient && latest.folio && (
                 <div>
                   <dt>{t('folio')}</dt>
                   <dd>{latest.folio}</dd>
@@ -145,14 +145,16 @@ export function PaperConsentSummary({ query, subject }: { query: ConsentQuery; s
                 </div>
               )}
               <div>
-                <dt>{t('decisionDate')}</dt>
+                <dt>
+                  {t(latest.decision === 'emergency' ? 'emergencyDate' : recipient ? 'signatureDate' : 'decisionDate')}
+                </dt>
                 <dd>{formatListDate(latest.decidedAt)}</dd>
               </div>
             </>
           )}
         </dl>
       )}
-      {query.records && (
+      {!recipient && query.records && (
         <Button type="button" kind="ghost" size="sm" onClick={query.reload}>
           {t('refresh')}
         </Button>
@@ -165,16 +167,22 @@ export function PaperConsentEditor({
   subject,
   disabled = false,
   onSaving,
+  footer,
 }: {
   subject: ConsentSubject;
   disabled?: boolean;
   onSaving?: (value: boolean) => void;
+  footer?: HTMLElement | null;
 }) {
   const query = usePaperConsent(subject);
   const t = useConsentTranslation();
   const session = useSession();
-  const privilege =
-    subject.kind === 'donor' ? bloodBankPrivileges.applicantSelection : 'app:hoja.clinica.ordenes.editar';
+  const recipient = subject.kind === 'recipient';
+  const privilege = recipient ? 'app:hoja.clinica.ordenes.editar' : bloodBankPrivileges.applicantSelection;
+  const subjectKey = `${subject.patientId}/${subject.id}/${subject.contextId}`;
+  const [printedSubject, setPrintedSubject] = useState<string>();
+  const [printing, setPrinting] = useState(false);
+  const printVerified = !recipient || printedSubject === subjectKey;
   const provider = session.currentProvider?.uuid;
   const canEdit =
     session.authenticated &&
@@ -191,8 +199,8 @@ export function PaperConsentEditor({
   const [representative, setRepresentative] = useState('');
   const [reason, setReason] = useState('');
   const emergency = decision === 'emergency';
-  const closing = subject.kind === 'recipient' && closesTransfusion(decision || undefined);
-  const closed = subject.kind === 'recipient' && closesTransfusion(query.latest?.decision);
+  const closing = recipient && closesTransfusion(decision || undefined);
+  const closed = recipient && closesTransfusion(query.latest?.decision);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<'saveFailed' | 'printFailed' | 'conflict'>();
   const saving = useRef(false);
@@ -202,30 +210,35 @@ export function PaperConsentEditor({
     setError(undefined);
     operation.current = '';
   };
+  const timestamp = Date.parse(date);
+  const input: ConsentInput | undefined =
+    decision && Number.isFinite(timestamp) && timestamp <= Date.now()
+      ? {
+          ...(!recipient ? { folio } : {}),
+          decision,
+          signer: emergency ? '' : role === 'self' ? subject.name : representative,
+          signerRole: emergency ? 'physician' : role,
+          ...(emergency || closing ? { reason } : {}),
+          decidedAt: new Date(timestamp).toISOString(),
+        }
+      : undefined;
+  const canSave =
+    canEdit &&
+    !disabled &&
+    !busy &&
+    !printing &&
+    !closed &&
+    isClinicalUuid(provider) &&
+    Boolean(query.metadata && query.records) &&
+    printVerified &&
+    confirmed &&
+    !!input &&
+    validConsentInput(input, subject.kind) &&
+    (!closing || Boolean(reason.trim())) &&
+    (decision !== 'revoked' || query.latest?.decision === 'granted');
+
   const save = async () => {
-    if (
-      !canEdit ||
-      !isClinicalUuid(provider) ||
-      !provider ||
-      !query.metadata ||
-      !query.records ||
-      saving.current ||
-      !confirmed ||
-      closed ||
-      !decision
-    )
-      return;
-    const timestamp = Date.parse(date);
-    if (!Number.isFinite(timestamp) || timestamp > Date.now()) return;
-    const input: ConsentInput = {
-      folio: emergency ? '' : folio,
-      decision,
-      signer: emergency ? '' : role === 'self' ? subject.name : representative,
-      signerRole: emergency ? 'physician' : role,
-      ...(emergency || closing ? { reason } : {}),
-      decidedAt: new Date(timestamp).toISOString(),
-    };
-    if (!validConsentInput(input)) return;
+    if (!canSave || !provider || !query.metadata || !input || saving.current) return;
     setError(undefined);
     saving.current = true;
     setBusy(true);
@@ -233,8 +246,9 @@ export function PaperConsentEditor({
     try {
       operation.current ||= crypto.randomUUID();
       await saveConsent(query.metadata, subject, input, provider, operation.current, query.latest?.uuid);
-      if (subject.kind === 'recipient') window.dispatchEvent(new Event(recipientConsentChanged));
+      if (recipient) window.dispatchEvent(new Event(recipientConsentChanged));
       await query.read();
+      setPrintedSubject(undefined);
       setFolio('');
       setDecision('');
       setDate(localDateTime());
@@ -258,40 +272,92 @@ export function PaperConsentEditor({
   };
   const title = `${consentFormat(subject.kind)} - ${t(subject.kind === 'donor' ? 'donorTitle' : 'recipientTitle')}`;
   const print = () => {
+    if (printing) return;
     setError(undefined);
+    const onError = () => {
+      setPrinting(false);
+      setError('printFailed');
+    };
     try {
-      const onError = () => setError('printFailed');
-      if (subject.kind === 'recipient') {
-        printDocument(<RecipientConsentDocument subject={subject} t={t} />, title, onError, recipientConsentPrintCss);
+      if (recipient) {
+        setPrinting(true);
+        printDocument(
+          <RecipientConsentDocument subject={subject} t={t} />,
+          t('fr12Heading'),
+          onError,
+          recipientConsentPrintCss,
+          () => {
+            setPrintedSubject(subjectKey);
+            setPrinting(false);
+          },
+        );
       } else {
         printDocument(<DonorConsentDocument subject={subject} title={title} t={t} />, title, onError);
       }
     } catch {
-      setError('printFailed');
+      onError();
     }
   };
+  const printButton = (
+    <Button
+      type="button"
+      size="sm"
+      kind="tertiary"
+      renderIcon={Printer}
+      onClick={print}
+      disabled={busy || disabled || printing}
+    >
+      {recipient ? t('printConsent') : `${t('print')} ${consentFormat(subject.kind)}`}
+    </Button>
+  );
+  const confirmation = (
+    <Checkbox
+      id={`${prefix}-confirmed`}
+      labelText={t(
+        emergency
+          ? 'confirmEmergency'
+          : closing
+            ? 'confirmClosing'
+            : recipient
+              ? 'confirmRecipientPaper'
+              : 'confirmPaper',
+      )}
+      checked={confirmed}
+      disabled={recipient && (disabled || busy || printing || !query.records || !provider || !printVerified)}
+      onChange={(_event, { checked }) => setConfirmed(checked)}
+    />
+  );
+  const saveButton = (
+    <Button type="button" size="sm" onClick={() => void save()} disabled={!canSave}>
+      {t('save')}
+    </Button>
+  );
+  const recipientActions = canEdit && !query.missingContext && (
+    <div className={styles.recipientActions}>
+      {printButton}
+      {!closed && (
+        <div className={styles.confirmActions}>
+          {confirmation}
+          {saveButton}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className={styles.editor}>
       <PaperConsentSummary query={query} subject={subject} />
       {error && <InlineNotification hideCloseButton kind="error" title={t(error)} />}
       {canEdit && !query.missingContext && (
         <>
-          <div className={styles.actions}>
-            <Button
-              type="button"
-              size="sm"
-              kind="tertiary"
-              renderIcon={Printer}
-              onClick={print}
-              disabled={busy || disabled}
-            >
-              {t('print')} {consentFormat(subject.kind)}
-            </Button>
-          </div>
+          {!recipient && <div className={styles.actions}>{printButton}</div>}
           {closed && <InlineNotification hideCloseButton kind="info" title={t('closedRequest')} />}
           {!closed && !provider && <InlineNotification hideCloseButton kind="warning" title={t('providerRequired')} />}
           {!closed && (
-            <fieldset className={styles.fields} disabled={disabled || busy || !query.records || !provider}>
+            <fieldset
+              className={recipient ? styles.recipientFields : styles.fields}
+              disabled={disabled || busy || !query.records || !provider}
+            >
               <Select
                 id={`${prefix}-decision`}
                 labelText={t('decision')}
@@ -311,7 +377,7 @@ export function PaperConsentEditor({
                 )}
                 {query.latest?.decision === 'granted' && <SelectItem value="revoked" text={t('revoked')} />}
               </Select>
-              {!emergency && (
+              {!recipient && (
                 <TextInput
                   id={`${prefix}-folio`}
                   labelText={t('folio')}
@@ -326,7 +392,7 @@ export function PaperConsentEditor({
               <TextInput
                 id={`${prefix}-date`}
                 type="datetime-local"
-                labelText={t('decisionDate')}
+                labelText={t(emergency ? 'emergencyDate' : recipient ? 'signatureDate' : 'decisionDate')}
                 max={localDateTime()}
                 value={date}
                 onChange={(event) => {
@@ -363,6 +429,7 @@ export function PaperConsentEditor({
               )}
               {(emergency || closing) && (
                 <TextArea
+                  className={styles.fullRow}
                   id={`${prefix}-reason`}
                   labelText={t(emergency ? 'emergencyReason' : 'closingReason')}
                   rows={3}
@@ -374,40 +441,29 @@ export function PaperConsentEditor({
                   }}
                 />
               )}
-              <div className={styles.actions}>
-                <Checkbox
-                  id={`${prefix}-confirmed`}
-                  labelText={t(emergency ? 'confirmEmergency' : closing ? 'confirmClosing' : 'confirmPaper')}
-                  checked={confirmed}
-                  onChange={(_event, { checked }) => setConfirmed(checked)}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void save()}
-                  disabled={
-                    !confirmed ||
-                    !decision ||
-                    (!emergency && (!folio.trim() || (role === 'representative' && !representative.trim()))) ||
-                    ((emergency || closing) && !reason.trim()) ||
-                    !date ||
-                    Date.parse(date) > Date.now() ||
-                    (decision === 'revoked' && query.latest?.decision !== 'granted')
-                  }
-                >
-                  {t('save')}
-                </Button>
-              </div>
+              {!recipient && (
+                <div className={styles.actions}>
+                  {confirmation}
+                  {saveButton}
+                </div>
+              )}
             </fieldset>
           )}
         </>
       )}
-      <PaperConsentHistory records={query.records} />
+      <PaperConsentHistory records={query.records} showFolio={!recipient} />
+      {recipient && (footer ? createPortal(recipientActions, footer) : footer === undefined ? recipientActions : null)}
     </div>
   );
 }
 
-export function PaperConsentHistory({ records }: { records?: ConsentRecord[] }) {
+export function PaperConsentHistory({
+  records,
+  showFolio = false,
+}: {
+  records?: ConsentRecord[];
+  showFolio?: boolean;
+}) {
   const t = useConsentTranslation();
   if (!records?.length) return null;
   return (
@@ -417,7 +473,7 @@ export function PaperConsentHistory({ records }: { records?: ConsentRecord[] }) 
         {records.map((record) => (
           <li key={record.uuid}>
             <strong>{t(record.decision)}</strong> · {formatListDate(record.decidedAt)}
-            {record.folio && <> · {record.folio}</>}
+            {showFolio && record.folio && <> · {record.folio}</>}
             {record.signer && <> · {record.signer}</>}
             {record.provider && <> · {record.provider}</>}
             {record.reason && <> · {record.reason}</>}

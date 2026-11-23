@@ -191,19 +191,22 @@ function ExistingOrderConsent({
   const { data, loading, failed, reload } = useProcessingData(load);
   const [id, setId] = useState('');
   const [saving, setSaving] = useState(false);
+  const [consentFooter, setConsentFooter] = useState<HTMLElement | null>(null);
   const inFlight = useRef(false);
   const order = data?.find((entry) => !entry.stopped && entry.order.id === id)?.order;
   return (
     <ComposedModal
       open
       size="lg"
+      aria-label={t('title')}
       className={styles.fr08Modal}
       preventCloseOnClickOutside
       onClose={() => {
-        if (!inFlight.current) onClose();
+        if (inFlight.current) return false;
+        onClose();
       }}
     >
-      <ModalHeader title={t('openRecipient')} iconDescription={t('close')} />
+      <ModalHeader title={t('title')} iconDescription={t('close')} />
       <ModalBody className={styles.fr08ModalBody}>
         {failed ? (
           <>
@@ -236,6 +239,7 @@ function ExistingOrderConsent({
           <PaperConsentEditor
             key={id}
             subject={recipientConsentSubject(order)}
+            footer={consentFooter}
             onSaving={(value) => {
               inFlight.current = value;
               setSaving(value);
@@ -243,11 +247,11 @@ function ExistingOrderConsent({
           />
         )}
       </ModalBody>
-      <ModalFooter>
-        <Button kind="secondary" disabled={saving} onClick={onClose}>
-          {t('close')}
-        </Button>
-      </ModalFooter>
+      {order && !failed && (
+        <ModalFooter className={styles.fr12Footer}>
+          <div ref={setConsentFooter} />
+        </ModalFooter>
+      )}
     </ComposedModal>
   );
 }
@@ -276,7 +280,12 @@ function TransfusionOrderForm({
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [editingConsent, setEditingConsent] = useState(false);
-  const [savingConsent, setSavingConsent] = useState(false);
+  const editingConsentRef = useRef(false);
+  const openConsent = () => {
+    editingConsentRef.current = true;
+    setEditingConsent(true);
+  };
+  const [consentFooter, setConsentFooter] = useState<HTMLElement | null>(null);
   const consentInFlight = useRef(false);
   const [issued, setIssued] = useState<IssuedTransfusionOrder>();
   const inFlight = useRef(false);
@@ -353,7 +362,7 @@ function TransfusionOrderForm({
         submissionId.current,
       );
       setIssued(order);
-      setEditingConsent(true);
+      openConsent();
       window.dispatchEvent(new Event(transfusionOrdersChanged));
     } catch {
       setFailed(true);
@@ -390,11 +399,13 @@ function TransfusionOrderForm({
     />
   );
   const ready = Boolean(recipient && visit?.location?.uuid && provider?.uuid);
+  const showConsent = Boolean(issued && editingConsent);
+  const modalTitle = showConsent ? consentText('title') : t('fr08Title');
   return (
     <ComposedModal
       open
       size="lg"
-      aria-label={t('fr08Title')}
+      aria-label={modalTitle}
       className={styles.fr08Modal}
       containerClassName={styles.fr08ModalContainer}
       preventCloseOnClickOutside
@@ -404,20 +415,22 @@ function TransfusionOrderForm({
       }}
       onClose={() => {
         if (inFlight.current || consentInFlight.current) return false;
+        if (editingConsentRef.current) {
+          editingConsentRef.current = false;
+          setEditingConsent(false);
+          return false;
+        }
         onClose();
       }}
     >
-      <ModalHeader
-        title={editingConsent && issued ? `${consentText('openRecipient')} · ${issued.order.number}` : t('fr08Title')}
-        iconDescription={t('close')}
-      />
-      <ModalBody ref={modalBody} className={styles.fr08ModalBody} aria-label={t('fr08Title')} hasScrollingContent>
+      <ModalHeader title={modalTitle} iconDescription={t('close')} />
+      <ModalBody ref={modalBody} className={styles.fr08ModalBody} aria-label={modalTitle} hasScrollingContent>
         {issued && editingConsent ? (
           <PaperConsentEditor
             subject={recipientConsentSubject(issued.order)}
+            footer={consentFooter}
             onSaving={(value) => {
               consentInFlight.current = value;
-              setSavingConsent(value);
             }}
           />
         ) : issued ? (
@@ -708,27 +721,30 @@ function TransfusionOrderForm({
           </>
         )}
       </ModalBody>
-      <ModalFooter className={styles.fr08Footer}>
-        {issued && !editingConsent && <PrintFr08 order={issued.order} t={t} />}
-        {issued && (
-          <Button
-            type="button"
-            kind="tertiary"
-            disabled={savingConsent}
-            onClick={() => setEditingConsent(!editingConsent)}
-          >
-            {editingConsent ? t('fr08Title') : consentText('openRecipient')}
+      {showConsent ? (
+        <ModalFooter key="fr12" className={styles.fr12Footer}>
+          <div ref={setConsentFooter} />
+        </ModalFooter>
+      ) : (
+        <ModalFooter key="fr08" className={styles.fr08Footer}>
+          {issued && (
+            <>
+              <PrintFr08 order={issued.order} t={t} />
+              <Button type="button" kind="tertiary" onClick={openConsent}>
+                {consentText('openRecipient')}
+              </Button>
+            </>
+          )}
+          <Button kind="secondary" disabled={saving} onClick={onClose}>
+            {t('close')}
           </Button>
-        )}
-        <Button kind="secondary" disabled={saving || savingConsent} onClick={onClose}>
-          {t('close')}
-        </Button>
-        {!issued && (
-          <Button kind="primary" type="submit" form={formId} disabled={!ready || saving}>
-            {t('fr08Send')}
-          </Button>
-        )}
-      </ModalFooter>
+          {!issued && (
+            <Button kind="primary" type="submit" form={formId} disabled={!ready || saving}>
+              {t('fr08Send')}
+            </Button>
+          )}
+        </ModalFooter>
+      )}
     </ComposedModal>
   );
 }

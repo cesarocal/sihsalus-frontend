@@ -54,9 +54,9 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   localhost con el inventario de prueba de la pestaña que conserva el egreso.
   Requiere acceso a Transfusiones, edición de órdenes y lectura de los registros
   de consentimiento y conducción. El adaptador clínico de stock sigue pendiente.
-- La impresión del FR12 usa la distribución del formato de PRONAHEBAS y deja
-  espacio para documentar la información clínica, la decisión y las firmas en
-  papel. El folio y el número de FR08 permiten vincular el original al registro.
+- La impresión del FR12 sigue la distribución del formato de PRONAHEBAS.
+  Para guardar una decisión en el FR12 se debe abrir primero la impresión
+  desde el formulario. El registro digital se vincula al FR08.
 - Importar los CSV de [openmrs-config](openmrs-config) con Initializer en la
   distribución de OpenMRS. Los UUID por defecto están en `paperConsent` y se
   pueden configurar por entorno. Los autores necesitan un proveedor asociado,
@@ -64,8 +64,8 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   REST y el privilegio de su sección. Banco de Sangre y Enfermería requieren
   lectura de encuentros y observaciones además de sus accesos existentes.
 - Cada decisión agrega un encuentro en la visita y una observación versionada
-  con el identificador de postulación o de orden, la decisión, la fecha, el
-  firmante y el folio. El original sigue en papel. No se suben firmas ni
+  con el identificador de postulación o de orden, la decisión, la fecha y el
+  firmante. El FR05 también registra la referencia del original en papel. No se suben firmas ni
   huellas. El hospital debe aprobar los formularios y su circuito antes de
   utilizarlos para atención clínica.
 - Selección y Extracción siguen usando el adaptador de prueba. La prueba local

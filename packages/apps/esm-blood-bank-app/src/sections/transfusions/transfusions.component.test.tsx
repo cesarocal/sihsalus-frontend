@@ -421,7 +421,8 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const event = dialog.getByRole('row', { name: /ORD-43/ });
     expect(event).toHaveTextContent(t('txCancelledDeclined'));
     fireEvent.click(within(event).getByRole('button', { name: t('txViewDetail') }));
-    expect(await dialog.findByText('FR12-DECLINED')).toBeVisible();
+    expect(await dialog.findByText('Negativa escrita')).toBeVisible();
+    expect(dialog.queryByText('FR12-DECLINED')).not.toBeInTheDocument();
   });
 
   it('records receipt and inspection from a cancelled dispatch detail', async () => {
