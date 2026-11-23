@@ -1,3 +1,4 @@
+import { showSnackbar } from '@openmrs/esm-framework';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -126,7 +127,7 @@ it('enables printing only after the FR12 decision is verified and saved', async 
   expect(print).toBeDisabled();
 });
 
-it('shows the cancellation notice and lists signed FR12 decisions from oldest to newest', async () => {
+it('lists past FR12 decisions from oldest to newest without replaying the cancellation notice', async () => {
   vi.mocked(listConsent).mockResolvedValue([
     {
       ...savedConsent,
@@ -139,12 +140,55 @@ it('shows the cancellation notice and lists signed FR12 decisions from oldest to
   ]);
   render(<PaperConsentEditor subject={recipient} />);
 
-  expect(await screen.findByText('Solicitud cancelada')).toBeInTheDocument();
-  expect(screen.getByText('El FR08 y las decisiones del FR12 se conservan en el historial.')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Imprimir consentimiento' })).toBeEnabled());
+  expect(screen.queryByText('Solicitud cancelada')).not.toBeInTheDocument();
+  expect(showSnackbar).not.toHaveBeenCalled();
   expect(screen.queryByRole('heading', { name: 'EG05 - FR12: Consentimiento informado del receptor' })).toBeNull();
   fireEvent.click(screen.getByText('Historial de decisiones'));
   expect(screen.getAllByRole('listitem').map((row) => row.querySelector('strong')?.textContent)).toEqual([
     'Otorgado',
     'Revocado',
   ]);
+});
+
+it.each([
+  ['declined', []],
+  ['revoked', [savedConsent]],
+] as const)('shows one auto-closing notification after saving an FR12 decision of %s', async (decision, history) => {
+  vi.mocked(listConsent).mockResolvedValue([...history]);
+  const cancellation = {
+    ...savedConsent,
+    uuid: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    decision,
+    reason: 'Motivo de prueba',
+  };
+  vi.mocked(saveConsent).mockImplementationOnce(async () => {
+    vi.mocked(listConsent).mockResolvedValue([cancellation, ...history]);
+    return cancellation;
+  });
+  const { unmount } = render(<PaperConsentEditor subject={recipient} />);
+  const field = screen.getByRole('combobox', { name: 'Decisión' });
+  await waitFor(() => expect(field).toBeEnabled());
+  fireEvent.change(field, { target: { value: decision } });
+  fireEvent.change(screen.getByLabelText('Motivo o circunstancia de la negativa o revocación'), {
+    target: { value: 'Motivo de prueba' },
+  });
+  fireEvent.click(screen.getByRole('checkbox', { name: /Esta decisión cancela la solicitud/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar decisión' }));
+
+  await waitFor(() => expect(showSnackbar).toHaveBeenCalledTimes(1));
+  expect(showSnackbar).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: 'Solicitud cancelada',
+      subtitle: 'El FR08 y las decisiones del FR12 se conservan en el historial.',
+      autoClose: true,
+      timeoutInMs: 5000,
+    }),
+  );
+  expect(screen.queryByText('Solicitud cancelada')).not.toBeInTheDocument();
+
+  unmount();
+  render(<PaperConsentEditor subject={recipient} />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Imprimir consentimiento' })).toBeEnabled());
+  expect(showSnackbar).toHaveBeenCalledTimes(1);
 });

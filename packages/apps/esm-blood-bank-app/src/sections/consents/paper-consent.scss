@@ -45,12 +45,6 @@
   padding-inline-start: calc(1rem + 1px);
 }
 
-.closedNotice:global(.cds--inline-notification) {
-  inline-size: 100%;
-  max-inline-size: none;
-  margin: 0;
-}
-
 .recipientFields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

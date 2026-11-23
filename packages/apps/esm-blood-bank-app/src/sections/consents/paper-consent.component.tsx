@@ -9,7 +9,7 @@ import {
   TextInput,
 } from '@carbon/react';
 import { Printer } from '@carbon/react/icons';
-import { useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
+import { showSnackbar, useConfig, userHasAccess, useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -261,7 +261,18 @@ export function PaperConsentEditor({
       setRepresentative('');
       setReason('');
       resetConfirmation();
-      notifySuccess(t('saved'));
+      if (closing) {
+        showSnackbar({
+          title: t('closedRequest'),
+          subtitle: t('closedRequestHelp'),
+          kind: 'info',
+          isLowContrast: true,
+          autoClose: true,
+          timeoutInMs: 5000,
+        });
+      } else {
+        notifySuccess(t('saved'));
+      }
     } catch (failure) {
       const conflicted = failure instanceof Error && failure.message === 'CONSENT_CONFLICT';
       setError(conflicted ? 'conflict' : 'saveFailed');
@@ -348,15 +359,6 @@ export function PaperConsentEditor({
       {canEdit && !query.missingContext && (
         <>
           {!recipient && <div className={styles.actions}>{printButton}</div>}
-          {closed && (
-            <InlineNotification
-              className={styles.closedNotice}
-              hideCloseButton
-              kind="info"
-              title={t('closedRequest')}
-              subtitle={t('closedRequestHelp')}
-            />
-          )}
           {!closed && !provider && <InlineNotification hideCloseButton kind="warning" title={t('providerRequired')} />}
           {!closed && (
             <fieldset
