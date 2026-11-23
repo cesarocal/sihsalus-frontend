@@ -69,7 +69,7 @@ export function consolidatedScreening(record: ScreeningRecord, throughRound = In
 }
 
 export function pendingScreeningRepeatTests(record: ScreeningRecord) {
-  if (record.status !== 'validated') return [];
+  if (record.status !== 'validated' || record.clinicalPersisted === false) return [];
   const current = consolidatedScreening(record);
   const requiresReactiveConfirmation =
     record.origin?.type === 'postExtraction' || (!record.origin && Boolean(record.collectionId && record.unitCode));

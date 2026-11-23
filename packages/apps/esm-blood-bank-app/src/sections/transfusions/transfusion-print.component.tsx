@@ -200,13 +200,15 @@ export function CompatibilityReport({
   showAttendedBy?: boolean;
 }) {
   const { assignments, order } = request;
+  const hasSyntheticSerumLabel =
+    order.priority === 'veryUrgent' && request.rounds.every((round) => round.revision === undefined);
   const summary = {
     txReportRequestNumber: order.number,
     txSamplePatientName: order.patientName,
     txSampleHistoryNumber: order.historyNumber,
     txReportBloodGroup: transfusionBloodGroupLabel(order.bloodGroup, t),
     ...(request.sample?.code
-      ? order.priority === 'veryUrgent'
+      ? hasSyntheticSerumLabel
         ? {
             txAnticoagulatedSample: request.sample.code,
             txNonAnticoagulatedSample: urgentSerumSampleCode(request.sample),

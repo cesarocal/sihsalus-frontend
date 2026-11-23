@@ -6,19 +6,21 @@ El [contrato de texto y confirmaciones de guardado](TEXT_AND_SAVE_CONTRACT.md) d
 
 ## Límites actuales
 
-- Inicio compone accesos operativos según cuatro permisos de vista y los permisos de destino. Sus tarjetas consultan los adaptadores de cada sección, y las alertas abren Inventario filtrado por una unidad exacta. Ver [Inicio y permisos de backend](src/sections/dashboard/README.md). Donantes e Inventario consumen `BloodBankApi` con datos sintéticos.
+- Inicio compone accesos operativos según cuatro permisos de vista y los permisos de destino. Sus tarjetas consultan los adaptadores de cada sección, y las alertas abren Inventario filtrado por una unidad exacta. Ver [Inicio y permisos de backend](src/sections/dashboard/README.md). Donantes e Inventario usan `BloodBankApi` en ambos modos.
 - Donantes y Registro de donantes incluyen búsqueda, filtros y paginación. Ver detalle abre una pantalla completa en `/blood-bank/donors/:donorId`, con opción de volver al listado, datos personales de la última donación registrada e Historial de donaciones ordenado por fecha. No permite editar ni muestra respuestas de entrevista/motivos de exclusión.
 - El botón Registrar donación, a la derecha del historial, abre Selección con una nueva postulación y datos personales editables. Requiere permisos de Donantes y Selección. Solo copia identidad/datos personales; modalidad, examen, entrevista y calificación requieren una evaluación nueva. Los viajes previos no se copian.
-- Selección del postulante incluye listado, filtros, formulario por etapas e impresión. Su avance se conserva en `sessionStorage` de la pestaña, exclusivamente para datos sintéticos.
+- Selección del postulante incluye listado, filtros, formulario por etapas e impresión. En modo mock, su avance se conserva en `sessionStorage`; en modo API, el OMOD guarda cada etapa.
   Teléfono y celular son opcionales. Si se ingresan, deben tener exactamente 7 y 9 dígitos respectivamente antes de completar Datos personales o Examen físico.
   Los viajes son opcionales y se registran como una lista de lugar, permanencia y fecha. El mock recupera como un viaje los datos guardados con el formato anterior.
   Las observaciones del examen físico y precalificación admiten hasta 500 unidades UTF-16.
 - Extracción incluye cola de seleccionados, etiquetas de unidad/tubo, volumen, registro y constancia imprimible.
 - Laboratorio / Tamizaje incluye recepción, siete pruebas, trazabilidad de reactivos, revisión e impresión.
 - Transferencias separa Recibidas / Pendientes y Solicitadas con pestañas Carbon. Incluye registro manual e historial independiente, generación e impresión FR09 de solicitudes a otras instituciones, selección y reserva de recibidas, constancia FR11, entrega y proyección administrativa del libro FR10. Generar una solicitud no envía correos ni compromete stock local. Las unidades entregadas pasan de Por transferir a Transferido, sin En tránsito. Ver [Transferencias](src/sections/transfers/README.md).
-- Transfusiones y Laboratorio / Compatibilidad incluyen la emisión del FR08 desde Órdenes y la atención con inventario de prueba. Programada y Urgente usan el circuito regular. Muy urgente verifica la autorización y pasa por entrega completa antes de las pruebas pendientes, con registro del resultado y de su comunicación. La administración clínica sigue pendiente. Ver [Atención transfusional](src/sections/transfusions/README.md).
+- Transfusiones y Laboratorio / Compatibilidad incluyen la emisión del FR08 desde Órdenes y su atención con el inventario del modo seleccionado. Programada y Urgente usan el circuito regular. Muy urgente verifica la autorización y pasa por entrega completa antes de las pruebas pendientes, con registro del resultado y de su comunicación. Ver [Atención transfusional](src/sections/transfusions/README.md).
 - Seguimientos al donante y al receptor incluyen casos abiertos, historial con filtros, detalle por etapas, trazabilidad, notificación documentada, muestras vinculadas a Tamizaje y cierre con impresión FR13/FR14. Ver [Seguimientos](src/sections/follow-up/README.md). Ningún flujo mock guarda información clínica en OpenMRS.
-- `useMockData` está habilitado por defecto. Desactivarlo requiere una API real compatible.
+- `useMockData` está habilitado por defecto. Al desactivarlo, el módulo usa los endpoints del OMOD y la sesión de OpenMRS. Extracción, Tamizaje, Fraccionamiento y Hemovigilancia requieren además `bloodbank.experimentalPersistenceEnabled=true` en el entorno de prueba.
+- La repetición de Tamizaje guarda una ronda vinculada al informe original. Transferencias y Seguimientos están disponibles en modo mock.
+- Con `useMockData=false`, el circuito transfusional usa el OMOD para preparación, muestra del receptor, asignación, compatibilidad, despacho, devolución, Hoja de conducción y FR02. Cada pantalla requiere los privilegios de su sección y la configuración del módulo.
 - Las pantallas se prueban dentro de la SPA de OpenMRS, con su sesión, navegación compartida y controles de privilegios. Los datos mock siguen disponibles mediante `useMockData`.
 
 El máximo de 500 unidades UTF-16 también se aplica a las observaciones de detección de seguimientos al guardar un borrador o completar el flujo.
@@ -32,15 +34,17 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   de OpenMRS. **Extracción** requiere una decisión otorgada antes de etiquetar
   y de guardar el volumen. Las extracciones históricas siguen consultables.
 - Al emitir el FR08 en **Órdenes**, el sistema abre el FR12. Para consultar
-  o actualizar la decisión de una solicitud existente se usa la flecha de la
-  tarjeta de transfusión. En el flujo regular, Banco de Sangre puede registrar
-  la recepción y requiere un FR12 otorgado para continuar la atención.
+  o actualizar una decisión, abre **Consentimiento informado** en la tarjeta
+  de transfusión y selecciona la solicitud por número. En el flujo regular,
+  Banco de Sangre puede registrar la recepción y requiere un FR12 otorgado
+  para continuar la atención.
 - En PC13, la autorización del FR08 habilita el despacho muy urgente antes de
   las pruebas de compatibilidad. Enfermería verifica el FR12 vigente o una
   excepción por emergencia previamente documentada por el médico en la historia
   clínica. La Hoja de conducción conserva el encuentro verificado.
 - La negativa o revocación cierra el FR08 en el módulo y conserva el historial de
-  decisiones. Antes del despacho libera las reservas del inventario de prueba.
+  decisiones. La revocación aparece en **Historial de solicitudes**. Antes del
+  despacho, el cierre libera las reservas de inventario.
   Después del despacho se mantiene su trazabilidad y la devolución de unidades
   sin administrar se gestiona por el procedimiento del hospital. Si ya se
   inició la transfusión, Enfermería registra el término por interrupción y el
@@ -50,10 +54,10 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   unidad y su inspección. La devolución se vincula con la decisión FR12 y el
   egreso original. Mientras está en evaluación, la unidad se excluye del stock
   disponible. La aprobación conserva código, sello y vencimiento, y el rechazo
-  deja la unidad elegible para el flujo de eliminación. Este circuito opera en
-  localhost con el inventario de prueba de la pestaña que conserva el egreso.
+  deja la unidad elegible para el flujo de eliminación. En modo real el OMOD
+  valida y registra la devolución contra el egreso persistido.
   Requiere acceso a Transfusiones, edición de órdenes y lectura de los registros
-  de consentimiento y conducción. El adaptador clínico de stock sigue pendiente.
+  de consentimiento y conducción.
 - La impresión del FR12 sigue la distribución del formato de PRONAHEBAS.
   La impresión se habilita al guardar y muestra la decisión, la fecha y el
   nombre del representante si corresponde. El registro digital se vincula al FR08.
@@ -65,11 +69,12 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   lectura de encuentros y observaciones además de sus accesos existentes.
 - Cada decisión agrega un encuentro en la visita y una observación versionada
   con el identificador de postulación o de orden, la decisión, la fecha y el
-  firmante. El FR05 también registra la referencia del original en papel. No se suben firmas ni
-  huellas. El hospital debe aprobar los formularios y su circuito antes de
-  utilizarlos para atención clínica.
-- Selección y Extracción siguen usando el adaptador de prueba. La prueba local
-  del FR05 se habilita enlazando una postulación sintética por ID, paciente y
+  firmante. El FR12 nuevo se registra sin folio y se conserva la lectura de los
+  registros anteriores. El FR05 requiere la referencia del original en papel.
+  El hospital debe aprobar los formularios y su circuito antes de utilizarlos
+  para atención clínica.
+- En modo mock, la prueba local del FR05 se habilita enlazando una postulación
+  de prueba por ID, paciente y
   visita con `paperConsent.demoDonorApplicationId`,
   `demoDonorPatientUuid` y `demoDonorVisitUuid`. El paciente debe tener el
   marcador de prueba de Hemovigilancia y la visita debe pertenecerle. La
@@ -86,10 +91,39 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
 - En OpenMRS, `src/root.component.tsx` registra `blood-bank-nav-slot` mediante `useLeftNav`. `src/navigation/blood-bank-nav.extension.tsx` aporta al slot los enlaces visibles según privilegios. La barra lateral compartida la dibuja `esm-primary-navigation-app`; el ESM no la duplica. El enlace global a Inicio sigue siendo responsabilidad de `esm-home-app`.
 - Donantes permanece activo en `/blood-bank/donors` y sus rutas de detalle. Se reconoce el límite de segmento `/donors/`, no prefijos similares como `/donors-other`. Inicio y Selección no quedan activos en el detalle; la visibilidad y los permisos no cambian. La base de la SPA se obtiene de OpenMRS.
 - Dependencia declarada: `webservices.rest >= 2.24.0`.
-- Endpoints previstos cuando `useMockData=false`:
+- Endpoints del OMOD cuando `useMockData=false`:
   - `GET /ws/rest/v1/bloodbank/dashboard`
   - `GET /ws/rest/v1/bloodbank/donors`
   - `GET /ws/rest/v1/bloodbank/inventory`
+  - `GET|POST /ws/rest/v1/bloodbank/applications`
+  - `POST /ws/rest/v1/bloodbank/applications/admission`
+  - `PUT /ws/rest/v1/bloodbank/applications/:uuid/draft`
+  - `PUT /ws/rest/v1/bloodbank/applications/:uuid/steps` para `admission`, `personal`, `physical`, `interview` y `qualification`
+  - `PUT /ws/rest/v1/bloodbank/applications/:uuid/selection`
+  - `GET /ws/rest/v1/bloodbank/applicants/history`
+  - `GET|POST /ws/rest/v1/bloodbank/collections` y `PUT /ws/rest/v1/bloodbank/collections/:uuid`
+  - `GET|PUT /ws/rest/v1/bloodbank/screenings/:uuid` y rutas de muestra de aféresis bajo `/ws/rest/v1/bloodbank/screenings/apheresis`
+  - `PUT /ws/rest/v1/bloodbank/screenings/:uuid/repeats`
+  - `GET /ws/rest/v1/bloodbank/fractionation`, `POST /start`, `PUT /:uuid` y `POST /:uuid/finalize`
+
+Para probar el modo API, instala en OpenMRS una compilación compatible de
+`openmrs-module-bloodbank` (`0.1.0-SNAPSHOT`, rama
+`feat/bloodbank-clinical-integration`) y configura los conceptos, tipos de
+encuentro y privilegios del entorno. Agrega este ajuste a la configuración del
+SPA de prueba, conservando los demás campos del módulo:
+
+```json
+{
+  "@sihsalus/esm-blood-bank-app": {
+    "useMockData": false
+  }
+}
+```
+
+Usa la [guía de desarrollo del frontend](../../../README.md#quick-start) para
+conectar el servidor de desarrollo al OpenMRS de prueba y abre
+`/openmrs/spa/blood-bank` en el origen del SPA. La API usa la sesión y los
+privilegios de OpenMRS.
 
 El backend continúa siendo la autoridad para autorización y persistencia. No se deben usar datos reales ni información identificable en mocks o pruebas.
 
@@ -170,7 +204,7 @@ El contrato `DonorDetail` incluye el tipo de documento y una referencia opcional
 
 ## Selección del postulante (prototipo navegable)
 
-Ruta integrada: `http://localhost:8080/openmrs/spa/blood-bank/applicant-selection`.
+Ruta integrada: `/openmrs/spa/blood-bank/applicant-selection`.
 El usuario necesita `app:home.bancoSangre` y `app:home.bancoSangre.seleccionPostulante`.
 No cambia el login, el navbar compartido, ni añade un standalone.
 
@@ -180,9 +214,9 @@ Al finalizar el examen físico regresa al listado: **Entrevistar** permite revis
 La X abre una confirmación con dos acciones: **Seguir editando** y **Salir**. La casilla **Guardar el avance antes de salir** está marcada por defecto en Selección, Extracción y Tamizaje. Desmarcarla descarta solo los cambios no guardados, sin eliminar el registro previo. Durante el guardado no se permite otra salida ni un segundo envío; un fallo mantiene el formulario y su edición. Los documentos finalizados conservan su cierre de consulta sin guardar. La advertencia del examen físico mantiene sus tres decisiones clínicas independientes.
 La revisión incluye el formulario imprimible para firmas físicas.
 
-Los borradores sobreviven a recargas en la misma pestaña, no al cierre de la pestaña.
+En modo mock, los borradores sobreviven a recargas en la misma pestaña, no al cierre de la pestaña. En modo API, el OMOD conserva el formulario y su revisión en la base local.
 El navegador no es una base de datos clínica: no use personas reales y no interprete estos controles como autorización del servidor.
-La configuración `useMockData=true` (por defecto) habilita este flujo. Si se desactiva, selección muestra un error seguro: todavía no existe su backend.
+Con `useMockData=false`, completar Datos personales crea la visita de la postulación y Examen físico guarda observaciones tipadas. Cerrar Revisión confirma la entrevista y precalificación, registra sus observaciones y actualiza `banco_postulante`. El borrador conserva el progreso intermedio. Para las pruebas locales usa historias sintéticas.
 
 Casos de prueba:
 
@@ -203,8 +237,8 @@ El detalle de archivos, mapeo del modelo y límites clínicos está en [Selecci�
 
 ## Extracción y Tamizaje (prototipo navegable)
 
-- [Extracción](http://localhost:8080/openmrs/spa/blood-bank/collection) requiere `app:home.bancoSangre.extraccionAferesis`.
-- [Laboratorio / Tamizaje](http://localhost:8080/openmrs/spa/blood-bank/laboratory/screening): requiere `app:home.bancoSangre.laboratorio.tamizaje`.
+- Extracción (`/openmrs/spa/blood-bank/collection`): requiere `app:home.bancoSangre.extraccionAferesis`.
+- Laboratorio / Tamizaje (`/openmrs/spa/blood-bank/laboratory/screening`): requiere `app:home.bancoSangre.laboratorio.tamizaje`.
 
 También requieren el privilegio de entrada del módulo; mantienen los enlaces y guards existentes, sin cambiar navbar ni login.
 Hay un seleccionado inicial (DNI ficticio `90000012`) y una muestra inicial `M-DEMO-001` para probar ambas pantallas.
@@ -215,9 +249,9 @@ nueva también hay `M-SEG-DEMO-001` y la postulación de aféresis `000001`
 (DNI ficticio `90000010`); los datos guardados anteriormente no se resetean.
 La muestra de aféresis no crea una unidad ni cambia la decisión de selección.
 Ver [Tamizaje por origen](src/sections/laboratory/screening/README.md) para contratos,
-compatibilidad, permisos, escenarios de prueba y limitaciones del backend pendiente.
+compatibilidad, permisos, escenarios de prueba y requisitos del OMOD.
 Los contratos de API están en `src/api/blood-bank-processing.api.ts`; los adaptadores reales fallan de forma segura hasta implementar el OMOD.
-Los desplegables de Etiqueta pueden consultar conceptos de OpenMRS incluso con el guardado mock. Configurar los UUID en `collectionLabelConcepts` según el [contrato de Extracción](src/sections/collection/README.md).
+En modo API, los desplegables de Etiqueta consultan los conceptos de OpenMRS. Configurar los UUID en `collectionLabelConcepts` según el [contrato de Extracción](src/sections/collection/README.md). El modo mock usa el catálogo de demostración.
 No se liberan unidades, diagnostican infecciones, envían correos ni archivan PDF en OpenMRS.
 Ver [Extracción y Tamizaje](src/sections/collection/README.md) para organización, mapeo y evidencia.
 
@@ -273,9 +307,10 @@ acta EG010-FR02 retira las unidades del stock activo y conserva su historial.
 El historial presenta los estados En proceso y Completado, y permite retomar
 procesos y consultar o imprimir actas. Las unidades en eliminación quedan
 bloqueadas para otras salidas mientras continúe el proceso.
-Persistencia atómica mock en la misma pestaña, sin cambios de backend/login ni
-standalone; el adaptador OMOD nuevo está deshabilitado. Ver [Inventario](src/sections/inventory/README.md)
-para los contratos, límites de impresión y validación clínica pendiente.
+El modo mock conserva el avance en la pestaña. En modo API, el OMOD guarda el
+sello y el proceso de eliminación por unidad. Ver
+[Inventario](src/sections/inventory/README.md) para los contratos y límites de
+impresión.
 
 Los botones de imprimir acta/sellos usan el estilo azul `ghost` con icono y
 se sitúan en el pie izquierdo de Inventario, también en el detalle histórico.
@@ -318,11 +353,9 @@ muestra un aviso si falla la impresión.
   conserva la designación. `inventoryDisposalSignatories` suministra los
   valores iniciales. Cada acta conserva los nombres registrados durante el
   procedimiento.
-- El prototipo guarda estos valores en el navegador por UUID de ubicación
-  activa. Para continuar la parametrización, decidir con backend si se requiere
-  una tabla de configuración por banco y otra para la vigencia y el historial
-  de las designaciones, o reutilizar una estructura existente. La configuración
-  compartida necesita validación, permisos y auditoría de cambios en el servidor.
+- El modo mock guarda los valores en el navegador por UUID de ubicación.
+  El modo API usa `/ws/rest/v1/bloodbank/settings` para cargar y guardar la
+  configuración de la sede activa con control de revisión.
 
 Otros parámetros a evaluar son mínimos de stock desglosados por ABO/Rh,
 plazo de entrega de resultados y series documentales por banco. Los catálogos

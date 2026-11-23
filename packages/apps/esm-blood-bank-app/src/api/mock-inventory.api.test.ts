@@ -8,7 +8,6 @@ import {
   seedInventoryReadyUnits,
 } from '../sections/inventory/inventory-test-fixtures';
 import { reviewBatch } from '../sections/laboratory/fractionation/fractionation-test-fixtures';
-import { openmrsInventoryApi } from './inventory.api';
 import { mockBloodBankApi } from './mock-blood-bank.api';
 import { createMockFractionationApi, fractionationStore } from './mock-fractionation.api';
 import { createMockInventoryApi } from './mock-inventory.api';
@@ -289,10 +288,6 @@ describe('mock inventory state transitions and retained traceability', () => {
     await expect(bad.saveDisposalSelection(disposalOperation(units))).rejects.toThrow('STORAGE_FULL');
     await expect(bad.prepareSeal(sealOperation(units))).rejects.toThrow('STORAGE_FULL');
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
-  });
-  it('real adapters fail closed without making any write requests', async () => {
-    for (const action of Object.values(openmrsInventoryApi))
-      await expect(action({} as never)).rejects.toThrow('BACKEND_NOT_IMPLEMENTED');
   });
   it('adds three validated non-reactive and two reactive demo units, but rejects seals for reactive units', async () => {
     const units = (await api().list()).units.filter((unit) => unit.id.startsWith('BB-SELLO-DEMO-'));

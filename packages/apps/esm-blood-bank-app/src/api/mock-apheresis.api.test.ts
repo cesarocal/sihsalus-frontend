@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockApplicantSelectionApi } from './mock-applicant-selection.api';
 import { createMockProcessingApi } from './mock-blood-bank-processing.api';
 import { processingStorageKey, readProcessingState } from './mock-processing-store';
-import { openmrsScreeningApi } from './blood-bank-processing.api';
 import { applicationsMock } from '../mocks/applicant-selection.mock';
 import { localDateTime, screeningCategory } from '../sections/laboratory/screening/screening-rules';
 import { screeningResultsFixture } from '../sections/laboratory/screening/screening-test-fixtures';
@@ -126,15 +125,5 @@ describe('sample provenance and apheresis registration', () => {
     expect(screeningCategory(sample)).toBe('followUps');
     expect(sample.unitCode).toBe('');
     expect(sample.status).toBe('validated');
-  });
-  it('fails closed for every proposed real apheresis endpoint', async () => {
-    const candidate = (await fixture().api.listApheresisCandidates())[0];
-    for (const call of [
-      openmrsScreeningApi.listApheresisCandidates(),
-      openmrsScreeningApi.getApheresisDraft(),
-      openmrsScreeningApi.saveApheresisDraft(candidate, 0),
-      openmrsScreeningApi.registerApheresisSample({ candidate, revision: 1 }),
-    ])
-      await expect(call).rejects.toThrow('BACKEND_NOT_IMPLEMENTED');
   });
 });

@@ -20,7 +20,6 @@ import { createMockInventoryApi } from './mock-inventory.api';
 import { processingStorageKey, readProcessingState, writeProcessingState } from './mock-processing-store';
 import { createMockTransfersApi } from './mock-transfers.api';
 import { createMockTransfusionsApi } from './mock-transfusions.api';
-import { openmrsTransfusionsApi } from './transfusions.api';
 
 const unitCode = (number: number) => `BB-TX-DEMO-${String(number).padStart(3, '0')}`;
 async function readyStock() {
@@ -505,6 +504,8 @@ describe('regular transfusion attention and compatibility shared stock', () => {
     const stock = (await api.list()).units.find((unit) => unit.id === unitCode(1));
     if (!stock) throw new Error('MISSING_FIXTURE');
     expect(transfusionCandidate(stock, request)).toBe(true);
+    expect(transfusionCandidate({ ...stock, autologousRecipientUuid: request.order.patientId }, request)).toBe(true);
+    expect(transfusionCandidate({ ...stock, autologousRecipientUuid: 'other-patient' }, request)).toBe(false);
     expect(transfusionCandidate({ ...stock, collectedOn: '' }, request)).toBe(false);
     expect(transfusionCandidate({ ...stock, collectedOn: '2027-01-01' }, request)).toBe(false);
     expect(transfusionCandidate({ ...stock, expiresAt: '2026-10-15T12:00' }, request)).toBe(false);
@@ -651,15 +652,11 @@ describe('regular transfusion attention and compatibility shared stock', () => {
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
     expect((await createMockTransfusionsApi().list()).requests[0].status).toBe('testing');
   });
-  it('does not rewrite previous workflow data and disables all live operations', async () => {
+  it('does not rewrite previous mock workflow data when listing requests', async () => {
     const state = readProcessingState(() => sessionStorage);
     writeProcessingState(() => sessionStorage, state);
     const before = sessionStorage.getItem(processingStorageKey);
     await createMockTransfusionsApi().list();
     expect(sessionStorage.getItem(processingStorageKey)).toBe(before);
-    await expect(openmrsTransfusionsApi.list()).rejects.toThrow('TRANSFUSION_BACKEND_NOT_IMPLEMENTED');
-    await expect(openmrsTransfusionsApi.deliver('uuid', 1, {} as never)).rejects.toThrow(
-      'TRANSFUSION_BACKEND_NOT_IMPLEMENTED',
-    );
   });
 });

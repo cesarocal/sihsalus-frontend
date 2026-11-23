@@ -12,7 +12,6 @@ import {
 } from '../sections/laboratory/screening/screening-rules';
 import { screeningResultsFixture } from '../sections/laboratory/screening/screening-test-fixtures';
 import type { ScreeningRecord } from '../sections/laboratory/screening/screening.types';
-import { openmrsCollectionApi, openmrsScreeningApi } from './blood-bank-processing.api';
 
 async function collectionFixture() {
   const selection = createMockApplicantSelectionApi();
@@ -405,9 +404,5 @@ describe('collection and screening mock contracts', () => {
     }));
     await expect(failure.collection.saveCollection(record, 'label')).rejects.toThrow('STORAGE_FULL');
     expect(sessionStorage.getItem(processingStorageKey)).toBeNull();
-  });
-  it('fails closed when mock mode is disabled rather than inventing backend calls', async () => {
-    await expect(openmrsCollectionApi.listCollections()).rejects.toThrow('BACKEND_NOT_IMPLEMENTED');
-    await expect(openmrsScreeningApi.listScreenings()).rejects.toThrow('BACKEND_NOT_IMPLEMENTED');
   });
 });

@@ -1,6 +1,6 @@
 import { openmrsFetch } from '@openmrs/esm-framework';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { cmvIgGTestName } from '../sections/laboratory/screening/screening.types';
+import { cmvIgGConceptUuid, cmvIgGTestName } from '../sections/laboratory/screening/screening.types';
 import { createLaboratoryCatalogs } from './laboratory-catalogs.api';
 
 vi.mock('@openmrs/esm-framework', () => ({ openmrsFetch: vi.fn(), restBaseUrl: '/ws/rest/v1' }));
@@ -32,18 +32,23 @@ it('reads active OpenMRS members and rejects an unconfigured set without a reque
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/concept/temperatures'), { rejectOnAuthFailure: true });
 });
 
-it('accepts the specific CMV IgG test and excludes other CMV tests', async () => {
+it('loads the module-owned CMV IgG test by UUID', async () => {
   const catalogs = createLaboratoryCatalogs({});
   fetch.mockResolvedValue({
-    data: {
-      results: [
-        { uuid: 'igg', display: cmvIgGTestName, retired: false },
-        { uuid: 'igm', display: 'CMV IgM', retired: false },
-      ],
-    },
+    data: { uuid: cmvIgGConceptUuid, display: cmvIgGTestName, retired: false },
   } as Awaited<ReturnType<typeof openmrsFetch>>);
-  await expect(catalogs.listAdditionalTestConcepts()).resolves.toEqual([{ uuid: 'igg', display: cmvIgGTestName }]);
-  expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/concept?q='), { rejectOnAuthFailure: true });
+  await expect(catalogs.listAdditionalTestConcepts()).resolves.toEqual([
+    { uuid: cmvIgGConceptUuid, display: cmvIgGTestName },
+  ]);
+  expect(fetch).toHaveBeenCalledWith(expect.stringContaining(`/concept/${cmvIgGConceptUuid}?`), {
+    rejectOnAuthFailure: true,
+  });
   fetch.mockRejectedValue(new Error('expired session'));
   await expect(catalogs.listAdditionalTestConcepts()).rejects.toThrow('expired session');
+});
+
+it('rejects a different configured assay', async () => {
+  const catalogs = createLaboratoryCatalogs({ cmvIgGConceptUuid: 'wrong-cmv-igm' });
+  await expect(catalogs.listAdditionalTestConcepts()).rejects.toThrow('LABORATORY_CMV_IGG_CONFIG_INVALID');
+  expect(fetch).not.toHaveBeenCalled();
 });

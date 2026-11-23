@@ -86,6 +86,8 @@ export interface TransfusionAssignment {
 }
 export interface CompatibilityRound {
   id: string;
+  revision?: number;
+  readOnly?: boolean;
   createdAt: string;
   completedAt: string | null;
   labelsPrintRequestedAt?: string;
@@ -169,7 +171,9 @@ export interface TransfusionStore {
 }
 export type TransfusionReturnView = TransfusionReturn & { disposal?: { operationId: string; at: string } };
 
+export type TransfusionStockUnit = TransferUnit & { autologousRecipientUuid?: string };
+
 export interface TransfusionWorkspace extends TransfusionStore {
-  units: TransferUnit[];
+  units: TransfusionStockUnit[];
   returns?: TransfusionReturnView[];
 }

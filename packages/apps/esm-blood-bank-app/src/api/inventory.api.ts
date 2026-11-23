@@ -19,9 +19,9 @@ export interface InventoryApi {
   confirmSeal(operation: InventoryOperation, operator?: string): Promise<InventoryOperation>;
   dispose(operation: InventoryOperation): Promise<InventoryOperation>;
 }
-/** Proposed OMOD contracts: authorization, transactions and idempotency must be enforced server-side. */
 export const inventoryEndpoints = {
   inventory: '/ws/rest/v1/bloodbank/inventory',
+  disposalSignatories: '/ws/rest/v1/bloodbank/inventory/disposal-signatories',
   operations: '/ws/rest/v1/bloodbank/inventory/operations',
   draft: '/ws/rest/v1/bloodbank/inventory/operations/:uuid',
   disposalSelection: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/disposal-selection',
@@ -32,20 +32,44 @@ export const inventoryEndpoints = {
   confirmSeal: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/confirm-seal',
   dispose: '/ws/rest/v1/bloodbank/inventory/operations/:uuid/dispose',
 } as const;
-const unavailable = async (): Promise<never> => {
-  throw new Error('BACKEND_NOT_IMPLEMENTED');
-};
+
+async function request<T>(url: string, method = 'GET', body?: object): Promise<T> {
+  const { data } = await openmrsFetch<T>(url, {
+    method,
+    ...(body ? { headers: { 'Content-Type': 'application/json' }, body } : {}),
+    rejectOnAuthFailure: true,
+  });
+  return data;
+}
+
+function save(
+  operation: InventoryOperation,
+  endpoint: string,
+  action: string,
+  reprint?: QualitySealReprintRequest,
+) {
+  const body = { operation, ...(reprint ? { reprint } : {}) };
+  if (!operation.id) {
+    return request<InventoryOperation>(inventoryEndpoints.operations, 'POST', { ...body, action });
+  }
+  return request<InventoryOperation>(
+    endpoint.replace(':uuid', encodeURIComponent(operation.id)),
+    action === 'draft' ? 'PUT' : 'POST',
+    body,
+  );
+}
+
 export const openmrsInventoryApi: InventoryApi = {
-  list: unavailable,
-  getDisposalSignatories: unavailable,
-  saveDraft: unavailable,
-  saveDisposalSelection: unavailable,
-  saveDisposalDetails: unavailable,
-  prepareSeal: unavailable,
-  requestSealPrint: unavailable,
-  requestSealReprint: unavailable,
-  confirmSeal: unavailable,
-  dispose: unavailable,
+  list: () => request<InventoryWorkspace>(inventoryEndpoints.inventory),
+  getDisposalSignatories: () => request<DisposalSignatories>(inventoryEndpoints.disposalSignatories),
+  saveDraft: (operation) => save(operation, inventoryEndpoints.draft, 'draft'),
+  saveDisposalSelection: (operation) => save(operation, inventoryEndpoints.disposalSelection, 'disposal-selection'),
+  saveDisposalDetails: (operation) => save(operation, inventoryEndpoints.disposalDetails, 'disposal-details'),
+  prepareSeal: (operation) => save(operation, inventoryEndpoints.prepareSeal, 'prepare-seal'),
+  requestSealPrint: (operation) => save(operation, inventoryEndpoints.requestPrint, 'request-print'),
+  requestSealReprint: (operation, reprint) => save(operation, inventoryEndpoints.requestReprint, 'request-reprint', reprint),
+  confirmSeal: (operation) => save(operation, inventoryEndpoints.confirmSeal, 'confirm-seal'),
+  dispose: (operation) => save(operation, inventoryEndpoints.dispose, 'dispose'),
 };
 
 interface OpenmrsSignatoryPerson {

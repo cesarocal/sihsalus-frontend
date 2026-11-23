@@ -598,6 +598,62 @@ describe('laboratory summary and exact pending shortcuts', () => {
     expect(fractionation).toHaveBeenCalledTimes(1);
   });
   it.each([
+    { mode: 'focused', extraPrivileges: [] },
+    { mode: 'mosaic', extraPrivileges: [p.homeInventory] },
+  ])('uses the laboratory endpoint for the $mode compatibility summary', async ({ mode, extraPrivileges }) => {
+    grant(p.homeLaboratory, p.compatibility, ...extraPrivileges);
+    const request = await prepareCompatibilityRound();
+    const [writable] = request.rounds;
+    const readOnly = { ...writable, id: 'READ-ONLY-DEMO', readOnly: true };
+    const list = vi.fn(async () => [{ ...request, rounds: [writable, readOnly] }]);
+    const listTransfusions = vi.fn().mockRejectedValue(new Error('Missing transfusions privilege'));
+
+    render(
+      <MemoryRouter>
+        <DashboardPage
+          api={{
+            ...mockBloodBankApi,
+            transfusions: {
+              ...mockBloodBankApi.transfusions,
+              list: listTransfusions,
+              compatibility: { list, save: vi.fn(), communicate: vi.fn() },
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('link', { name: `${spanish.dashboard.compatibility}: 1` })).toBeInTheDocument();
+    if (mode === 'focused') {
+      const table = screen.getByRole('table', { name: spanish.dashboard.laboratoryPendingTitle });
+      expect(within(table).getByRole('link', { name: spanish.dashboard.compatibilityAction })).toHaveAttribute(
+        'href',
+        dashboardLink('/laboratory/compatibility', { round: writable.id }),
+      );
+    }
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(listTransfusions).not.toHaveBeenCalled();
+  });
+  it('does not consult the laboratory compatibility endpoint without the destination privilege', async () => {
+    grant(p.homeLaboratory, p.screening);
+    const list = vi.fn();
+    render(
+      <MemoryRouter>
+        <DashboardPage
+          api={{
+            ...mockBloodBankApi,
+            transfusions: {
+              ...mockBloodBankApi.transfusions,
+              compatibility: { list, save: vi.fn(), communicate: vi.fn() },
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+    await screen.findByRole('link', { name: new RegExp(`^${spanish.dashboard.donorSamples}:`) });
+    expect(list).not.toHaveBeenCalled();
+  });
+  it.each([
     p.screening,
     p.compatibility,
     p.fractionation,

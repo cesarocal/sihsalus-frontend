@@ -6,7 +6,7 @@ import {
   userHasAccess,
   useSession,
 } from '@openmrs/esm-framework';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bloodBankPrivileges } from './access/blood-bank-privileges';
@@ -53,6 +53,7 @@ const sessionAt = (uuid: string) =>
 describe('Blood Bank root', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.mocked(openmrsFetch).mockReset();
     mockUseLeftNav.mockClear();
     mockBloodBankApp.mockClear();
     mockBloodBankApp.mockReturnValue(<div>Blood Bank application</div>);
@@ -153,5 +154,36 @@ describe('Blood Bank root', () => {
       inventoryCardComponents: componentTypes,
       servicePersonUuid: 'service-person',
     });
+  });
+
+  it('loads and saves settings against the active site revision in real mode', async () => {
+    mockUseConfig.mockReturnValue({ enabled: true, useMockData: false, dashboardExpiryWarningDays: 9 });
+    const originalSettings = {
+      revision: 3,
+      expiryWarningDays: 14,
+      stockMinimums: { wholeBlood: 4 },
+      inventoryCardComponents: ['wholeBlood'],
+      servicePersonUuid: '',
+      epidemiologyPersonUuid: '',
+    };
+    vi.mocked(openmrsFetch).mockResolvedValueOnce({ data: originalSettings } as FetchResponse<unknown>);
+    render(<Root />);
+    await waitFor(() => expect(mockBloodBankApp.mock.lastCall?.[0].settings).toEqual(originalSettings));
+    expect(openmrsFetch).toHaveBeenCalledWith(
+      '/ws/rest/v1/bloodbank/settings?locationUuid=bank-a&defaultWarningDays=9',
+      expect.objectContaining({ rejectOnAuthFailure: true }),
+    );
+    const { settings, saveSettings } = mockBloodBankApp.mock.lastCall?.[0] ?? {};
+    if (!settings || !saveSettings) throw new Error('Missing settings editor');
+
+    const savedSettings = { ...originalSettings, revision: 4, expiryWarningDays: 25 };
+    vi.mocked(openmrsFetch).mockResolvedValueOnce({ data: savedSettings } as FetchResponse<unknown>);
+    await act(() => saveSettings({ ...settings, expiryWarningDays: 25 }));
+    expect(openmrsFetch).toHaveBeenLastCalledWith(
+      '/ws/rest/v1/bloodbank/settings?locationUuid=bank-a',
+      expect.objectContaining({ method: 'PUT', body: { ...originalSettings, expiryWarningDays: 25 } }),
+    );
+    expect(mockBloodBankApp.mock.lastCall?.[0].settings).toEqual(savedSettings);
+    expect(localStorage.length).toBe(0);
   });
 });

@@ -1,5 +1,3 @@
-import { usePaperConsent } from '../../consents/paper-consent.component';
-import { closesTransfusion, recipientConsentSubject } from '../../consents/paper-consent.resource';
 import { Button, Checkbox, InlineNotification, RadioButton, RadioButtonGroup, TextInput } from '@carbon/react';
 import { ArrowRight, Checkmark, Close, Printer } from '@carbon/react/icons';
 import { useSession } from '@openmrs/esm-framework';
@@ -10,11 +8,13 @@ import { printDocument } from '../../../shared/print-document';
 import { ProcessingModal } from '../../../shared/processing-modal.component';
 import type { ProcessingTranslate } from '../../../shared/processing-page.component';
 import { WarningConfirmation } from '../../../shared/warning-confirmation.component';
+import { usePaperConsent } from '../../consents/paper-consent.component';
+import { closesTransfusion, recipientConsentSubject } from '../../consents/paper-consent.resource';
 import { inventoryUnitSealCode } from '../../inventory/inventory-rules';
 import { transfusionBloodGroupLabel } from '../../transfusions/transfusion-blood-group';
 import {
-  compatibilityLabelPrintCss,
   CompatibilityReport,
+  compatibilityLabelPrintCss,
   TransfusionLabels,
 } from '../../transfusions/transfusion-print.component';
 import styles from '../../transfusions/transfusions.scss';
@@ -88,13 +88,14 @@ export function CompatibilityWorkflow({
     [t('txRecipientName'), order.patientName],
     [t('txSampleHistoryNumber'), round.sample.historyNumber],
   ];
-  if (afterDispatch)
+  if (afterDispatch && !api.compatibility)
     recipientFields.splice(1, 0, [t('txNonAnticoagulatedSample'), urgentSerumSampleCode(round.sample)]);
   const assignments = request.assignments.filter((item) => item.roundId === round.id);
   const labelsRequested = !!round.labelsPrintRequestedAt;
   const complete =
     labelsRequested &&
     !!operator &&
+    assignments.length > 0 &&
     round.identityVerified &&
     round.pretransfusionVerified &&
     Object.values(round.results).every(Boolean);
@@ -118,19 +119,24 @@ export function CompatibilityWorkflow({
           return false;
         }
       }
-      const result = communicating
-        ? await api.communicateCompatibility(request.id, request.revision, round.id, operator)
-        : await api.saveCompatibility(
-            request.id,
-            request.revision,
-            { ...round, operator: operator || round.operator },
-            finalize,
-          );
+      const result = api.compatibility
+        ? await (communicating
+            ? api.compatibility.communicate(request, round)
+            : api.compatibility.save(request, round, finalize))
+        : await (communicating
+            ? api.communicateCompatibility(request.id, request.revision, round.id, operator)
+            : api.saveCompatibility(
+                request.id,
+                request.revision,
+                { ...round, operator: operator || round.operator },
+                finalize,
+              ));
+      const savedRound = result.rounds.find((item) => item.id === round.id) ?? round;
       setRequest(result);
-      setRound(result.rounds.find((item) => item.id === round.id) ?? round);
+      setRound(savedRound);
       setDirty(false);
       onSaved();
-      if (result.revision !== request.revision)
+      if ((savedRound.revision ?? result.revision) !== (round.revision ?? request.revision))
         notifySuccess(
           t(communicating ? 'txCommunicationSaved' : finalize ? 'txCompatibilitySaved' : 'txCompatibilityDraftSaved'),
         );

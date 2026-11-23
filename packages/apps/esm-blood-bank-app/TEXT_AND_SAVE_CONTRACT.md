@@ -5,8 +5,9 @@
 Aplicación al ESM del contrato upstream
 [text-input-and-save-feedback](https://github.com/sihsalus/sihsalus-frontend/blob/4e4fb34d4b836767e629841e99582eb424a78559/docs/clinical/text-input-and-save-feedback.md),
 referenciado por `CONTRIBUTING.md` actualizado el 29 de septiembre de 2026.
-Solo cambia `esm-blood-bank-app`: no actualiza Yarn, componentes globales,
-roles, login ni backend. Los datos siguen siendo sintéticos.
+El contrato aplica al ESM y a sus adaptadores mock y OpenMRS. La integración con
+el OMOD depende de la configuración y los privilegios del entorno. Las pruebas
+usan datos de prueba.
 
 ## Contrato del lote de bolsa
 
@@ -61,11 +62,12 @@ no se cambian en este ajuste.
 - Cada aviso identifica la operación: creación/actualización de borrador,
   admisión, datos personales, examen físico, entrevista, precalificación,
   etiquetas, volumen, registro, constancia, recepción, resultados o validación.
-- Solo se anuncia éxito después de resolver la escritura mock. Las etapas
+- Solo se anuncia éxito después de resolver la escritura configurada. Las etapas
   intermedias no anuncian selección, extracción o tamizaje finalizados.
-- Los avisos dicen **en esta pestaña**: no implican una escritura en OpenMRS,
-  persistencia clínica, sincronización, uso offline durable ni envío de correo.
-  Recargar la misma pestaña conserva el mock; cerrar la pestaña puede perderlo.
+- Los avisos ya no afirman **en esta pestaña**: en modo mock se usa almacenamiento
+  de la pestaña y en modo API se guarda en el OMOD local. Ninguno de los dos
+  implica persistencia clínica completa, sincronización, uso offline durable
+  ni envío de correo. Cerrar la pestaña puede perder solo el avance mock.
 - La salida distingue `saved`, `unchanged`, `failed` y descarte. Un formulario
   guardado sin nueva edición se cierra sin escribir, incrementar su revisión
   ni emitir un aviso de éxito. Una ficha nueva todavía puede crear un borrador.
@@ -83,10 +85,11 @@ no se cambian en este ajuste.
   finalizar exige confirmación y registra salida/entradas en cuarentena de forma
   atómica. Una impresión no demuestra verificación física ni persistencia backend.
 
-Los adaptadores OpenMRS continúan deshabilitados. Antes de conectarlos deberán
-distinguir conflicto, rechazo e incertidumbre de un timeout, reconciliar el
-estado confirmado y garantizar idempotencia; no copiar una política de reintento
-ciego desde el mock.
+Los adaptadores de Selección, Extracción, Tamizaje y Fraccionamiento están activos
+solo cuando `useMockData=false`; los tres últimos requieren además un interruptor
+experimental en el OMOD. Los borradores conservan revisiones y las etapas
+confirmadas guardan los registros que corresponden a cada flujo. Ante un
+timeout, el cliente debe reconciliar el estado confirmado antes de reintentar.
 
 ## Regresiones y verificación
 
@@ -97,8 +100,9 @@ guardado al salir, errores seguros, creación/edición, cierre sin cambios y
 éxito de etapa frente a finalización.
 
 La evidencia de este ajuste debe ejecutarse contra el diff actual; las tablas
-históricas en otros README no lo validan. El E2E clínico integrado permanece
-pendiente: no hay contrato OMOD implementado para estas escrituras.
+históricas documentan versiones anteriores. Las pruebas con OMOD requieren un
+entorno coordinado de pruebas, permisos por sección y comprobación de los
+resultados después de recargar la pantalla.
 
 ### Evidencia local — 2026-10-03
 

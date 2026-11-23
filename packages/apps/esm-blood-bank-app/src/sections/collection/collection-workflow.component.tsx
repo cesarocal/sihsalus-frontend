@@ -172,26 +172,31 @@ export function CollectionWorkflow({
     setErrors(missing);
     setFailed('');
     if (missing.length) return;
-    if (checkingConsent && kind !== 'certificate') {
-      setSaving(true);
-      try {
-        if ((await consent.read())[0]?.decision !== 'granted') {
+    setSaving(true);
+    try {
+      let printable = record;
+      if (checkingConsent && kind !== 'certificate') {
+        const latest = (await consent.read())[0];
+        if (latest?.decision !== 'granted') {
           setFailed('collectionConsentRequired');
           return;
         }
-      } catch {
-        setFailed('collectionConsentRequired');
-        return;
-      } finally {
-        setSaving(false);
+        printable = { ...record, consentEncounterUuid: latest.uuid };
       }
-    }
-    try {
+      if (api.recordPrint) {
+        if (dirty || printable.id.startsWith('new-collection-') ||
+            printable.consentEncounterUuid !== record.consentEncounterUuid) {
+          printable = await api.saveCollection(printable);
+          setRecord(printable);
+          setDirty(false);
+        }
+        await api.recordPrint(printable.id, kind, crypto.randomUUID());
+      }
       printDocument(
         kind === 'certificate' ? (
-          <DonationCertificateDocument record={record} t={t} />
+          <DonationCertificateDocument record={printable} t={t} />
         ) : (
-          <CollectionLabelDocument record={record} t={t} sample={kind === 'sample'} print />
+          <CollectionLabelDocument record={printable} t={t} sample={kind === 'sample'} print />
         ),
         t(kind === 'certificate' ? 'printCertificate' : kind === 'sample' ? 'printSample' : 'printUnit'),
         () => setFailed('printFailed'),
@@ -199,6 +204,8 @@ export function CollectionWorkflow({
       );
     } catch {
       setFailed('printFailed');
+    } finally {
+      setSaving(false);
     }
   };
   const labelInput = (

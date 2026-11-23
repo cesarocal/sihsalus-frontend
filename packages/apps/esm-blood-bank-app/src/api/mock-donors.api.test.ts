@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { openmrsFetch } from '@openmrs/esm-framework';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockBloodBankApi } from './mock-blood-bank.api';
 import { openmrsDonorReadApi, donorEndpoints } from './donors.api';
 import { readProcessingState, writeProcessingState } from './mock-processing-store';
@@ -57,10 +58,16 @@ describe('donor read contracts', () => {
     expect(detail).not.toHaveProperty('qualification');
   });
 
-  it('documents encoded endpoints but does not issue real requests before the OMOD exists', async () => {
+  it('reads the donor detail and registry from the OMOD', async () => {
     expect(donorEndpoints.detail('DON/1')).toBe('/ws/rest/v1/bloodbank/donors/DON%2F1');
-    await expect(openmrsDonorReadApi.getDonorDetail('DON-0001')).rejects.toThrow('DONOR_BACKEND_NOT_IMPLEMENTED');
-    await expect(openmrsDonorReadApi.getDonorRegistry()).rejects.toThrow('DONOR_BACKEND_NOT_IMPLEMENTED');
+    const detail = await mockBloodBankApi.getDonorDetail('DON-0001');
+    const registry = detail.donations;
+    vi.mocked(openmrsFetch).mockResolvedValueOnce({ data: detail } as Awaited<ReturnType<typeof openmrsFetch>>);
+    vi.mocked(openmrsFetch).mockResolvedValueOnce({ data: registry } as Awaited<ReturnType<typeof openmrsFetch>>);
+    await expect(openmrsDonorReadApi.getDonorDetail('DON-0001')).resolves.toEqual(detail);
+    await expect(openmrsDonorReadApi.getDonorRegistry()).resolves.toEqual(registry);
+    expect(openmrsFetch).toHaveBeenCalledWith(donorEndpoints.detail('DON-0001'));
+    expect(openmrsFetch).toHaveBeenCalledWith(donorEndpoints.registry);
   });
 
   it('uses the same donor identities in Selection lookup and saves the prefilled draft without bypassing identity checks', async () => {

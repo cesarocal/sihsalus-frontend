@@ -435,7 +435,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     expect(dialog.queryByText('FR12-TEST')).not.toBeInTheDocument();
   });
 
-  it('records receipt and inspection from a cancelled dispatch detail', async () => {
+  it.each([true, false])('records receipt and inspection from a cancelled dispatch detail with demo mode %s', async (useMockData) => {
     consentConfig.enabled = true;
     const api = createMockTransfusionsApi();
     if (!api.prepareIssuedRequest) throw new Error('MISSING_ISSUED_WORKFLOW');
@@ -496,6 +496,15 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     const { bookEntries } = await api.list();
     const original = bookEntries.find(({ unitCode }) => unitCode === code(1));
     if (!original) throw new Error('MISSING_DISPATCH');
+    const receive = api.receiveReturnedUnit;
+    if (!useMockData && receive) {
+      vi.spyOn(api, 'receiveReturnedUnit').mockImplementation((detailId, consentUuid, receipt) => {
+        if (bookEntries.some(({ id, unitCode }) => id === detailId && unitCode === code(2))) {
+          return Promise.reject({ responseBody: { error: 'TRANSFUSION_RETURN_STARTED' } });
+        }
+        return receive(detailId, consentUuid, receipt);
+      });
+    }
     const dispatch = {
       uuid: 'dispatch-encounter',
       patient: issued.patient,
@@ -573,7 +582,7 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
             };
       return { data } as FetchResponse<unknown>;
     });
-    render(<TransfusionsPage api={api} orderConfig={fr08Config} />);
+    render(<TransfusionsPage api={api} orderConfig={fr08Config} useMockData={useMockData} />);
     const history = screen.getByRole('button', { name: t('txHistory') });
     await waitFor(() => expect(history).toBeEnabled());
     fireEvent.click(history);
@@ -1014,6 +1023,126 @@ describe('transfusion attention, sample pairing and dispatch UI', () => {
     page.unmount();
     render(<CompatibilityPage api={openmrsTransfusionsApi} />);
     expect(await screen.findByRole('button', { name: t('retry') })).toBeEnabled();
+  });
+  it('loads a stored OMOD round, saves each unit and refreshes it from the backend', async () => {
+    const { order } = (await createMockTransfusionsApi().list()).requests[0];
+    consentConfig.enabled = true;
+    const requestId = '247c1124-dfad-4f93-b55e-cb80fdbbec01';
+    const roundId = 'compat-round';
+    const patientUuid = 'acb3819b-2770-42ac-a2f8-ad26bb318d28';
+    const base = '/ws/rest/v1/bloodbank';
+    const at = '2026-11-16T15:30:00Z';
+    const endpoint = `${base}/transfusion-requests/${requestId}/compatibility/${roundId}`;
+    const nativeOrder = {
+      uuid: requestId,
+      orderNumber: 'TEST-FR08',
+      patient: { uuid: patientUuid },
+      encounter: { uuid: 'a86d436a-bd7b-4cdd-8e60-098f49fda89c' },
+      orderer: { display: 'Médico de prueba' },
+      concept: { uuid: 'fr08-concept' },
+      orderType: { uuid: 'fr08-type' },
+      dateActivated: at,
+      instructions: JSON.stringify({ format: 'EG05-FR08/v1', request: { ...order, priority: 'urgent' } }),
+    };
+    let stored = {
+      id: roundId,
+      requestId,
+      patientUuid,
+      revision: 8,
+      writable: true,
+      communicable: false,
+      createdAt: at,
+      completedAt: null as string | null,
+      labelsPrintRequestedAt: null as string | null,
+      identityVerified: false,
+      pretransfusionVerified: false,
+      operator: '',
+      sample: { code: 'REC-01', collectedAt: at, collectedBy: 'Operador de prueba' },
+      results: { 'UNIT-1': '', 'UNIT-2': '' },
+      tests: ['UNIT-1', 'UNIT-2'].map((unitCode, index) => ({
+        unitCode,
+        unitSampleCode: `SEG-${index + 1}`,
+        componentConceptUuid: '51e73781-e839-5973-aa5d-71205285447a',
+        componentDisplay: 'Glóbulos rojos',
+        groupConceptUuid: 'fe9c1d29-077d-4923-acc9-f49798b86b76',
+        rhConceptUuid: 'b4454bf6-5e67-4235-9507-6875d784656d',
+        result: 'pending',
+        resultAt: null,
+        testedBy: '',
+      })),
+      deliveredAt: null,
+    };
+    vi.mocked(openmrsFetch).mockImplementation(async (url, init) => {
+      if (url === `${base}/compatibility`) {
+        return {
+          data: [{ ...stored, id: 'history-round', revision: 2, writable: false, completedAt: at }, stored],
+        } as FetchResponse<unknown>;
+      }
+      if (String(url).startsWith(`/ws/rest/v1/order/${requestId}?`))
+        return { data: nativeOrder } as FetchResponse<unknown>;
+      if (String(url).startsWith('/ws/rest/v1/encounter?'))
+        return { data: { results: [] } } as FetchResponse<unknown>;
+      if (url === endpoint && init?.method === 'PUT') {
+        const payload = init.body as unknown as {
+          results: typeof stored.results;
+          labelsPrintRequestedAt: string;
+        };
+        stored = {
+          ...stored,
+          revision: 9,
+          completedAt: at,
+          writable: false,
+          identityVerified: true,
+          pretransfusionVerified: true,
+          labelsPrintRequestedAt: payload.labelsPrintRequestedAt,
+          results: payload.results,
+        };
+        return { data: stored } as FetchResponse<unknown>;
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const page = render(<CompatibilityPage api={openmrsTransfusionsApi} />);
+    fireEvent.click(await screen.findByRole('button', { name: t('txProcessTests') }));
+    expect(within(screen.getByRole('dialog')).getByText('REC-01')).toBeInTheDocument();
+    vi.mocked(printDocument).mockImplementationOnce((_content, _title, _onError, _css, onPrint) => onPrint?.());
+    fireEvent.click(screen.getByRole('button', { name: t('txPrintLabels') }));
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txLabIdentity') }));
+    fireEvent.click(screen.getByRole('checkbox', { name: t('txPretransfusionCheck') }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: `${t('txResult')} UNIT-1` })).getByRole('radio', {
+        name: t('txCompatible'),
+      }),
+    );
+    fireEvent.click(
+      within(screen.getByRole('group', { name: `${t('txResult')} UNIT-2` })).getByRole('radio', {
+        name: t('txIncompatible'),
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('txRegisterResults') }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: t('txConfirmResults') })).getByRole('button', { name: t('txConfirm') }),
+    );
+    await waitFor(() =>
+      expect(openmrsFetch).toHaveBeenCalledWith(
+        endpoint,
+        expect.objectContaining({
+          method: 'PUT',
+          body: {
+            revision: 8,
+            identityVerified: true,
+            pretransfusionVerified: true,
+            labelsPrintRequestedAt: expect.any(String),
+            results: { 'UNIT-1': 'compatible', 'UNIT-2': 'incompatible' },
+            finalize: true,
+          },
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: t('txProcessTests') })).not.toBeInTheDocument());
+    page.unmount();
+    render(<CompatibilityPage api={openmrsTransfusionsApi} />);
+    expect(await screen.findByRole('table', { name: t('txPendingTests') })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: t('txProcessTests') })).not.toBeInTheDocument();
   });
   it('opens the book independently, filters by component and delivery date, and prints history handover details', async () => {
     const { api, request } = await compatible();

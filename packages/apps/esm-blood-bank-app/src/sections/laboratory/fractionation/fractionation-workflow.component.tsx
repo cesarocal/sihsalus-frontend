@@ -132,7 +132,7 @@ export function FractionationWorkflow({
       setSaving(false);
     }
   };
-  const print = () => {
+  const print = async () => {
     setFailed('');
     const missing = validateFractionation(batch, 'fractionationLabels').filter(
       (key) => key !== 'fractionationVerifyLabels',
@@ -141,9 +141,30 @@ export function FractionationWorkflow({
       missing.push(...validateFractionation(batch, 'fractionationVolumes').filter((key) => !missing.includes(key)));
     setErrors(missing);
     if (missing.length) return;
+    let document = batch;
+    if (api.recordPrint && batch.canonical) {
+      setSaving(true);
+      try {
+        document = await api.save(batch);
+        setBatch(document);
+        setDirty(false);
+        onSaved();
+      } catch {
+        setFailed('fractionationSaveFailed');
+        return;
+      } finally {
+        setSaving(false);
+      }
+    }
+    const recordPrint = document.canonical ? api.recordPrint : undefined;
     try {
-      printDocument(<FractionationLabels batch={batch} print t={t} />, t('fractionationPrint'), () =>
-        setFailed('printFailed'),
+      const operationUuid = recordPrint ? crypto.randomUUID() : '';
+      printDocument(
+        <FractionationLabels batch={document} print showDemoMark={!document.canonical} t={t} />,
+        t('fractionationPrint'),
+        () => setFailed('printFailed'),
+        undefined,
+        recordPrint ? () => void recordPrint(document, operationUuid).catch(() => setFailed('fractionationSaveFailed')) : undefined,
       );
     } catch {
       setFailed('printFailed');
@@ -263,7 +284,7 @@ export function FractionationWorkflow({
           t={t}
           extraActions={
             (step === 1 || step === 3) && (
-              <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={print}>
+              <Button kind="ghost" renderIcon={Printer} disabled={saving} onClick={() => void print()}>
                 {t('fractionationPrint')}
               </Button>
             )

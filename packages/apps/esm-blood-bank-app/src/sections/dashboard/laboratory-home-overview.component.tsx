@@ -10,10 +10,11 @@ import {
   Tag,
 } from '@carbon/react';
 import { ArrowRight } from '@carbon/react/icons';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { bloodBankPrivileges as p } from '../../access/blood-bank-privileges';
 import type { BloodBankApi } from '../../api';
+import { listCompatibilityRequests } from '../../api/transfusions.api';
 import { useProcessingTranslation } from '../../shared/processing-page.component';
 import { componentDefinitions, eligibleSource } from '../laboratory/fractionation/fractionation-rules';
 import { screeningCategory, screeningOriginLabel } from '../laboratory/screening/screening-rules';
@@ -36,11 +37,12 @@ function ready<TData>(source: HomeSourceState<TData> | null) {
 
 export function LaboratoryHomeOverview({ api, t }: { api: BloodBankApi; t: (key: string) => string }) {
   const processingT = useProcessingTranslation();
+  const loadCompatibility = useCallback(() => listCompatibilityRequests(api.transfusions), [api.transfusions]);
   const [filter, setFilter] = useState<Filter>('all');
   return (
     <AuthorizedHomeSource privilege={p.screening} load={api.screening.listScreenings}>
       {(screenings) => (
-        <AuthorizedHomeSource privilege={p.compatibility} load={api.transfusions.list}>
+        <AuthorizedHomeSource privilege={p.compatibility} load={loadCompatibility}>
           {(compatibility) => (
             <AuthorizedHomeSource privilege={p.fractionation} load={api.fractionation.list}>
               {(fractionation) => {
@@ -51,7 +53,7 @@ export function LaboratoryHomeOverview({ api, t }: { api: BloodBankApi; t: (key:
                   .sort((a, b) => a.collectedOn.localeCompare(b.collectedOn));
                 const donors = samples.filter((record) => screeningCategory(record) === 'donors');
                 const followUps = samples.filter((record) => screeningCategory(record) === 'followUps');
-                const rounds = (ready(compatibility)?.requests ?? [])
+                const rounds = (ready(compatibility) ?? [])
                   .flatMap((request) => request.rounds.map((round) => ({ request, round })))
                   .filter(({ request, round }) => compatibilityPending(request, round))
                   .sort((a, b) =>

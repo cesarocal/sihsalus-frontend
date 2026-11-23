@@ -1,7 +1,7 @@
 import { openmrsFetch, restBaseUrl } from '@openmrs/esm-framework';
 import type { BloodBankConfig } from '../config-schema';
-import { cmvIgGTestName } from '../sections/laboratory/screening/screening.types';
-import { conceptFields, getActiveConceptSet, getConcept } from './collection-label-concepts.api';
+import { cmvIgGConceptUuid } from '../sections/laboratory/screening/screening.types';
+import { getActiveConceptSet, getConcept } from './collection-label-concepts.api';
 import type { FractionationApi, FractionationCatalogField } from './fractionation.api';
 
 type LaboratoryCatalogConfig = NonNullable<BloodBankConfig['laboratoryCatalogs']>;
@@ -18,23 +18,11 @@ export function createLaboratoryCatalogs(config: LaboratoryCatalogConfig, antico
     return getActiveConceptSet(uuid);
   };
   const listAdditionalTestConcepts = async () => {
-    if (config.cmvIgGConceptUuid) {
-      const { uuid, display } = await getConcept(config.cmvIgGConceptUuid);
-      return [{ uuid, display }];
+    if (config.cmvIgGConceptUuid?.trim() && config.cmvIgGConceptUuid.trim() !== cmvIgGConceptUuid) {
+      throw new Error('LABORATORY_CMV_IGG_CONFIG_INVALID');
     }
-    const query = new URLSearchParams({
-      q: cmvIgGTestName,
-      v: `custom:(${conceptFields})`,
-    });
-    const { data } = await openmrsFetch<{ results: { uuid: string; display: string; retired: boolean }[] }>(
-      `${restBaseUrl}/concept?${query}`,
-      { rejectOnAuthFailure: true },
-    );
-    const matches = data.results.filter(
-      ({ uuid, display, retired }) =>
-        uuid && retired === false && display?.trim().toLowerCase() === cmvIgGTestName.toLowerCase(),
-    );
-    return matches.length === 1 ? matches.map(({ uuid, display }) => ({ uuid, display })) : [];
+    const { uuid, display } = await getConcept(cmvIgGConceptUuid);
+    return [{ uuid, display }];
   };
   const getModifierLocation = config.modifierLocationUuid
     ? async () => {

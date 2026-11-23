@@ -2,6 +2,7 @@ import { formatListDate } from '../../../shared/format-list-date';
 import type { DashboardShortcut } from '../../dashboard/dashboard-shortcuts';
 import { Button, Checkbox, InlineNotification, Search, Select, SelectItem, Tag } from '@carbon/react';
 import { Fork, RecentlyViewed } from '@carbon/react/icons';
+import { useSession } from '@openmrs/esm-framework';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FractionationApi } from '../../../api/fractionation.api';
 import { notifySuccess } from '../../../shared/notify-success';
@@ -21,6 +22,7 @@ import styles from './fractionation.scss';
 
 export function FractionationPage({ api, shortcut }: { api: FractionationApi; shortcut?: DashboardShortcut }) {
   const t = useProcessingTranslation();
+  const { sessionLocation } = useSession();
   const load = useCallback(() => api.list(), [api]);
   const { data, loading, failed, reload } = useProcessingData(load);
   const [search, setSearch] = useState('');
@@ -82,7 +84,8 @@ export function FractionationPage({ api, shortcut }: { api: FractionationApi; sh
     setStarting(true);
     setStartFailed(false);
     try {
-      const batch = await api.start(sourceIds);
+      const locationUuid = api.modifierLocationUuid || sessionLocation?.uuid;
+      const batch = await (locationUuid ? api.start(sourceIds, locationUuid) : api.start(sourceIds));
       setActive(batch);
       resetSelection();
       reload();
@@ -298,6 +301,7 @@ export function FractionationPage({ api, shortcut }: { api: FractionationApi; sh
       {history && (
         <FractionationHistory
           batches={data?.batches ?? []}
+          recordPrint={api.recordPrint}
           loading={loading}
           failed={failed}
           reload={reload}

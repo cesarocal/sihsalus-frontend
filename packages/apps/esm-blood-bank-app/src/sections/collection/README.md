@@ -47,17 +47,23 @@ El panel proviene de los documentos entregados y necesita validación del protoc
 - `../../api/blood-bank-processing.api.ts`: `CollectionApi` y `ScreeningApi`; rutas propuestas `/ws/rest/v1/bloodbank/collections` y `/ws/rest/v1/bloodbank/screenings`.
 - `../../api/mock-{blood-bank-processing.api,processing-store}.ts`: persistencia y fixtures.
 
-`useMockData=false` muestra error seguro: los adaptadores reales están deshabilitados. Hay que acordar payloads, conceptos/UUIDs configurables, encuentros/órdenes, provider/ubicación y autorización por operación antes de implementar el OMOD.
+`useMockData=false` usa el adaptador del OMOD. El servidor exige
+`bloodbank.experimentalPersistenceEnabled=true`, el privilegio de Extracción,
+un proveedor y una ubicación activa. Los borradores conservan una revisión y las
+etapas confirmadas registran la extracción y su relación con la unidad o la
+muestra, según el flujo.
 
 En Tamizaje, el DDL de referencia aún requiere reactivo, marca y lote por prueba. La integración deberá definir el origen de esos datos. El formulario mock conserva esos valores y las observaciones de registros históricos en el almacenamiento local.
 
-El contrato propuesto para guardar una repetición es `/ws/rest/v1/bloodbank/screenings/:id/repeats`. El adaptador mock guarda las rondas junto a la muestra y verifica la revisión, las pruebas que corresponden y el estado de validación antes de guardar. El OMOD deberá asociar cada ronda a su informe de origen y conservar sus resultados e identidad del responsable de forma independiente.
+El adaptador OpenMRS guarda las repeticiones mediante
+`PUT /ws/rest/v1/bloodbank/screenings/:id/repeats`. El OMOD vincula cada ronda
+validada al informe de origen. El modo mock conserva las rondas por pestaña.
 
 ### Catálogos de etiqueta
 
 En la configuración del microfrontend, `collectionLabelConcepts.bloodBankServiceUuid` y `campaignServiceUuid` apuntan a **UPSS Banco de Sangre** y **Campaña de donación**. `collectionLabelConcepts.anticoagulantSetUuid` apunta al conjunto de anticoagulantes permitidos. La consulta usa `GET /ws/rest/v1/concept/{uuid}` con la sesión de OpenMRS y muestra los miembros activos del conjunto.
 
-Con guardado mock y los tres UUID vacíos, el flujo usa un catálogo de demostración. Al configurar los UUID se consulta OpenMRS y se permite reintentar ante un error. La selección conserva el UUID y el nombre para impresión. Los documentos guardados conservan su etiqueta. En borradores antiguos, el servicio requiere seleccionar un concepto antes de continuar.
+En modo mock, el flujo usa un catálogo de demostración. En modo API, consulta los UUID configurados en OpenMRS y permite reintentar ante un error. La selección conserva el UUID y el nombre para impresión. Los documentos guardados conservan su etiqueta. En borradores antiguos, el servicio requiere seleccionar un concepto antes de continuar.
 
 La muestra postextracción se genera como **Sangre** en **Tubo** en el mock, conservando los datos de muestras previas. El OMOD deberá asignar los conceptos de tipo y recipiente y acordar dónde persistir el texto de conservación, dado que el DDL propone una referencia a concepto para ese dato.
 

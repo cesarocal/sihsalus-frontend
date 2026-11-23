@@ -2,9 +2,9 @@
 
 ## Alcance
 
-Primera etapa navegable del Banco de Sangre, con datos mock. Selección termina al guardar la revisión; el flujo posterior vive en [Extracción](../collection/README.md) y Laboratorio / Tamizaje. No modifica roles, login ni componentes globales.
+Primera etapa navegable del Banco de Sangre, con modo mock por defecto y modo OMOD experimental. Selección termina al guardar la revisión; el flujo posterior vive en [Extracción](../collection/README.md) y Laboratorio / Tamizaje. No modifica roles, login ni componentes globales.
 
-Los mensajes distinguen creación/actualización del borrador y guardado de cada etapa; solo la revisión final anuncia selección o exclusión. Indican **en esta pestaña**, no en OpenMRS. Al salir de una postulación guardada sin nuevas ediciones, no se escribe ni se anuncia un guardado. Un error conserva los cambios en el formulario. Consulte el [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) para los límites aún pendientes y la evidencia del ajuste.
+Los mensajes distinguen creación/actualización del borrador y guardado de cada etapa; solo la revisión final anuncia selección o exclusión. No afirman un medio de persistencia específico, porque depende de `useMockData`. Al salir de una postulación guardada sin nuevas ediciones, no se escribe ni se anuncia un guardado. Un error conserva los cambios en el formulario. Consulte el [contrato de texto y guardado](../../../TEXT_AND_SAVE_CONTRACT.md) para los límites aún pendientes y la evidencia del ajuste.
 
 ## Organización
 
@@ -17,7 +17,7 @@ Los mensajes distinguen creación/actualización del borrador y guardado de cada
 - `selection-report.component.tsx`: resumen completo e impresión A4 aislada del shell, sin captura de firmas.
 - `selection.scss`: tokens Carbon/styleguide, grillas, tabla y estados UI.
 - `../../../translations/{es,en}.json`: textos de UI; `selection-messages.ts` aporta valores de respaldo mientras carga la traducción.
-- `../../api/applicant-selection.api.ts`: interfaz y rutas propuestas para la futura integración. Los adaptadores reales están deshabilitados.
+- `../../api/applicant-selection.api.ts`: interfaz y rutas activas del OMOD para admisión, etapas clínicas y decisión final. Los formularios clínicos todavía se guardan como borradores, no como observaciones codificadas.
 - `../../api/mock-applicant-selection.api.ts`: persistencia de prueba por pestaña, secuencia, control de versiones y bloqueo de etapas cerradas.
 - `../../mocks/applicant-selection.mock.ts`: perfiles y postulaciones ficticias.
 - `*.test.ts(x)` y `../../api/mock-applicant-selection.api.test.ts`: regresiones de formulario, reglas, estados y persistencia.

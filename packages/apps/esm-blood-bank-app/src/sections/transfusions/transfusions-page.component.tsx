@@ -32,7 +32,6 @@ import {
 import { IssuedTransfusionOrderDialog } from './issued-transfusion-order-dialog.component';
 import { transfusionBloodGroupLabel } from './transfusion-blood-group';
 import { TransfusionHistory } from './transfusion-history.component';
-import type { ReturnActions } from './transfusion-returns.component';
 import {
   configuredTransfusionOrders,
   type IssuedTransfusionOrder,
@@ -42,6 +41,7 @@ import {
   type TransfusionOrderConfig,
   transfusionOrdersChanged,
 } from './transfusion-order.resource';
+import type { ReturnActions } from './transfusion-returns.component';
 import { TransfusionWorkflow } from './transfusion-workflow.component';
 import styles from './transfusions.scss';
 import type { TransfusionBookEntry, TransfusionOrder, TransfusionRequest } from './transfusions.types';
@@ -97,7 +97,7 @@ export function TransfusionsPage({
   const { paperConsent } = useConfig<BloodBankConfig>();
   const configured = configuredTransfusionOrders(orderConfig) ? orderConfig : undefined;
   const readableConfig = authenticated && configured && userHasAccess(bankOrderRead, user) ? configured : undefined;
-  const loadWorkspace = useMockData || !configured;
+  const loadWorkspace = useMockData || Boolean(api.prepareIssuedRequest && readableConfig) || !configured;
   const verifyDelivery = Boolean(readableConfig && isLocalHemovigilance(useMockData));
   const load = useCallback(() => api.list(), [api]);
   const workspace = useProcessingData(load, loadWorkspace);
@@ -158,7 +158,7 @@ export function TransfusionsPage({
   const archiveUnavailable = loading || (!readableConfig && (!loadWorkspace || workspaceFailed));
   const issued = readableConfig && !ordersFailed ? (orders.data?.issued ?? []) : [];
   const canInvestigate = Boolean(
-    readableConfig && isLocalHemovigilance(useMockData) && userHasAccess(hemoPrivileges.bank, user),
+    readableConfig && (!useMockData || isLocalHemovigilance(useMockData)) && userHasAccess(hemoPrivileges.bank, user),
   );
   const issuedById = new Map(issued.map((item) => [item.order.id, item]));
   const requests = loadWorkspace && !workspaceFailed ? (workspace.data?.requests ?? []) : [];
@@ -182,9 +182,15 @@ export function TransfusionsPage({
   });
   const canEditOrders = Boolean(readableConfig && userHasAccess('Edit Orders', user));
   const returnOperator = transfusionOperatorName(session);
+  const canVerifyReturn = !useMockData || verifyDelivery;
   const verifyReturn = async (dispatch: TransfusionBookEntry, mustBeUnused: boolean) => {
     const order = issuedById.get(dispatch.requestId)?.order;
-    if (!order || !paperConsent || !verifyDelivery || !canEditOrders) throw new Error('TRANSFUSION_RETURN_CONTEXT');
+    if (!order || !paperConsent || !canVerifyReturn || !canEditOrders) throw new Error('TRANSFUSION_RETURN_CONTEXT');
+    if (!useMockData) {
+      const [latest] = await listConsent(paperConsent, recipientConsentSubject(order));
+      if (!latest || !closesTransfusion(latest.decision)) throw new Error('TRANSFUSION_RETURN_CONTEXT');
+      return latest;
+    }
     const [[latest], cases] = await Promise.all([
       listConsent(paperConsent, recipientConsentSubject(order)),
       listHemovigilance([order]),
@@ -203,7 +209,7 @@ export function TransfusionsPage({
   const receiveReturnedUnit = api.receiveReturnedUnit;
   const inspectReturnedUnit = api.inspectReturnedUnit;
   const returnActions: ReturnActions | undefined =
-    canEditOrders && verifyDelivery && paperConsent && returnOperator && receiveReturnedUnit && inspectReturnedUnit
+    canEditOrders && canVerifyReturn && paperConsent && returnOperator && receiveReturnedUnit && inspectReturnedUnit
       ? {
           operator: returnOperator,
           async receive(dispatch, receipt) {
@@ -240,7 +246,7 @@ export function TransfusionsPage({
           !paperConsent || !isClinicalUuid(item.order.id) || Boolean(orders.data?.consents?.has(item.order.id));
         const canReceive = canEditOrders && canCheckConsent && !closed && !item.stopped && !item.fulfillerStatus;
         const canPrepare = Boolean(
-          useMockData &&
+          (useMockData || canEditOrders) &&
             canCheckConsent &&
             !closed &&
             !workspaceFailed &&
@@ -328,7 +334,10 @@ export function TransfusionsPage({
         }
       }
       if (item.request) setActive(item.request);
-      else if (api.prepareIssuedRequest) setActive(await api.prepareIssuedRequest(item.order));
+      else if (api.prepareIssuedRequest) {
+        setActive(await api.prepareIssuedRequest(item.order));
+        reloadWorkspace();
+      }
     } catch {
       setPrepareFailed('txSaveFailed');
     } finally {
@@ -492,7 +501,7 @@ export function TransfusionsPage({
           onDelivered={verifyDelivery ? recordDemoDispatch : undefined}
           onSaved={() => {
             workspace.reload();
-            if (verifyDelivery) reloadOrders();
+            if (verifyDelivery || !useMockData) reloadOrders();
           }}
           onClose={() => {
             setActive(null);

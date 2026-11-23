@@ -6,10 +6,15 @@ import {
   type Dispatch,
   demoMetadata,
   type Fields,
+  type SavedSection,
   type Stage,
   type UnitCase,
   validStage,
 } from './hemovigilance';
+
+type ClinicalCase = Omit<UnitCase, 'order'> & { orderId: string; patientUuid: string };
+
+const clinicalResource = 'bloodbank/hemovigilance';
 
 type Ref = { uuid: string };
 type Event = {
@@ -37,6 +42,50 @@ const endpoint = (resource: string, params: Record<string, string>) =>
 
 export const isLocalHemovigilance = (useMockData: boolean) =>
   useMockData && ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+
+async function listClinicalCases(query: { patientUuid: string } | { scope: 'queue' }): Promise<UnitCase[]> {
+  const { data } = await openmrsFetch<ClinicalCase[]>(endpoint(clinicalResource, query), {
+    cache: 'no-store',
+    rejectOnAuthFailure: true,
+  });
+  const orders = new Map<string, Promise<TransfusionOrder>>();
+  return Promise.all(
+    data.map(async ({ orderId, patientUuid, dispatch, deliveryLocation, sections }) => {
+      if ('patientUuid' in query && query.patientUuid !== patientUuid) throw new Error('FR08_RECIPIENT_MISMATCH');
+      const key = `${orderId}/${patientUuid}`;
+      let order = orders.get(key);
+      if (!order) {
+        order = readLinkedFr08(orderId, patientUuid);
+        orders.set(key, order);
+      }
+      return { order: await order, dispatch, deliveryLocation, sections };
+    }),
+  );
+}
+
+export function listClinicalPatientHemovigilance(patientUuid: string) {
+  return listClinicalCases({ patientUuid });
+}
+
+export function listClinicalHemovigilanceQueue() {
+  return listClinicalCases({ scope: 'queue' });
+}
+
+export async function saveClinicalHemovigilance(unit: UnitCase, stage: Stage, fields: Fields): Promise<SavedSection> {
+  const { order, dispatch, sections } = unit;
+  const orderId = encodeURIComponent(order.id);
+  const unitCode = encodeURIComponent(dispatch.unitCode);
+  const { data } = await openmrsFetch<SavedSection>(
+    `${restBaseUrl}/${clinicalResource}/${orderId}/units/${unitCode}/${stage}`,
+    {
+      method: 'PUT',
+      rejectOnAuthFailure: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ previous: sections[stage]?.uuid ?? '', fields }),
+    },
+  );
+  return data;
+}
 
 export async function isHemovigilanceTestPatient(patientId: string) {
   const { data } = await openmrsFetch<{ person: { attributes: { attributeType: Ref; value: string }[] } }>(
@@ -162,6 +211,7 @@ export function hemovigilanceSaveError(error: unknown) {
   }
   const status = responseStatus(error);
   if (status === 401 || status === 403) return 'saveAccessDenied';
+  if (status === 409) return 'saveConflict';
   if (status === 400) return 'saveRejected';
   return 'saveFailed';
 }
