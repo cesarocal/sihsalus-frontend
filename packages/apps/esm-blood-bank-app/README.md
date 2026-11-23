@@ -55,8 +55,8 @@ El máximo de 500 unidades UTF-16 también se aplica a las observaciones de dete
   Requiere acceso a Transfusiones, edición de órdenes y lectura de los registros
   de consentimiento y conducción. El adaptador clínico de stock sigue pendiente.
 - La impresión del FR12 sigue la distribución del formato de PRONAHEBAS.
-  Para guardar una decisión en el FR12 se debe abrir primero la impresión
-  desde el formulario. El registro digital se vincula al FR08.
+  La impresión se habilita al guardar y muestra la decisión, la fecha y el
+  nombre del representante si corresponde. El registro digital se vincula al FR08.
 - Importar los CSV de [openmrs-config](openmrs-config) con Initializer en la
   distribución de OpenMRS. Los UUID por defecto están en `paperConsent` y se
   pueden configurar por entorno. Los autores necesitan un proveedor asociado,

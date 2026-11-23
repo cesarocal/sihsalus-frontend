@@ -688,15 +688,6 @@
   block-size: auto;
   border-block-start: 1px solid $ui-03;
   padding: 0;
-
-  :global(.cds--btn:not(.cds--skeleton)) {
-    flex: 0 0 auto;
-    align-items: center;
-    inline-size: auto;
-    min-inline-size: 0;
-    block-size: 2.5rem;
-    padding-block: 0;
-  }
 }
 
 .fr08Footer:global(.cds--modal-footer) {

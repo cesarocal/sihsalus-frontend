@@ -179,10 +179,7 @@ export function PaperConsentEditor({
   const session = useSession();
   const recipient = subject.kind === 'recipient';
   const privilege = recipient ? 'app:hoja.clinica.ordenes.editar' : bloodBankPrivileges.applicantSelection;
-  const subjectKey = `${subject.patientId}/${subject.id}/${subject.contextId}`;
-  const [printedSubject, setPrintedSubject] = useState<string>();
   const [printing, setPrinting] = useState(false);
-  const printVerified = !recipient || printedSubject === subjectKey;
   const provider = session.currentProvider?.uuid;
   const canEdit =
     session.authenticated &&
@@ -222,6 +219,8 @@ export function PaperConsentEditor({
           decidedAt: new Date(timestamp).toISOString(),
         }
       : undefined;
+  const savedDecision = query.latest;
+  const canPrint = !busy && !disabled && !printing && (!recipient || Boolean(savedDecision && !decision));
   const canSave =
     canEdit &&
     !disabled &&
@@ -230,7 +229,6 @@ export function PaperConsentEditor({
     !closed &&
     isClinicalUuid(provider) &&
     Boolean(query.metadata && query.records) &&
-    printVerified &&
     confirmed &&
     !!input &&
     validConsentInput(input, subject.kind) &&
@@ -248,7 +246,6 @@ export function PaperConsentEditor({
       await saveConsent(query.metadata, subject, input, provider, operation.current, query.latest?.uuid);
       if (recipient) window.dispatchEvent(new Event(recipientConsentChanged));
       await query.read();
-      setPrintedSubject(undefined);
       setFolio('');
       setDecision('');
       setDate(localDateTime());
@@ -272,26 +269,23 @@ export function PaperConsentEditor({
   };
   const title = `${consentFormat(subject.kind)} - ${t(subject.kind === 'donor' ? 'donorTitle' : 'recipientTitle')}`;
   const print = () => {
-    if (printing) return;
+    if (!canPrint) return;
     setError(undefined);
     const onError = () => {
       setPrinting(false);
       setError('printFailed');
     };
     try {
-      if (recipient) {
+      if (recipient && savedDecision) {
         setPrinting(true);
         printDocument(
-          <RecipientConsentDocument subject={subject} t={t} />,
+          <RecipientConsentDocument subject={subject} record={savedDecision} t={t} />,
           t('fr12Heading'),
           onError,
           recipientConsentPrintCss,
-          () => {
-            setPrintedSubject(subjectKey);
-            setPrinting(false);
-          },
+          () => setPrinting(false),
         );
-      } else {
+      } else if (!recipient) {
         printDocument(<DonorConsentDocument subject={subject} title={title} t={t} />, title, onError);
       }
     } catch {
@@ -301,11 +295,11 @@ export function PaperConsentEditor({
   const printButton = (
     <Button
       type="button"
-      size="sm"
+      size={recipient ? 'lg' : 'sm'}
       kind="tertiary"
       renderIcon={Printer}
       onClick={print}
-      disabled={busy || disabled || printing}
+      disabled={!canPrint}
     >
       {recipient ? t('printConsent') : `${t('print')} ${consentFormat(subject.kind)}`}
     </Button>
@@ -323,24 +317,19 @@ export function PaperConsentEditor({
               : 'confirmPaper',
       )}
       checked={confirmed}
-      disabled={recipient && (disabled || busy || printing || !query.records || !provider || !printVerified)}
+      disabled={recipient && (disabled || busy || !query.records || !provider || !decision)}
       onChange={(_event, { checked }) => setConfirmed(checked)}
     />
   );
   const saveButton = (
-    <Button type="button" size="sm" onClick={() => void save()} disabled={!canSave}>
+    <Button type="button" size={recipient ? 'lg' : 'sm'} onClick={() => void save()} disabled={!canSave}>
       {t('save')}
     </Button>
   );
   const recipientActions = canEdit && !query.missingContext && (
     <div className={styles.recipientActions}>
       {printButton}
-      {!closed && (
-        <div className={styles.confirmActions}>
-          {confirmation}
-          {saveButton}
-        </div>
-      )}
+      {saveButton}
     </div>
   );
 
@@ -441,7 +430,9 @@ export function PaperConsentEditor({
                   }}
                 />
               )}
-              {!recipient && (
+              {recipient ? (
+                <div className={styles.fullRow}>{confirmation}</div>
+              ) : (
                 <div className={styles.actions}>
                   {confirmation}
                   {saveButton}

@@ -1,5 +1,6 @@
+import { localDateTime } from '../laboratory/screening/screening-rules';
 import type { useConsentTranslation } from './paper-consent.component';
-import type { ConsentSubject } from './paper-consent.resource';
+import type { ConsentRecord, ConsentSubject } from './paper-consent.resource';
 
 export const recipientConsentPrintCss = `
   @page { size: A4; margin: 24mm 22mm 17mm; }
@@ -12,7 +13,7 @@ export const recipientConsentPrintCss = `
   .fr12-date { display: flex; align-items: center; gap: 2mm; margin: 14mm 0 7mm; }
   .fr12-digits { display: inline-flex; gap: .9mm; }
   .fr12-pair { display: inline-flex; }
-  .fr12-digit { display: inline-block; width: 4mm; height: 4mm; border: .25mm solid; }
+  .fr12-digit { display: inline-grid; place-items: center; width: 4mm; height: 4mm; border: .25mm solid; line-height: 1; }
   .fr12-digit + .fr12-digit { border-inline-start: 0; }
   table { width: 100%; border: .25mm solid; border-spacing: 0; table-layout: fixed; }
   td { height: 8.2mm; box-sizing: border-box; padding: 1mm 1.2mm; overflow-wrap: anywhere; }
@@ -30,12 +31,13 @@ export const recipientConsentPrintCss = `
   .fr12-decision { display: flex; flex-wrap: wrap; align-items: center; gap: 2mm; margin-top: 3mm; }
   .fr12-signatures { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10mm; margin: 10mm 4mm 0 8mm; break-inside: avoid; }
   .fr12-signature { margin: 0; border-top: .25mm solid; text-align: center; padding-top: 1mm; font-size: 8.5pt; }
+  .fr12-representative { display: block; margin-block-start: 1mm; overflow-wrap: anywhere; }
   .fr12-fingerprint { display: flex; align-items: center; gap: 2mm; font-size: 8pt; }
   .fr12-fingerprint-box { width: 31mm; height: 38mm; border: .25mm solid; }
   .fr12-clinician { width: 46%; margin: 31mm auto 0; break-inside: avoid; }
 `;
 
-function choice(label: string, selected = false) {
+function choice(label: string, selected: boolean) {
   return (
     <span className="fr12-choice">
       <span className="fr12-mark">{selected ? '×' : ''}</span>
@@ -46,11 +48,14 @@ function choice(label: string, selected = false) {
 
 export function RecipientConsentDocument({
   subject,
+  record,
   t,
 }: {
   subject: ConsentSubject;
+  record: ConsentRecord;
   t: ReturnType<typeof useConsentTranslation>;
 }) {
+  const [year, month, day] = localDateTime(new Date(record.decidedAt)).slice(0, 10).split('-');
   return (
     <article data-fr12>
       <header>
@@ -60,13 +65,19 @@ export function RecipientConsentDocument({
       </header>
       <div className="fr12-date">
         {t('fr12Date')}
-        <span className="fr12-digits" aria-hidden="true">
-          {['day', 'month', 'year'].map((part) => (
-            <span className="fr12-pair" key={part}>
-              <span className="fr12-digit" />
-              <span className="fr12-digit" />
-            </span>
-          ))}
+        <span className="fr12-digits">
+          <span className="fr12-pair">
+            <span className="fr12-digit">{day[0]}</span>
+            <span className="fr12-digit">{day[1]}</span>
+          </span>
+          <span className="fr12-pair">
+            <span className="fr12-digit">{month[0]}</span>
+            <span className="fr12-digit">{month[1]}</span>
+          </span>
+          <span className="fr12-pair">
+            <span className="fr12-digit">{year[2]}</span>
+            <span className="fr12-digit">{year[3]}</span>
+          </span>
         </span>
       </div>
       <section>
@@ -119,13 +130,16 @@ export function RecipientConsentDocument({
           {t('recipientDeclaration')} {t('freeDecision')}
         </p>
         <div className="fr12-decision">
-          {choice(t('fr12Accept'))}
-          {choice(t('fr12Decline'))}
-          {choice(t('fr12Revoke'))}
+          {choice(t('fr12Accept'), record.decision === 'granted')}
+          {choice(t('fr12Decline'), record.decision === 'declined')}
+          {choice(t('fr12Revoke'), record.decision === 'revoked')}
         </div>
       </section>
       <div className="fr12-signatures">
-        <p className="fr12-signature">{t('fr12RecipientSignature')}</p>
+        <p className="fr12-signature">
+          {t('fr12RecipientSignature')}
+          {record.signerRole === 'representative' && <strong className="fr12-representative">{record.signer}</strong>}
+        </p>
         <div className="fr12-fingerprint">
           {t('fr12Fingerprint')} <span className="fr12-fingerprint-box" aria-hidden="true" />
         </div>

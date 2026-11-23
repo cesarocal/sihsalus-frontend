@@ -1,10 +1,16 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { transfusionRequestsMock } from '../../mocks/transfusions.mock';
 import { printDocument } from '../../shared/print-document';
 import { PaperConsentEditor } from './paper-consent.component';
-import { type ConsentSubject, listConsent, recipientConsentSubject, saveConsent } from './paper-consent.resource';
+import {
+  type ConsentRecord,
+  type ConsentSubject,
+  listConsent,
+  recipientConsentSubject,
+  saveConsent,
+} from './paper-consent.resource';
 
 const metadata = vi.hoisted(() => ({ recipientEncounterTypeUuid: 'fr12' }));
 const provider = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -31,14 +37,27 @@ const recipient = recipientConsentSubject({
   sex: 'F',
 });
 
+const savedConsent: ConsentRecord = {
+  uuid: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  decision: 'granted',
+  decidedAt: new Date(2026, 10, 20, 15, 30).toISOString(),
+  recordedAt: new Date(2026, 10, 20, 15, 31).toISOString(),
+  signer: 'Carmen López Flores',
+  signerRole: 'representative',
+  provider,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listConsent).mockResolvedValue([]);
 });
 
-it('prints the FR12 layout with recipient demographics and leaves the paper decision unsigned', () => {
+it('prints the FR12 with the saved decision, signature date, and representative', async () => {
+  vi.mocked(listConsent).mockResolvedValue([savedConsent]);
   render(<PaperConsentEditor subject={recipient} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Imprimir consentimiento' }));
+  const print = screen.getByRole('button', { name: 'Imprimir consentimiento' });
+  await waitFor(() => expect(print).toBeEnabled());
+  fireEvent.click(print);
   const [content, title, , css] = vi.mocked(printDocument).mock.lastCall ?? [];
   const markup = renderToStaticMarkup(content);
 
@@ -50,11 +69,12 @@ it('prints the FR12 layout with recipient demographics and leaves the paper deci
   expect(markup).not.toContain(recipient.number);
   expect(markup).toContain('<span class="fr12-mark">×</span>Femenino');
   expect(markup).toContain('Huella digital');
-  expect(markup).toContain('Autorizo la transfusión');
-  expect(markup).toContain('Revoco mi consentimiento');
+  expect(markup).toContain('<span class="fr12-mark">×</span>Autorizo la transfusión');
+  expect(markup).toContain('<span class="fr12-mark"></span>Revoco mi consentimiento');
+  expect(markup).toContain('class="fr12-representative">Carmen López Flores');
   expect(markup).toContain('Firma y sello del médico solicitante');
   expect(markup).not.toMatch(/folio/i);
-  expect(markup.match(/class="fr12-digit"/g)).toHaveLength(6);
+  expect(Array.from(markup.matchAll(/class="fr12-digit">([0-9])</g), ([, digit]) => digit).join('')).toBe('201126');
 });
 
 it('preserves the original FR05 print when the subject is a prospective donor', () => {
@@ -70,7 +90,11 @@ it('preserves the original FR05 print when the subject is a prospective donor', 
   expect(markup).not.toContain('data-fr12');
 });
 
-it('keeps the FR12 save locked until printing is requested and the signature is verified', async () => {
+it('enables printing only after the FR12 decision is verified and saved', async () => {
+  vi.mocked(saveConsent).mockImplementationOnce(async () => {
+    vi.mocked(listConsent).mockResolvedValue([savedConsent]);
+    return savedConsent;
+  });
   render(<PaperConsentEditor subject={recipient} />);
   const formDecision = screen.getByRole('combobox', { name: 'Decisión' });
   await waitFor(() => expect(formDecision).toBeEnabled());
@@ -80,19 +104,12 @@ it('keeps the FR12 save locked until printing is requested and the signature is 
   expect(screen.getByLabelText('Fecha y hora de firma')).toBeEnabled();
   expect(screen.queryByLabelText(/folio/i)).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Actualizar estado' })).not.toBeInTheDocument();
-  expect(verify).toBeDisabled();
-  expect(save).toBeDisabled();
-
   const print = screen.getByRole('button', { name: 'Imprimir consentimiento' });
+  expect(verify).toBeEnabled();
+  expect(save).toBeDisabled();
+  expect(print).toBeDisabled();
   fireEvent.click(print);
-  expect(save).toBeDisabled();
-  // A failed print does not unlock verification or saving.
-  act(() => vi.mocked(printDocument).mock.lastCall?.[2]?.());
-  expect(verify).toBeDisabled();
-  expect(save).toBeDisabled();
-  fireEvent.click(print);
-  act(() => vi.mocked(printDocument).mock.lastCall?.[4]?.());
-  expect(save).toBeDisabled();
+  expect(printDocument).not.toHaveBeenCalled();
   fireEvent.click(verify);
   expect(save).toBeEnabled();
   fireEvent.click(save);
@@ -103,5 +120,8 @@ it('keeps the FR12 save locked until printing is requested and the signature is 
   expect(issuer).toBe(provider);
   expect(decision).toMatchObject({ decision: 'granted', signerRole: 'self' });
   expect(decision).not.toHaveProperty('folio');
-  await waitFor(() => expect(verify).toBeDisabled());
+  await waitFor(() => expect(print).toBeEnabled());
+  expect(verify).toBeDisabled();
+  fireEvent.change(formDecision, { target: { value: 'revoked' } });
+  expect(print).toBeDisabled();
 });
